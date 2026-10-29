@@ -188,7 +188,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {att.length > 12 && <p className="small"><Link href={qhref("review", "&over=1")}>See all in the Review Queue</Link></p>}
         </section>
         <section className="card">
-          <h2 style={{ display: "flex", alignItems: "center" }}>Why tasks get sent back<InfoTip>Each time a reviewer sends a task back, they pick a reason. A longer bar means it happened more often.</InfoTip></h2>
+          <h2 style={{ display: "flex", alignItems: "center" }}>Why tasks get sent back<InfoTip>ZoTask doesn&apos;t collect this today. This prototype adds one step: when a reviewer sends a task back, they pick a reason (Photo missing, Photo unclear, Wrong location and so on). A longer bar means it happened more often.</InfoTip><span className="pill b" style={{ marginLeft: 8 }}>New</span></h2>
           {!reasons.length && <p className="muted">No flags in this period.</p>}
           <div className="grid" style={{ gap: 8 }}>
             {reasons.map((r) => (
