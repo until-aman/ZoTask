@@ -41,9 +41,11 @@ function Health({ d }: { d: CC }) {
       </section>
       <section className="card score">
         <h3>Reviewers</h3>
-        <div className="kpis k3 k2">
+        <div className="kpis k3">
           <Tile label="Reviewed on time" def={{ means: "Reviewed tasks where every review was on time", calc: "In-time tasks ÷ tasks reviewed in the period", note: "SLA is set per task type, usually 24h from submission. Tasks still waiting are under Pending past SLA." }} k={v.inSla} band={[90, 75]} target="Target 90%+" unitNote="Every review was on time" />
           <TimeTile label="Usual review wait" t={v.median} band={[12, 24]} def={{ means: "Typical time a task waits for its review", calc: "Middle value, per task, of submission to the reviewer's decision", note: "Each task counted once." }} />
+          <Tile label="Missed reviews" k={v.missed} band={[2, 5]} goodUp={false} target="Target under 2%" unitNote="Not reviewed within the time limit"
+            def={{ means: "Submitted tasks not reviewed within the time limit, and still not reviewed", calc: "Missed reviews ÷ tasks submitted in the period", note: "Lower is better. Click to see the tasks." }} />
         </div>
         <div className="minis">
           <Mini label="Reviewed + waiting" k={v.requiring} def={{ means: "Tasks reviewed in the period plus tasks waiting now" }} />
@@ -52,7 +54,6 @@ function Health({ d }: { d: CC }) {
           <Mini label="Waiting for review" k={v.pending} def={{ means: "Submitted tasks waiting for review right now" }} />
           <Mini label="Waiting too long" k={v.over} tone="r" def={{ means: "Tasks waiting for review longer than the time limit", note: "These are in Action required." }} />
           <Mini label="Waiting for re-review" k={v.rereview} def={{ means: "Fixed and resubmitted, waiting for review" }} />
-          <Mini label="Review missed" k={v.missed} tone="r" of def={{ means: "Tasks from this period that were submitted but not reviewed within the time limit, and still aren't reviewed", note: "Base: tasks submitted in the period. Waiting too long also includes older tasks." }} />
         </div>
       </section>
       <section className="card outcome">
