@@ -7,11 +7,11 @@ import { InfoTip, N, Sec, Table, dur, fmtP, pct, rag, useDrill } from "./parts";
 
 type Pt = Record<string, number[][] | null> | null;
 const METRICS: { key: string; label: string; rate: boolean; goodUp: boolean; tip: string }[] = [
-  { key: "onTime", label: "On-time completion", rate: true, goodUp: true, tip: "Tasks submitted by the deadline ÷ tasks due that day" },
+  { key: "onTime", label: "On-time completion", rate: true, goodUp: true, tip: "Tasks submitted by the deadline ÷ tasks past deadline that day" },
   { key: "inSla", label: "Reviews within SLA", rate: true, goodUp: true, tip: "Tasks whose every check that day met its limit ÷ tasks checked that day" },
   { key: "fta", label: "First-time approval", rate: true, goodUp: true, tip: "Approved on the first check ÷ tasks checked at least once" },
-  { key: "approved", label: "Final approval", rate: true, goodUp: true, tip: "Tasks approved at any attempt ÷ tasks due" },
-  { key: "overdue", label: "Overdue or missed", rate: false, goodUp: false, tip: "Tasks due that day that are still open or were missed" },
+  { key: "approved", label: "Final approval", rate: true, goodUp: true, tip: "Tasks approved at any attempt ÷ tasks past deadline" },
+  { key: "overdue", label: "Overdue or missed", rate: false, goodUp: false, tip: "Tasks with a deadline that day that are still open or were missed" },
   { key: "backlog", label: "Review backlog", rate: false, goodUp: false, tip: "Submissions waiting for a check at the end of the day" },
   { key: "rejections", label: "Tasks sent back", rate: false, goodUp: false, tip: "Tasks sent back for changes that day" },
   { key: "repeatRate", label: "Repeat send-backs", rate: true, goodUp: false, tip: "Send-backs on a second or later attempt ÷ all send-backs that day" },
@@ -105,9 +105,9 @@ export function Lifecycle({ d }: { d: CC }) {
     </div>
   );
   return (
-    <Sec title="Task lifecycle" tip={<InfoTip title="Task lifecycle" rows={[["Counts", "Tasks due in the period, each counted once however many times it was checked"], ["%", "Share of the step before"], ["Time", "Median time for that step"], ["Stuck now", "All open tasks in the filters, any date"]]} />}
+    <Sec title="Task lifecycle" tip={<InfoTip title="Task lifecycle" rows={[["Counts", "Tasks past deadline in the period, each counted once however many times it was checked"], ["%", "Share of the step before"], ["Time", "Median time for that step"], ["Stuck now", "All open tasks in the filters, any date"]]} />}
       right={<span className="small">Final approval <b>{fmtP(pct(L.finalApproved.length, due))}</b> <span className="muted">({L.finalApproved.length} of {due})</span></span>}>
-      {!due ? <p className="muted">No tasks were due in this period.</p> : <>
+      {!due ? <p className="muted">No task deadlines passed in this period.</p> : <>
         <div className="stages">{L.stages.map((s, i) => <Row key={s.key} s={s} base={due} prevN={i ? L.stages[i - 1].ids.length : null} />)}</div>
         <div className="small muted" style={{ fontWeight: 700, marginTop: 4 }}>When a task is sent back</div>
         <div className="stages">{L.fix.map((s, i) => <Row key={s.key} s={s} base={due} prevN={i ? L.fix[i - 1].ids.length : L.stages[2].ids.length} />)}</div>
@@ -175,8 +175,8 @@ export function Compare({ d }: { d: CC }) {
         { key: "name", label: lvl === "city" ? "City" : "Cluster", sticky: true, value: (r) => r.name, render: (r) => <button type="button" className="link" style={{ padding: 0 }} onClick={() => go(r.name, r.city)}>{r.name}</button> },
         ...(lvl === "cluster" ? [{ key: "city", label: "City", value: (r: C) => r.city }] : []),
         { key: "props", label: "Properties", num: true, value: (r) => r.props },
-        { key: "due", label: "Tasks due", num: true, value: (r) => r.due.length, render: (r) => <N ids={r.due} title={`${r.name}: tasks due`} /> },
-        { key: "onTime", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks due"]]} />, value: (r) => r.onTime, render: (r) => <span className={`pill ${rag(r.onTime, 85, 70)}`}>{fmtP(r.onTime)}</span> },
+        { key: "due", label: "Past deadline", num: true, value: (r) => r.due.length, render: (r) => <N ids={r.due} title={`${r.name}: tasks past deadline`} /> },
+        { key: "onTime", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (r) => r.onTime, render: (r) => <span className={`pill ${rag(r.onTime, 85, 70)}`}>{fmtP(r.onTime)}</span> },
         { key: "dOn", label: "vs before", num: true, value: (r) => delta(r.onTime, r.onTimePrev), render: (r) => { const x = delta(r.onTime, r.onTimePrev); return x === null ? "—" : <span className={x >= 0 ? "t-g" : "t-r"}>{x > 0 ? "+" : ""}{x}</span>; } },
         { key: "missed", label: "Missed", num: true, value: (r) => r.missed.length, render: (r) => <N ids={r.missed} title={`${r.name}: missed`} /> },
         { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first check"], ["Formula", "Approved first time ÷ tasks checked"]]} />, value: (r) => r.fta, render: (r) => fmtP(r.fta) },

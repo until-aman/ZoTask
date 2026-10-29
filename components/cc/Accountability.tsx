@@ -30,7 +30,7 @@ export function Properties({ d, cbm, setCbm, issues }: { d: CC; cbm: string; set
           <span className="pickwrap">
             <button type="button" className="btn sm" onClick={() => setEditW(!editW)} aria-expanded={editW}>Risk weights</button>
             {editW && <div className="pop" style={{ width: 280 }}>
-              <div className="small muted" style={{ marginBottom: 6 }}>Risk is 0 to 100. Each input is a share of tasks (0 to 1), weighted below. Needs 3+ tasks due.</div>
+              <div className="small muted" style={{ marginBottom: 6 }}>Risk is 0 to 100. Each input is a share of tasks (0 to 1), weighted below. Needs 3+ tasks past deadline.</div>
               {(Object.keys(W0) as (keyof typeof W0)[]).map((k) => (
                 <label key={k} className="opt" style={{ justifyContent: "space-between" }}>{WL[k]}
                   <input type="number" min={0} max={100} value={w[k]} style={{ width: 64 }} onChange={(e) => setW({ ...w, [k]: Math.max(0, Number(e.target.value) || 0) })} aria-label={`${WL[k]} weight`} /></label>
@@ -50,12 +50,12 @@ export function Properties({ d, cbm, setCbm, issues }: { d: CC; cbm: string; set
           { key: "cbm", label: "CBM", value: (p) => p.cbm },
           { key: "risk", label: "Risk", num: true, value: (p) => riskOf(p, w), csv: (p) => riskOf(p, w),
             tip: <InfoTip title="Risk score (indicative)" rows={(Object.keys(W0) as (keyof typeof W0)[]).map((k) => [WL[k], `weight ${w[k]}`] as [string, string])} note="A pointer for where to look first, not a verdict on the property. Change the weights with Risk weights." />,
-            render: (p) => { const v = riskOf(p, w); return v === null ? <span className="small muted" title="Fewer than 3 tasks due">Not enough data</span> : <span className={`pill ${LV[level(v)]}`}>{v} · {level(v)}</span>; } },
-          { key: "due", label: "Due", num: true, value: (p) => p.due.length, render: (p) => <N ids={p.due} title={`${p.name}: tasks due`} /> },
-          { key: "onTime", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks due"]]} />, value: (p) => p.onTime, render: (p) => <span className={`pill ${rag(p.onTime, 85, 70)}`}>{fmtP(p.onTime)}</span> },
+            render: (p) => { const v = riskOf(p, w); return v === null ? <span className="small muted" title="Fewer than 3 tasks past deadline">Not enough data</span> : <span className={`pill ${LV[level(v)]}`}>{v} · {level(v)}</span>; } },
+          { key: "due", label: "Past deadline", num: true, value: (p) => p.due.length, render: (p) => <N ids={p.due} title={`${p.name}: tasks past deadline`} /> },
+          { key: "onTime", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (p) => p.onTime, render: (p) => <span className={`pill ${rag(p.onTime, 85, 70)}`}>{fmtP(p.onTime)}</span> },
           { key: "d", label: "vs before", num: true, value: delta, render: (p) => { const x = delta(p); return x === null ? "—" : <span className={x >= 0 ? "t-g" : "t-r"}>{x > 0 ? "+" : ""}{x}</span>; } },
           { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first check"], ["Formula", "Approved first time ÷ tasks checked"]]} />, value: (p) => p.fta, render: (p) => fmtP(p.fta) },
-          { key: "approved", label: "Final approval", num: true, tip: <InfoTip title="Final approval" rows={[["Means", "Approved at any attempt"], ["Formula", "Approved ÷ tasks due"]]} />, value: (p) => p.approved, render: (p) => fmtP(p.approved), hidden: true },
+          { key: "approved", label: "Final approval", num: true, tip: <InfoTip title="Final approval" rows={[["Means", "Approved at any attempt"], ["Formula", "Approved ÷ tasks past deadline"]]} />, value: (p) => p.approved, render: (p) => fmtP(p.approved), hidden: true },
           { key: "overdue", label: "Overdue open", num: true, tip: <InfoTip title="Overdue open" rows={[["Means", "Past deadline, not submitted, grace period running"], ["Formula", "Count of tasks"]]} />, value: (p) => p.overdue.length, render: (p) => <N ids={p.overdue} title={`${p.name}: overdue, still open`} /> },
           { key: "missed", label: "Missed", num: true, value: (p) => p.missed.length, render: (p) => <N ids={p.missed} title={`${p.name}: missed`} className={p.missed.length ? "t-r" : ""} /> },
           { key: "pending", label: "To review", num: true, value: (p) => p.pending.length, render: (p) => <N ids={p.pending} title={`${p.name}: waiting for review`} /> },
@@ -97,8 +97,8 @@ export function Cbms({ d, onPick }: { d: CC; onPick: (name: string) => void }) {
       <Table<C> name="CBMs" rows={d.cbms} rowKey={(c) => c.name} search={(c) => c.name} pageSize={20} cols={[
         { key: "name", label: "CBM", sticky: true, value: (c) => c.name, render: (c) => <button type="button" className="link" style={{ padding: 0 }} onClick={() => onPick(c.name)}>{c.name}</button> },
         { key: "props", label: "Properties", num: true, value: (c) => c.props },
-        { key: "due", label: "Tasks due", num: true, value: (c) => c.due.length, render: (c) => <N ids={c.due} title={`${c.name}: tasks due`} /> },
-        { key: "on", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks due"]]} />, value: (c) => c.onTime, render: (c) => <span className={`pill ${rag(c.onTime, 85, 70)}`}>{fmtP(c.onTime)}</span> },
+        { key: "due", label: "Past deadline", num: true, value: (c) => c.due.length, render: (c) => <N ids={c.due} title={`${c.name}: tasks past deadline`} /> },
+        { key: "on", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (c) => c.onTime, render: (c) => <span className={`pill ${rag(c.onTime, 85, 70)}`}>{fmtP(c.onTime)}</span> },
         { key: "missed", label: "Missed", num: true, value: (c) => c.missed.length, render: (c) => <N ids={c.missed} title={`${c.name}: missed`} /> },
         { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first check"], ["Formula", "Approved first time ÷ tasks checked"]]} />, value: (c) => c.fta, render: (c) => fmtP(c.fta) },
         { key: "rep", label: "Sent back 2+", num: true, value: (c) => c.repeat.length, render: (c) => <N ids={c.repeat} title={`${c.name}: repeated failures`} /> },

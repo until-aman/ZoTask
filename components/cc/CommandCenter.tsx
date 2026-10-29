@@ -26,13 +26,13 @@ function Health({ d }: { d: CC }) {
       <section className="card score">
         <h3>Ground team</h3>
         <div className="kpis k3">
-          <Tile label="On time" def={{ means: "Tasks submitted by their deadline", calc: "Submitted on time ÷ tasks due", note: "Due = deadline has passed. Cancelled tasks are left out." }} k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline" />
+          <Tile label="On time" def={{ means: "Tasks submitted by their deadline", calc: "Submitted on time ÷ tasks past deadline", note: "Cancelled tasks are left out." }} k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline" />
           <Tile label="First-time approval" def={{ means: "Tasks approved at their first check", calc: "Approved first time ÷ tasks checked at least once", note: "Tasks still waiting for a first check are left out." }} k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first check" />
-          <Tile label="Missed" def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks due", note: "Lower is better." }} k={g.missed} band={[5, 10]} goodUp={false} target="Target under 5%" unitNote="Never submitted" />
+          <Tile label="Missed" def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} k={g.missed} band={[5, 10]} goodUp={false} target="Target under 5%" unitNote="Never submitted" />
         </div>
         <div className="minis">
           <Mini label="Assigned" k={g.assigned} def={{ means: "All tasks scheduled in the period", note: "Cancelled tasks are left out." }} />
-          <Mini label="Due" k={g.due} def={{ means: "Assigned tasks whose deadline has passed", note: "This is the base for On time and Missed." }} />
+          <Mini label="Deadline passed" k={g.due} def={{ means: "Tasks whose deadline is over, whether done or not. Not a to-do count", note: "This is the base for On time and Missed. Still to do: Overdue, still open." }} />
           <Mini label="Late" k={g.late} tone="a" def={{ means: "Submitted, but after the deadline" }} />
           <Mini label="Overdue, still open" k={g.overdue} tone="a" def={{ means: "Past the deadline, not submitted, grace period still running", note: "These can still be saved today. Remind the owner." }} />
           <Mini label="Sent back" k={g.returned} def={{ means: "Tasks a reviewer sent back for changes at least once" }} />
@@ -56,15 +56,15 @@ function Health({ d }: { d: CC }) {
       </section>
       <section className="card outcome">
         <div className="row2">
-          <h3 style={{ margin: 0, display: "flex", alignItems: "center" }}>Outcome of {due} tasks due</h3>
+          <h3 style={{ margin: 0, display: "flex", alignItems: "center" }}>Outcome of {due} tasks past deadline</h3>
           <span className="spacer" />
           <span className="small" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>Approved at any attempt <b>{o.approved.rate ?? "—"}%</b>
-            <DefTip label="Approved at any attempt" def={{ means: "Due tasks that passed review, first time or after fixing", calc: "Approved ÷ tasks due", note: `Includes tasks now in audit. Recent tasks may still be in review, so this rises over the next days.${o.waived.n ? ` ${o.waived.n} cancelled tasks are not counted.` : ""}` }} k={o.approved} rate /> <Delta cur={o.approved.rate} prev={o.approved.prev} /></span>
+            <DefTip label="Approved at any attempt" def={{ means: "Tasks past deadline that passed review, first time or after fixing", calc: "Approved ÷ tasks past deadline", note: `Includes tasks now in audit. Recent tasks may still be in review, so this rises over the next days.${o.waived.n ? ` ${o.waived.n} cancelled tasks are not counted.` : ""}` }} k={o.approved} rate /> <Delta cur={o.approved.rate} prev={o.approved.prev} /></span>
         </div>
-        <div className="bar big" aria-label="Outcome of tasks due">{parts.map(([l, k, c]) => <i key={l} title={`${l}: ${k.n}`} style={{ width: `${due ? (k.n / due) * 100 : 0}%`, background: c }} />)}</div>
+        <div className="bar big" aria-label="Outcome of tasks past deadline">{parts.map(([l, k, c]) => <i key={l} title={`${l}: ${k.n}`} style={{ width: `${due ? (k.n / due) * 100 : 0}%`, background: c }} />)}</div>
         <div className="legend">{parts.map(([l, k, c, m]) => (
           <span key={l} className="lgw"><button type="button" className="lg" disabled={!k.n} onClick={() => open({ title: l, ids: k.ids })}><b style={{ color: c }}>●</b> {l} <b>{k.n}</b> <span className="muted">{k.rate ?? 0}%</span></button>
-            <DefTip label={l} def={{ means: m, calc: `${l} ÷ tasks due` }} k={k} rate /></span>
+            <DefTip label={l} def={{ means: m, calc: `${l} ÷ tasks past deadline` }} k={k} rate /></span>
         ))}</div>
       </section>
     </div>

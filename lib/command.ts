@@ -308,7 +308,7 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
   const ids = (xs: Row[]) => xs.map((r) => r.id);
   const lifecycle = {
     stages: [
-      { key: "due", label: "Due", ids: gC.due },
+      { key: "due", label: "Deadline passed", ids: gC.due },
       { key: "sub", label: "Submitted", ids: ids(submitted), time: quant(submitted.map((r) => r.first_submitted_at! - r.window_start_at), 0.5), timeLabel: "to submit" },
       { key: "rev", label: "Reviewed", ids: ids(reviewedT), time: quant(reviewedT.map((r) => firstCheck.get(r.id)).filter((x): x is number => x !== undefined), 0.5), timeLabel: "to first check" },
       { key: "fta", label: "Approved first time", ids: gC.fta },
