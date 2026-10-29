@@ -226,7 +226,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </table></div>
       </section>
 
-      <div className="grid g2">
+      <div className="grid">
         <section>
           <h2>Reviewers</h2>
           <div className="tbl"><table>
