@@ -6,16 +6,17 @@ import { geo, Row } from "@/lib/queries";
 import * as M from "@/lib/metrics";
 import { HOUR, fmtDate, isoDate } from "@/lib/time";
 import RemindAll from "@/components/RemindAll";
+import InfoTip from "@/components/InfoTip";
 
 type SP = Record<string, string | undefined>;
 const PRESETS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], ["7d", "7 days"], ["14d", "14 days"], ["30d", "30 days"]];
 
 function Delta({ cur, prev, goodUp = true, unit = " pts" }: { cur: number | null; prev: number | null; goodUp?: boolean; unit?: string }) {
-  if (cur === null || prev === null) return <span className="d flat">Nothing to compare with yet</span>;
+  if (cur === null || prev === null) return <span className="d flat">—</span>;
   const d = Math.round((cur - prev) * 10) / 10;
-  if (Math.abs(d) < 0.5) return <span className="d flat">→ Same as before</span>;
+  if (Math.abs(d) < 0.5) return <span className="d flat">→ no change</span>;
   const good = goodUp ? d > 0 : d < 0;
-  return <span className={`d ${good ? "up" : "down"}`}>{good ? "▲ Better" : "▼ Worse"} than before by {Math.abs(d)}{unit === " pts" ? "%" : unit}</span>;
+  return <span className={`d ${good ? "up" : "down"}`} title="Compared with the same number of days just before">{d > 0 ? "▲" : "▼"} {Math.abs(d)}{unit === " pts" ? " pts" : unit}</span>;
 }
 const rag = (v: number | null, g: number, a: number, lowerBetter = false) =>
   v === null ? "" : lowerBetter ? (v <= g ? "g" : v <= a ? "a" : "r") : v >= g ? "g" : v >= a ? "a" : "r";
@@ -105,47 +106,45 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         {(sp.city || sp.cluster || sp.prop) && <Link className="link small" href={self({ city: undefined, cluster: undefined, prop: undefined })}>Clear</Link>}
       </form>
 
-      <p className="small muted" style={{ margin: 0 }}>The dot on each number: <b style={{ color: "var(--green)" }}>● green</b> is good, <b style={{ color: "var(--amber)" }}>● amber</b> needs watching, <b style={{ color: "var(--red)" }}>● red</b> needs help now. “Before” means the same number of days just before these dates. Click any number to see the tasks behind it.</p>
       <div className="grid g3">
         <section className="card score">
-          <div><h3>1 · Did the property team do their jobs?</h3><p className="small muted" style={{ margin: 0 }}>Looking at the {E.due} tasks whose deadline has already passed</p></div>
+          <h3>Property team<InfoTip>Tasks whose deadline has passed ({E.due}). <b>On time</b>: finished before the deadline. <b>Right first time</b>: approved without being sent back. The dot is green when good, amber to watch, red when it needs help.</InfoTip></h3>
           <div className="kpis">
             <Link className="kpi" href={qhref("done")}><span className={`rag ${rag(E.onTimeRate, 85, 70)}`} />
-              <div className="lab">Done on time</div><div className="v">{fmtP(E.onTimeRate)}</div><div className="sub">{E.onTime} of {E.due} tasks were finished before the deadline</div><Delta cur={E.onTimeRate} prev={Ep.onTimeRate} /></Link>
+              <div className="lab">On time</div><div className="v">{fmtP(E.onTimeRate)}<small>{E.onTime}/{E.due}</small></div><Delta cur={E.onTimeRate} prev={Ep.onTimeRate} /></Link>
             <Link className="kpi" href={qhref("changes")}><span className={`rag ${rag(E.fpaRate, 80, 65)}`} />
-              <div className="lab">Done right the first time</div><div className="v">{fmtP(E.fpaRate)}</div><div className="sub">{E.fpa} of {E.decided} checked tasks were approved without being sent back</div><Delta cur={E.fpaRate} prev={Ep.fpaRate} /></Link>
+              <div className="lab">Right first time</div><div className="v">{fmtP(E.fpaRate)}<small>{E.fpa}/{E.decided}</small></div><Delta cur={E.fpaRate} prev={Ep.fpaRate} /></Link>
           </div>
           <div>
-            <div className="bar" title="On time, late, still open, missed">
+            <div className="bar" aria-label="On time, late, still open, never done">
               {[[E.onTime, "var(--green)"], [E.late, "var(--amber)"], [E.open, "var(--blue)"], [E.missed, "var(--red)"]].map(([n, c], i) => <i key={i} style={{ width: `${E.due ? ((n as number) / E.due) * 100 : 0}%`, background: c as string }} />)}
             </div>
-            <div className="row2 small" style={{ marginTop: 6, gap: 12 }}>
-              <span><b style={{ color: "var(--green)" }}>●</b> On time {E.onTime}</span><span><b style={{ color: "var(--amber)" }}>●</b> Done late {E.late}</span>
-              <Link href={qhref("notsub")}><b style={{ color: "var(--blue)" }}>●</b> Late, still possible {E.open}</Link><Link href={qhref("missed")}><b style={{ color: "var(--red)" }}>●</b> Never done {E.missed}</Link>
-              {E.waived ? <Link href={qhref("waived")} className="muted">{E.waived} cancelled, not counted</Link> : null}
+            <div className="legend">
+              <span><b style={{ color: "var(--green)" }}>●</b> On time {E.onTime}</span><span><b style={{ color: "var(--amber)" }}>●</b> Late {E.late}</span>
+              <Link href={qhref("notsub")}><b style={{ color: "var(--blue)" }}>●</b> Still open {E.open}</Link><Link href={qhref("missed")}><b style={{ color: "var(--red)" }}>●</b> Missed {E.missed}</Link>
             </div>
           </div>
         </section>
         <section className="card score">
-          <div><h3>2 · Did reviewers check the work quickly?</h3><p className="small muted" style={{ margin: 0 }}>Reviewers checked {V.unique} tasks · {V.pending} are waiting for a check right now</p></div>
+          <h3>Reviewers<InfoTip><b>In time</b>: checks done within each task&apos;s time limit, counting tasks still waiting past the limit as late. <b>Usual wait</b>: half of tasks were checked faster than this. {V.audits ? `Auditors re-checked ${V.audits} approved tasks and found problems in ${V.auditFails}.` : ""}</InfoTip></h3>
           <div className="kpis">
             <Link className="kpi" href={`/queue?tab=review&over=1&from=${M.isoDate(now - 60 * 864e5)}&to=${today}${loc ? "&" + loc : ""}`}><span className={`rag ${rag(V.slaRate, 90, 75)}`} />
-              <div className="lab">Checked in time</div><div className="v">{fmtP(V.slaRate)}</div><div className="sub">{V.onTime} checks were in time; {V.decisions - V.onTime} were late and {V.pendingOver} are still waiting past the limit</div><Delta cur={V.slaRate} prev={Vp.slaRate} /></Link>
-            <div className="kpi"><div className="lab">Usual wait for a check</div><div className="v">{hrs(V.medianTat)}</div><div className="sub">Half of all tasks were checked faster than this</div>
+              <div className="lab">Checked in time</div><div className="v">{fmtP(V.slaRate)}<small>{V.onTime}/{V.decisions + V.pendingOver}</small></div><Delta cur={V.slaRate} prev={Vp.slaRate} /></Link>
+            <div className="kpi"><div className="lab">Usual wait</div><div className="v">{hrs(V.medianTat)}</div>
               <Delta cur={V.medianTat === null ? null : V.medianTat / HOUR} prev={Vp.medianTat === null ? null : Vp.medianTat / HOUR} goodUp={false} unit="h" /></div>
           </div>
-          <p className="small muted" style={{ margin: 0 }}>Second check: {V.audits ? `auditors re-checked ${V.audits} approved tasks and found problems in ${V.auditFails} (${Math.round((V.auditFails / V.audits) * 100)}%)` : "auditors didn't re-check any tasks in these dates"}</p>
+          <div className="legend"><span>{V.pending} waiting now</span>{V.pendingOver ? <span style={{ color: "var(--red)" }}>{V.pendingOver} overdue</span> : null}</div>
         </section>
         <section className="card score">
-          <div><h3>3 · How did tasks end up?</h3><p className="small muted" style={{ margin: 0 }}>Where each task with a passed deadline finished</p></div>
+          <h3>Outcome<InfoTip><b>Approved</b>: tasks fully done and approved. The rest are still being checked or fixed, or were missed. <b>Missed</b>: never done at all, lower is better. {E.waived ? `${E.waived} cancelled tasks aren't counted.` : ""}</InfoTip></h3>
           <div className="kpis">
             <Link className="kpi" href={qhref("done")}><span className={`rag ${rag(E.verifiedRate, 80, 65)}`} />
-              <div className="lab">Fully approved</div><div className="v">{fmtP(E.verifiedRate)}</div><div className="sub">{E.verified} of {E.due} tasks are done and approved. The rest are still being checked or fixed, or were never done</div><Delta cur={E.verifiedRate} prev={Ep.verifiedRate} /></Link>
+              <div className="lab">Approved</div><div className="v">{fmtP(E.verifiedRate)}<small>{E.verified}/{E.due}</small></div><Delta cur={E.verifiedRate} prev={Ep.verifiedRate} /></Link>
             <Link className="kpi" href={qhref("missed")}><span className={`rag ${rag(E.missedRate, 5, 10, true)}`} />
-              <div className="lab">Never done</div><div className="v">{fmtP(E.missedRate)}</div><div className="sub">{E.missed} of {E.due} tasks were skipped completely. Lower is better</div><Delta cur={E.missedRate} prev={Ep.missedRate} goodUp={false} /></Link>
+              <div className="lab">Missed</div><div className="v">{fmtP(E.missedRate)}<small>{E.missed}/{E.due}</small></div><Delta cur={E.missedRate} prev={Ep.missedRate} goodUp={false} /></Link>
           </div>
           <div className="row2">
-            <Link href={`/queue?tab=notsub&from=${M.isoDate(now - 14 * 864e5)}&to=${today}${loc ? "&" + loc : ""}`}><b>{recoverable.length}</b> late tasks can still be done today</Link>
+            <Link href={`/queue?tab=notsub&from=${M.isoDate(now - 14 * 864e5)}&to=${today}${loc ? "&" + loc : ""}`} className="small"><b>{recoverable.length}</b> late, still fixable today</Link>
             <span className="spacer" />
             {recoverable.length > 0 && <RemindAll ids={recoverable.map((r) => r.id)} />}
           </div>
@@ -154,7 +153,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <div className="grid g2">
         <section className="card">
-          <div className="row2"><h2 style={{ margin: 0 }}>Fix these first</h2><span className="spacer" /><span className="small muted">{att.length} problems, most serious and oldest at the top</span></div>
+          <div className="row2"><h2 style={{ margin: 0, display: "flex", alignItems: "center" }}>Fix these first<InfoTip>Problems ranked by how serious and how old they are. Each one names who needs to act. Click to open the task.</InfoTip></h2><span className="spacer" /><span className="pill">{att.length}</span></div>
           {!att.length && <p className="muted">Nothing is overdue. Good day.</p>}
           {att.slice(0, 12).map((a, i) => (
             <Link key={i} href={a.href} className="att" style={{ color: "var(--fg)" }}>
@@ -166,8 +165,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {att.length > 12 && <p className="small"><Link href={qhref("review", "&over=1")}>See all in the Review Queue</Link></p>}
         </section>
         <section className="card">
-          <h2>Why tasks get sent back</h2>
-          <p className="small muted" style={{ marginTop: -4 }}>Each time a reviewer sends a task back, they pick a reason. Longer bar = happened more often</p>
+          <h2 style={{ display: "flex", alignItems: "center" }}>Why tasks get sent back<InfoTip>Each time a reviewer sends a task back, they pick a reason. A longer bar means it happened more often.</InfoTip></h2>
           {!reasons.length && <p className="muted">No flags in this period.</p>}
           <div className="grid" style={{ gap: 8 }}>
             {reasons.map((r) => (
@@ -182,9 +180,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </div>
 
       <section>
-        <div className="row2" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>Properties, the ones needing most help first</h2><span className="spacer" /><span className="small muted">Click a property to see its tasks</span></div>
+        <div className="row2" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>Properties</h2><span className="spacer" /><span className="small muted">Weakest first</span></div>
         <div className="tbl"><table>
-          <thead><tr><th>Property</th><th>City · Area</th><th>Manager (CBM)</th><th className="n">Tasks due</th><th className="n">Done on time</th><th className="n">Change</th><th className="n">Right first time</th><th className="n">Never done</th><th className="n">Waiting for a check</th><th>On time, day by day</th></tr></thead>
+          <thead><tr><th>Property</th><th>City · Area</th><th>Manager (CBM)</th><th className="n">Tasks due</th><th className="n">Done on time</th><th className="n">Change</th><th className="n">Right first time</th><th className="n">Never done</th><th className="n">To check</th><th>Trend</th></tr></thead>
           <tbody>{propRows.map(({ g, e, ep, pending, spark, cbm }) => {
             const pq = `&prop=${encodeURIComponent(g.property)}`;
             const d = e.onTimeRate !== null && ep.onTimeRate !== null ? Math.round(e.onTimeRate - ep.onTimeRate) : null;
@@ -209,7 +207,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <section>
           <h2>Reviewers</h2>
           <div className="tbl"><table>
-            <thead><tr><th>Reviewer</th><th className="n">Checks done</th><th className="n">Checked in time</th><th className="n">Usual wait</th><th className="n">Waiting now</th><th className="n">Waiting too long</th><th className="n">Approved, then reopened</th><th className="n">Auditor found problems</th></tr></thead>
+            <thead><tr><th>Reviewer</th><th className="n">Checks</th><th className="n">Checked in time</th><th className="n">Usual wait</th><th className="n">Waiting now</th><th className="n">Overdue</th><th className="n">Reopened</th><th className="n">Audit fails</th></tr></thead>
             <tbody>{reviewers.map((r) => (
               <tr key={r.name}><td>{r.name}</td><td className="n">{r.v.decisions} <span className="muted small">({r.v.unique} tasks)</span></td>
                 <td className="n"><span className={`pill ${rag(r.v.slaRate, 90, 75)}`}>{fmtP(r.v.slaRate)}</span></td><td className="n">{hrs(r.v.medianTat)}</td>
@@ -221,14 +219,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <section>
           <h2>CBMs</h2>
           <div className="tbl"><table>
-            <thead><tr><th>Manager (CBM)</th><th className="n">Properties</th><th className="n">Tasks due</th><th className="n">Done on time</th><th className="n">Right first time</th><th className="n">Never done</th><th className="n">Auditor questions to answer</th></tr></thead>
+            <thead><tr><th>Manager (CBM)</th><th className="n">Properties</th><th className="n">Tasks due</th><th className="n">Done on time</th><th className="n">Right first time</th><th className="n">Never done</th><th className="n">Audit questions</th></tr></thead>
             <tbody>{cbms.map((c) => (
               <tr key={c.name}><td>{c.name}</td><td className="n">{c.props}</td><td className="n">{c.e.due}</td>
                 <td className="n"><span className={`pill ${rag(c.e.onTimeRate, 85, 70)}`}>{fmtP(c.e.onTimeRate)}</span></td>
                 <td className="n">{fmtP(c.e.fpaRate)}</td><td className="n">{c.e.missed}</td><td className="n">{c.flags}</td></tr>
             ))}</tbody>
           </table></div>
-          <p className="small muted">Each property has one manager, so these rows add up to the total.</p>
+          
         </section>
       </div>
     </div>
