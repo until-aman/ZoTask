@@ -22,6 +22,8 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",
+    "esbuild": "^0.25.12",
+    "sql.js": "^1.10.3",
     "typescript": "5.9"
   }
 }

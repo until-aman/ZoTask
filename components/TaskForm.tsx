@@ -29,6 +29,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
   const [loc, setLoc] = useState<{ ok: boolean | null; distance: number | null; msg: string }>({ ok: null, distance: null, msg: "" });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [locWarned, setLocWarned] = useState(false);
   const set = (id: number, patch: Partial<Ans>) => setAns((s) => ({ ...s, [id]: { ...s[id], ...patch } }));
 
   async function upload(id: number, files: FileList | null) {
@@ -62,7 +63,10 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
 
   async function onSubmit() {
     setErr("");
-    if (property.geofence && loc.ok === null && !confirm("Location hasn't been checked. Submit anyway? The reviewer will see that.")) return;
+    if (property.geofence && loc.ok === null && !locWarned) {
+      setLocWarned(true);
+      return setErr("Location hasn't been checked. Validate it, or press Submit again to send without it. The reviewer will see that.");
+    }
     setBusy(true);
     const r = await submitTask(instanceId, items.map((it) => ({ itemId: it.id, ...ans[it.id] })), { ok: loc.ok, distance: loc.distance });
     setBusy(false);

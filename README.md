@@ -53,3 +53,7 @@ Time-based moves (`lib/engine.ts → sweep`) run on every page load, and today's
 - `components/` – client components (QueueClient, TaskForm, ReviewForm, TemplateEditor…)
 
 Not included yet: real notifications (reminders are logged in history only), SSO, and integration with the booking system (event tasks are triggered from Admin).
+
+## Browser prototype
+
+`node web/build.mjs` builds `web/dist/zotask.html`, a single file that runs the same pages and engine in the browser on an in-memory SQLite database (sql.js). It's what the shareable prototype link is built from; nothing persists between reloads.

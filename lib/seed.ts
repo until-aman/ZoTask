@@ -233,7 +233,10 @@ export function seed() {
   }
 
   // Run everything in time order, applying time-based transitions before each step.
+  // Earliest moment any time-based move can happen; skips the scans between boundaries.
+  let nextBoundary = -Infinity;
   const transitions = (ts: number) => {
+    if (ts < nextBoundary) return;
     for (const i of all<Instance>("SELECT * FROM instances WHERE status='upcoming' AND window_start_at<=?", ts))
       run("UPDATE instances SET status='current', status_since=? WHERE id=?", i.window_start_at, i.id);
     for (const i of all<Instance>("SELECT * FROM instances WHERE status='current' AND window_end_at<=?", ts)) {
@@ -244,6 +247,8 @@ export function seed() {
       run("UPDATE instances SET status='missed', status_since=?, closed_at=? WHERE id=?", i.late_until_at, i.late_until_at, i.id);
       logEvent(i.id, i.late_until_at, null, "missed", "Late window ended unsubmitted");
     }
+    nextBoundary = one<{ t: number | null }>(`SELECT min(CASE status WHEN 'upcoming' THEN window_start_at WHEN 'current' THEN window_end_at
+      WHEN 'notsub' THEN late_until_at END) t FROM instances WHERE status IN ('upcoming','current','notsub')`)?.t ?? Infinity;
   };
   tx(() => {
     while (queue.length) {

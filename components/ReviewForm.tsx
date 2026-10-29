@@ -48,7 +48,8 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
     return (
       <div className="card row2">
         <span>Not happening today? Waive it so it isn't counted as missed.</span><span className="spacer" />
-        <button className="btn" onClick={() => { const why = prompt("Why is this task being waived?"); if (why) go(waiveTask(instanceId, why)); }}>Waive task</button>
+        <input type="text" placeholder="Reason, e.g. property under renovation" value={comment} onChange={(e) => setComment(e.target.value)} style={{ flex: "1 1 220px" }} aria-label="Reason for waiving" />
+        <button className="btn" disabled={!comment.trim() || busy} onClick={() => go(waiveTask(instanceId, comment.trim()))}>Waive task</button>
         {err && <div className="err">{err}</div>}
       </div>
     );
