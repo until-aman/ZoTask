@@ -34,8 +34,10 @@ export type Saved = {
   name?: string; note?: string; notify?: (msg: string) => void;
 };
 
-export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [], panel, foot, onClearAll, saved, right }: {
+export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [], panel, foot, onClearAll, saved, right, dates }: {
   search?: string; setSearch?: (q: string) => void; searchLabel?: string; chips?: ActiveChip[];
+  /** Date quick filters, shown on their own row under the search. */
+  dates?: ReactNode;
   /** The filters, shown when the Filters button is pressed. */
   panel: ReactNode;
   /** Footer of the filters panel; defaults to a Done button. Gets close() to call after applying. */
@@ -67,6 +69,7 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
         {saved && <SavedViews {...saved} />}
         {right && <><span className="spacer" />{right}</>}
       </div>
+      {dates}
       {chips.length > 0 && (
         <div className="chips">
           {chips.map((c) => <span key={c.key} className="chip">{c.label}<button type="button" aria-label="Remove filter" onClick={c.clear}>×</button></span>)}
@@ -142,7 +145,7 @@ export function Stats({ items }: { items: Stat[] }) {
   return (
     <div className="stats">
       {items.map((s) => {
-        const body = <><span className="stat-l">{s.label}{s.tip}</span><b className={s.tone ? `t-${s.tone}` : ""}>{s.value}</b>{s.sub !== undefined && <span className="stat-s">{s.sub}</span>}</>;
+        const body = <><span className="stat-h"><b className={s.tone ? `t-${s.tone}` : ""}>{s.value}</b><span className="stat-l">{s.label}{s.tip}</span></span>{s.sub !== undefined && <span className="stat-s">{s.sub}</span>}</>;
         return s.onClick
           ? <button key={s.key} type="button" className={`stat click${s.tone ? ` ${s.tone}` : ""}`} aria-pressed={!!s.active} onClick={s.onClick}>{body}</button>
           : <div key={s.key} className={`stat${s.tone ? ` ${s.tone}` : ""}`}>{body}</div>;
@@ -152,16 +155,45 @@ export function Stats({ items }: { items: Stat[] }) {
 }
 
 export const PAGE = 20;
-export function Pager({ page, total, size = PAGE, setPage }: { page: number; total: number; size?: number; setPage: (p: number) => void }) {
+export const PAGE_SIZES = [10, 20, 25, 50];
+const SIZE_KEY = "zotask.rows";
+/** Rows per page, one choice for the whole app, remembered in this browser. */
+export function usePageSize(): [number, (n: number) => void] {
+  const [size, set] = useState(PAGE);
+  useEffect(() => {
+    try { const n = Number(localStorage.getItem(SIZE_KEY)); if (PAGE_SIZES.includes(n)) set(n); } catch { /* storage blocked */ }
+    const on = (e: Event) => set((e as CustomEvent<number>).detail);
+    window.addEventListener(SIZE_KEY, on);
+    return () => window.removeEventListener(SIZE_KEY, on);
+  }, []);
+  const change = (n: number) => {
+    try { localStorage.setItem(SIZE_KEY, String(n)); } catch { /* storage blocked */ }
+    window.dispatchEvent(new CustomEvent(SIZE_KEY, { detail: n }));
+  };
+  return [size, change];
+}
+/** The page that fits `total` rows; use it so the list can never sit before the first page or past the last. */
+export const clampPage = (page: number, total: number, size: number) => Math.max(0, Math.min(page, Math.ceil(total / size) - 1));
+
+/** Sticky footer under a list: rows per page, where you are, and first/previous/next/last buttons. */
+export function Pager({ page, total, size = PAGE, setPage, setSize }: { page: number; total: number; size?: number; setPage: (p: number) => void; setSize?: (n: number) => void }) {
+  if (!total) return null;
   const pages = Math.max(1, Math.ceil(total / size));
-  if (total <= size) return total ? <div className="pager"><span className="small muted">{total} {total === 1 ? "row" : "rows"}</span></div> : null;
-  const p = Math.min(page, pages - 1);
+  const p = clampPage(page, total, size);
+  const go = (n: number) => setPage(Math.max(0, Math.min(pages - 1, n)));
+  const sizes = !!setSize && total > PAGE_SIZES[0];
   return (
-    <div className="pager">
-      <span className="small muted">{p * size + 1}–{Math.min(total, (p + 1) * size)} of {total}</span>
-      <button type="button" className="btn sm" disabled={p === 0} onClick={() => setPage(p - 1)} aria-label="Previous page">‹</button>
-      <span className="small">Page {p + 1} of {pages}</span>
-      <button type="button" className="btn sm" disabled={p >= pages - 1} onClick={() => setPage(p + 1)} aria-label="Next page">›</button>
+    <div className={`pager${sizes || pages > 1 ? "" : " plain"}`} role="navigation" aria-label="Pages">
+      {sizes && <label className="pgsize">Rows<select value={size} onChange={(e) => { const n = Number(e.target.value); setSize(n); setPage(Math.floor((p * size) / n)); }} aria-label="Rows per page">
+        {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}</select></label>}
+      <span className="pgcount">{total <= size ? `${total} ${total === 1 ? "row" : "rows"}` : `${p * size + 1}–${Math.min(total, (p + 1) * size)} of ${total}`}</span>
+      {pages > 1 && <span className="pgbtns">
+        <button type="button" className="btn sm" disabled={p === 0} onClick={() => go(0)} aria-label="First page" title="First page">«</button>
+        <button type="button" className="btn sm" disabled={p === 0} onClick={() => go(p - 1)} aria-label="Previous page" title="Previous page">‹</button>
+        <span className="pgnum">Page {p + 1} of {pages}</span>
+        <button type="button" className="btn sm" disabled={p >= pages - 1} onClick={() => go(p + 1)} aria-label="Next page" title="Next page">›</button>
+        <button type="button" className="btn sm" disabled={p >= pages - 1} onClick={() => go(pages - 1)} aria-label="Last page" title="Last page">»</button>
+      </span>}
     </div>
   );
 }
@@ -185,6 +217,38 @@ export function SortHead({ k, label, sort, setSort, className = "" }: { k: strin
     <span className={`sorth ${className}`} aria-sort={on ? (sort!.dir === 1 ? "ascending" : "descending") : "none"}>
       <button type="button" className="sortbtn" onClick={() => setSort(nextSort(sort, k))}>{label}<span className="sorti">{on ? (sort!.dir === 1 ? "▲" : "▼") : "↕"}</span></button>
     </span>
+  );
+}
+
+export const DATE_PRESETS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], ["7d", "Last 7 days"], ["custom", "Custom"]];
+/** Date quick filters under the search. Presets apply at once; Custom opens a From/To pair (or one date with `single`) and applies on Apply. */
+export function DateRow({ label = "Dates", presets = DATE_PRESETS, value, from = "", to = "", onPick, onCustom, single, max }: {
+  label?: string; presets?: [string, string][]; value: string; from?: string; to?: string;
+  onPick: (key: string) => void; onCustom: (from: string, to: string) => void; single?: boolean; max?: string;
+}) {
+  const [custom, setCustom] = useState(value === "custom");
+  const [f, setF] = useState(from);
+  const [t, setT] = useState(to);
+  useEffect(() => { setCustom(value === "custom"); setF(from); setT(to); }, [value, from, to]);
+  const ok = single ? !!f : !!f && !!t && f <= t;
+  const changed = value !== "custom" || f !== from || (!single && t !== to);
+  return (
+    <div className="daterow" role="group" aria-label={label}>
+      <span className="ff-l">{label}</span>
+      <div className="seg">{presets.map(([k, l]) => (
+        <button key={k} type="button" aria-pressed={k === "custom" ? custom : !custom && value === k}
+          onClick={() => { if (k === "custom") setCustom(true); else { setCustom(false); onPick(k); } }}>{l}</button>
+      ))}</div>
+      {custom && <span className="dates">
+        {single
+          ? <input type="date" value={f} max={max} onChange={(e) => { setF(e.target.value); if (e.target.value) onCustom(e.target.value, e.target.value); }} aria-label="Date" />
+          : <>
+            <input type="date" value={f} max={t || max} onChange={(e) => setF(e.target.value)} aria-label="From" /><span className="muted">to</span>
+            <input type="date" value={t} min={f} max={max} onChange={(e) => setT(e.target.value)} aria-label="To" />
+            <button type="button" className="btn sm primary" disabled={!ok || !changed} onClick={() => onCustom(f, t)}>Apply</button>
+          </>}
+      </span>}
+    </div>
   );
 }
 

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getHistory, reassignReviewer, remindTasks, ViewFilters } from "@/app/actions";
-import { ActiveChip, Field, FilterBar, PAGE, Pager, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
+import { ActiveChip, DateRow, Field, FilterBar, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
 
 export type QItem = {
   id: number; t: string; p: string; cluster: string; city: string; a: string; r: string; s: string; h: number; sla: number; att: string;
@@ -95,8 +95,9 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   let list = g.open && bk !== "all" ? all.filter((t) => (bk === "over" ? over(t) : bucket(t) === bk)) : all;
   list = sort ? sortRows(list, sort, (t, k) => k === "task" ? t.t : k === "asg" ? t.a : k === "next" ? t.next || nextStep(t).what : k === "wait" ? (g.open ? t.h : t.date) : null)
     : [...list].sort((a, b) => (g.open ? b.h - a.h : b.date.localeCompare(a.date)));
-  const pg = Math.min(page, Math.max(0, Math.ceil(list.length / PAGE) - 1));
-  const shown = list.slice(pg * PAGE, pg * PAGE + PAGE);
+  const [size, setSize] = usePageSize();
+  const pg = clampPage(page, list.length, size);
+  const shown = list.slice(pg * size, pg * size + size);
   const hiddenByDate = items.filter((t) => t.s === tab && inScope(t) && !inDates(t)).length;
   const hiddenByFilter = items.filter((t) => t.s === tab && inDates(t)).length - all.length;
   const oldest = list.length && g.open ? Math.max(...list.map((t) => t.h)) : 0;
@@ -135,7 +136,6 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   const chipList: ActiveChip[] = [
     ...chips.map(([k, v, l, d]) => ({ key: k + v, label: <>{l}: <b>{d ?? v}</b></>, clear: () => change({ [k]: (f[k] as string[]).filter((x) => x !== v) }) })),
     ...(f.mine ? [{ key: "mine", label: <>Waiting on me</>, clear: () => change({ mine: false }) }] : []),
-    ...(date !== "today" ? [{ key: "date", label: <>Dates: <b>{from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}</b></>, clear: () => setDate("today") }] : []),
   ];
   const openItem = items.find((t) => t.id === open);
   const selIds = [...sel];
@@ -187,19 +187,12 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
           ]} />
 
           <FilterBar search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search task or property" chips={chipList}
-            onClearAll={() => { change(empty); setDate("today"); }}
+            onClearAll={() => change(empty)}
+            dates={<DateRow value={date} from={from} to={to} max={today} onPick={(k) => { setDate(k); setPage(0); }} onCustom={(a, b) => { setDateMode("custom"); setFrom(a); setTo(b); setPage(0); }} />}
             saved={{ page: "queue", views, current: f, apply: (v) => { setF({ ...empty, ...(v as Partial<ViewFilters>) }); setDate("today"); setSel(new Set()); setPage(0); },
               name: locText + (f.role.length ? " · " + f.role.join(", ") : ""), notify: setToast, note: "Dates are not saved. The queue always starts at today." }}
             panel={<>
               <Field label="Location" wide><LocPicker f={f} cities={cities} clusters={clusterList()} props={propList()} change={change} /></Field>
-              <Field label="Dates" wide>
-                <div className="seg" role="group" aria-label="Date range">
-                  {[["today", "Today"], ["yday", "Yesterday"], ["7d", "7 days"], ["custom", "Custom"]].map(([k, l]) => (
-                    <button key={k} type="button" aria-pressed={date === k} onClick={() => setDate(k)}>{l}</button>
-                  ))}
-                </div>
-                {date === "custom" && <div className="dates"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From" /><span className="muted">to</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To" /></div>}
-              </Field>
               <Field label="Role"><div className="checks">{ROLES.map((r) => <label key={r} title={RNAME[r]}><input type="checkbox" checked={f.role.includes(r)} onChange={(e) => change({ role: e.target.checked ? [...f.role, r] : f.role.filter((x) => x !== r) })} />{r}</label>)}</div></Field>
               <Field label="Assignee"><select value="" onChange={(e) => e.target.value && change({ asg: [...f.asg, e.target.value] })}><option value="">{f.asg.length ? `${f.asg.length} picked · add another` : "Anyone"}</option>{people.filter((p) => !f.asg.includes(p)).map((p) => <option key={p}>{p}</option>)}</select></Field>
               <Field label="Next step"><label className="switch"><input type="checkbox" checked={f.mine} onChange={(e) => change({ mine: e.target.checked })} /> Waiting on me</label></Field>
@@ -247,7 +240,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                 </div>
               );
             })}
-            <div style={{ padding: "8px 12px" }}><Pager page={pg} total={list.length} setPage={setPage} /></div>
+            <Pager page={pg} total={list.length} size={size} setPage={setPage} setSize={setSize} />
           </section>
         </main>
       </div>

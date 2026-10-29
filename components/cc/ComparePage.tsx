@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import type { CompareData, Kind, Metric } from "@/lib/compare";
 import { CopyModal, DrillCtx, Drill, InfoTip, N, Sec, dur, fmtP } from "./parts";
 import { DrillDrawer, TaskDrawer } from "./Drawers";
-import { ActiveChip, Field, FilterBar, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
+import { ActiveChip, DateRow, Field, FilterBar, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
 
 const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from) : `${nice(r.from)} – ${nice(r.to)}`);
-const PRESETS: [string, string][] = [["7d", "7 days"], ["14d", "14 days"], ["30d", "30 days"], ["custom", "Custom"]];
+const PRESETS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], ["7d", "Last 7 days"], ["14d", "Last 14 days"], ["30d", "Last 30 days"], ["custom", "Custom"]];
 const COLORS = ["#2563eb", "#d97706", "#059669", "#9333ea", "#dc2626", "#0891b2", "#db2777", "#65a30d"];
 const fmt = (m: Metric, v: number | null) => (m.fmt === "pct" ? fmtP(v === null ? null : Math.round(v * 10) / 10) : m.fmt === "dur" ? dur(v) : v === null ? "—" : String(Math.round(v * 10) / 10));
 const diff = (m: Metric, x: number, y: number) => (m.fmt === "pct" ? `${Math.abs(Math.round((x - y) * 10) / 10)} pts` : m.fmt === "dur" ? dur(Math.abs(x - y)) : String(Math.round(Math.abs(x - y) * 10) / 10));
@@ -50,9 +50,6 @@ const better = (m: Metric, x: number, y: number) => (m.better === "high" ? x > y
 
 export default function ComparePage({ data: d, views, bare }: { data: CompareData; views: SavedView[]; bare: boolean }) {
   const router = useRouter();
-  const [preset, setPreset] = useState(PRESETS.some(([k]) => k === d.preset) ? d.preset : "14d");
-  const [from, setFrom] = useState(d.R.from);
-  const [to, setTo] = useState(d.R.to);
   const [drill, setDrill] = useState<Drill | null>(null);
   const [task, setTask] = useState<{ id: number; fromList: boolean } | null>(null);
   const [report, setReport] = useState<string | null>(null);
@@ -67,9 +64,9 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
   const ctx = useMemo(() => ({ tasks: d.tasks, open: (x: Drill) => { setDrill(x); setTask(null); }, task: (id: number) => setTask({ id, fromList: false }) }), [d.tasks]);
 
   const P = d.picked, ids = P.map((o) => o.id);
-  const go = (patch: { kind?: Kind; ids?: string[]; range?: string } = {}) => {
-    const range = patch.range ?? preset;
-    const v: Record<string, string> = { kind: patch.kind ?? d.kind, range, ...(range === "custom" ? { from, to } : {}) };
+  const go = (patch: { kind?: Kind; ids?: string[]; range?: string; from?: string; to?: string } = {}) => {
+    const range = patch.range ?? d.preset;
+    const v: Record<string, string> = { kind: patch.kind ?? d.kind, range, ...(range === "custom" ? { from: patch.from ?? d.R.from, to: patch.to ?? d.R.to } : {}) };
     if (!patch.kind || patch.kind === d.kind) v.ids = (patch.ids ?? ids).join(",") || "-";
     router.push(`/compare?${new URLSearchParams(Object.entries(v).filter(([, x]) => x))}`);
   };
@@ -151,24 +148,21 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
         </div>
 
         {ready && <Stats items={ranking.map((r) => ({
-          key: r.o.id, label: `#${place.get(r.i)} ${r.o.label}`,
-          value: r.avgPos === null ? "—" : r.avgPos.toFixed(1),
-          sub: <>avg position · best on <b className="t-g">{r.bestOn}</b>, worst on <b className={r.worstOn ? "t-r" : ""}>{r.worstOn}</b> of {r.scored}{r.tasks < MIN_TASKS ? <span className="t-a"> · few tasks</span> : null}</>,
+          key: r.o.id, label: r.o.label,
+          value: `#${place.get(r.i)}`,
+          sub: <>avg position {r.avgPos === null ? "—" : <b>{r.avgPos.toFixed(1)}</b>} · best on <b className="t-g">{r.bestOn}</b>, worst on <b className={r.worstOn ? "t-r" : ""}>{r.worstOn}</b> of {r.scored}{r.tasks < MIN_TASKS ? <span className="t-a"> · few tasks</span> : null}</>,
           tone: place.get(r.i) === 1 ? "g" as const : place.get(r.i) === ranking.length ? "r" as const : undefined,
-          tip: <InfoTip title="Overall ranking" rows={[["Number", "Average position across the scored metrics. 1.0 means best on every one"], ["Best on / worst on", "Metrics where it is first or last in this group"], ["Tasks", `${r.tasks} ${d.kind === "reviewer" ? "reviewed" : "due"} in the period`]]} />,
+          tip: <InfoTip title="Overall ranking" rows={[["Rank", "Place by average position across the scored metrics"], ["Avg position", "1.0 means best on every metric"], ["Best on / worst on", "Metrics where it is first or last in this group"], ["Tasks", `${r.tasks} ${d.kind === "reviewer" ? "reviewed" : "due"} in the period`]]} />,
         }))} />}
 
         <FilterBar
           chips={[
             ...P.map((o, i): ActiveChip => ({ key: o.id, label: <><span className="cmp-dot" style={{ background: COLORS[i] }} aria-hidden="true" />{o.label}</>, clear: () => go({ ids: ids.filter((x) => x !== o.id) }) })),
-            ...(d.preset !== "14d" ? [{ key: "range", label: <>Dates: <b>{span(d.R)}</b></>, clear: () => go({ range: "14d" }) }] : []),
           ]}
           onClearAll={() => go({ ids: [] })}
           saved={{ page: "compare", views, current, notify: setToast, name: `${kindLabel}: ${P.map((o) => o.label).join(", ")}`.slice(0, 60),
             apply: (f) => router.push(`/compare?${new URLSearchParams(f as Record<string, string>)}`), note: "Saves who is compared and the date range." }}
-          foot={(close) => preset === "custom"
-            ? <button type="button" className="btn sm primary" disabled={!from || !to || from > to} onClick={() => { go(); close(); }}>Apply dates</button>
-            : <button type="button" className="btn sm primary" onClick={close}>Done</button>}
+          dates={<DateRow presets={PRESETS} value={d.preset} from={d.R.from} to={d.R.to} onPick={(k) => go({ range: k })} onCustom={(f, t) => go({ range: "custom", from: f, to: t })} />}
           panel={<>
             <Field label="Compare" wide><div className="seg" role="group" aria-label="What to compare">
               {d.kinds.map(([k, l]) => <button key={k} type="button" aria-pressed={d.kind === k} onClick={() => go({ kind: k })}>{l}</button>)}
@@ -189,13 +183,6 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
                 )}
                 {P.length < Math.min(d.max, d.options.length) && <button type="button" className="link small" onClick={() => go({ ids: [...ids, ...unpicked.map((o) => o.id)].slice(0, d.max) })}>Add all{d.options.length > d.max ? ` (up to ${d.max})` : ""}</button>}
               </div>
-            </Field>
-            <Field label="Dates" wide>
-              <div className="seg">{PRESETS.map(([k, l]) => <button key={k} type="button" aria-pressed={preset === k} onClick={() => { setPreset(k); if (k !== "custom") go({ range: k }); }}>{l}</button>)}</div>
-              {preset === "custom" && <div className="dates">
-                <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} aria-label="From" /><span className="muted">to</span>
-                <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} aria-label="To" />
-              </div>}
             </Field>
           </>} />
 

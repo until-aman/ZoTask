@@ -125,8 +125,8 @@ export function Housekeeping({ d }: { d: CC }) {
         <div className="hkgrid">
           {([["HK", hk.ihk, hk.chk], ["SHK", hk.ishk, hk.cshk]] as [string, number, number][]).map(([l, ideal, cur]) => {
             const gap = Math.max(0, ideal - cur);
-            return <div key={l} className="kpi"><span className={`rag ${gap > 0 ? "r" : "g"}`} /><div className="lab">{l} to hire</div>
-              <div className="v" style={{ color: gap > 0 ? "var(--red)" : "var(--green)" }}>{gap}<small>{cur} of {ideal} in place</small></div></div>;
+            return <div key={l} className="kpi"><span className={`rag ${gap > 0 ? "r" : "g"}`} /><div className="kpi-h"><div className="v" style={{ color: gap > 0 ? "var(--red)" : "var(--green)" }}>{gap}</div><div className="lab">{l} to hire</div></div>
+              <div className="sub">{cur} of {ideal} in place</div></div>;
           })}
         </div>
         <Table<S> name="Housekeeping" rows={d.staff} rowKey={(x) => x.property_id} initialSort={{ key: "hkGap", dir: -1 }} cols={[

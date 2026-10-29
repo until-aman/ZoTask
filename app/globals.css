@@ -11,8 +11,8 @@ html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-feature-settings:"cv11","ss01"}
 /* Figures in IBM Plex Mono so columns of numbers line up. */
 :root{--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
-.mono,td.n,.kpi .v,.mini b,.stat>b,.esc-kpi>b,.num,.cnt,.fcount,.pager,.cmp-tbl td.n,.ref,code,kbd,textarea.code{font-family:var(--mono);font-variant-numeric:tabular-nums}
-.kpi .v,.stat>b,.esc-kpi>b{letter-spacing:-.02em}
+.mono,td.n,.kpi .v,.mini b,.stat-h>b,.esc-kpi>b,.num,.cnt,.fcount,.pager,.cmp-tbl td.n,.ref,code,kbd,textarea.code{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.kpi .v,.stat-h>b,.esc-kpi>b{letter-spacing:-.02em}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:var(--blue-d);text-decoration:none}
@@ -67,7 +67,8 @@ textarea{width:100%;min-height:60px}
 label.f,div.f{display:grid;gap:4px;font-weight:700;font-size:13px}
 
 /* tables */
-.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.tbl{overflow:auto;max-height:max(320px,calc(100vh - 170px));border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.tbl thead th{position:sticky;top:0;z-index:2;box-shadow:inset 0 -1px 0 var(--line)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line2);vertical-align:top}
 th{background:var(--bg);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
@@ -125,7 +126,7 @@ main.q{min-width:0;display:grid;gap:12px}
 .opt input{accent-color:var(--blue);margin:0}
 .grp-l{font-size:11px;color:var(--faint);font-weight:700;padding:6px 6px 2px}
 .popfoot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
-.listcard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.listcard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:clip}
 .ltool{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
 .bk{display:inline-flex;gap:6px;flex-wrap:wrap}
 .bk button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 10px;font-weight:700;font-size:12.5px}
@@ -189,6 +190,9 @@ a.kpi:hover{border-color:var(--blue);text-decoration:none;box-shadow:0 0 0 2px v
 .kpi .v{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
 .kpi .lab{font-size:12.5px;font-weight:700;color:var(--muted)}
 .kpi .sub{font-size:12px;color:var(--muted)}
+.kpi-h{display:flex;align-items:baseline;gap:8px;padding-right:14px;min-width:0}
+.kpi-h>.v{flex:none}
+.kpi-h .lab{color:var(--fg);font-weight:600;font-size:13px}
 .kpi .d{font-size:12px;font-weight:800}
 .d.up{color:var(--green)} .d.down{color:var(--red)} .d.flat{color:var(--muted)}
 .rag{position:absolute;top:10px;right:10px;width:10px;height:10px;border-radius:50%}
@@ -238,7 +242,6 @@ a.task:hover{border-color:var(--blue);text-decoration:none}
 .sech{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sech h2{margin:0;display:flex;align-items:center}
 .score .kpis.k3{grid-template-columns:repeat(3,minmax(0,1fr))}
-@media (max-width:560px){.score .kpis.k3{grid-template-columns:1fr 1fr}}
 .kpi.click{cursor:pointer}
 .kpi.click:hover,.kpi.click:focus-visible{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-soft)}
 .kpi .foot{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-top:2px}
@@ -265,8 +268,6 @@ table.aq .acts{white-space:nowrap;display:flex;gap:4px;justify-content:flex-end}
 .ttable{display:grid;gap:8px;min-width:0}
 .ttool{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ttool .search{flex:0 1 240px}
-.tbl.sticky{max-height:560px;overflow:auto}
-.tbl.sticky thead th{position:sticky;top:0;z-index:2}
 .sortbtn{border:0;background:none;padding:0;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;display:inline-flex;gap:4px;align-items:center}
 .sorti{color:var(--faint);font-size:10px}
 th[aria-sort="ascending"] .sorti,th[aria-sort="descending"] .sorti{color:var(--blue)}
@@ -293,9 +294,9 @@ tr.xrow td{background:#f8faff;padding-top:0}
 .ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chipn{display:inline-flex;gap:4px;align-items:center;background:var(--bg);border:1px solid var(--line2);border-radius:999px;padding:2px 10px}
 .seg button:disabled{opacity:.5;cursor:not-allowed}
-.kpis.k3 .v{font-size:23px}
-.kpis.k3 .v small{display:block;margin:2px 0 0;font-size:12px}
-.kpis.k3 .lab{min-height:34px;align-items:flex-start;padding-right:14px}
+.kpis.k3 .v{font-size:20px}
+.kpis.k3 .kpi-h{column-gap:6px}
+.kpis.k3 .kpi-h .lab{font-size:12.5px}
 .cc .seg{max-width:100%;overflow-x:auto}
 .cc>*{min-width:0}
 @media (max-width:520px){.cc .row2>select{flex:1 1 140px;min-width:0}.mini{padding:6px 8px}}
@@ -394,7 +395,7 @@ select{max-width:100%}
 @media (max-width:560px){.esc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.esc-kpis>:last-child:nth-child(odd){grid-column:1/-1}}
 
 /* ---------- Shared toolbar: search, Filters button, saved filters, active chips ---------- */
-.fbar2{display:grid;gap:8px}
+.fbar2{display:grid;gap:8px;grid-template-columns:minmax(0,1fr)}
 .fbrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .fbrow>.search{flex:0 1 300px}
 .fwrap{position:relative;display:inline-flex}
@@ -438,13 +439,16 @@ select{max-width:100%}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .stat{display:grid;gap:2px;align-content:start;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--fg);position:relative;min-width:0}
 .stat-l{font-size:12.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:2px}
-.stat>b{font-size:26px;font-weight:600;line-height:1.15}
+.stat-h{display:flex;align-items:baseline;gap:8px;min-width:0}
+.stat-h>b{flex:none}
+.stat-h>b{font-size:22px;font-weight:600;line-height:1.2}
+.stat-h>.stat-l{font-size:13.5px;color:var(--fg);font-weight:600}
 .stat-s{font-size:12px;color:var(--muted)}
 .stat.click{cursor:pointer}
 .stat.click:hover{border-color:var(--blue)}
 .stat.click[aria-pressed="true"]{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue);background:var(--blue-soft)}
 .stat.r{border-left:4px solid var(--red)} .stat.a{border-left:4px solid var(--amber)} .stat.g{border-left:4px solid var(--green)}
-@media (max-width:560px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats>:last-child:nth-child(odd){grid-column:1/-1}.stat>b{font-size:22px}}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats>:last-child:nth-child(odd){grid-column:1/-1}.stat-h>b{font-size:19px}}
 
 /* ---------- Sortable headers outside tables ---------- */
 .sorth .sortbtn{text-transform:inherit;letter-spacing:inherit;font-weight:inherit}
@@ -461,3 +465,22 @@ select{max-width:100%}
 .locpick{display:grid;gap:8px}
 .lhead .sorth{min-width:0}
 @media (max-width:640px){.loc{grid-template-columns:minmax(0,1fr)}}
+
+/* ---------- Sticky list headers, pager, date row ---------- */
+.lhead,.mthead{position:sticky;top:var(--toph,57px);z-index:5}
+.pager{position:sticky;bottom:8px;z-index:6;margin-left:auto;width:fit-content;max-width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:5px 8px;box-shadow:0 4px 14px rgba(15,23,42,.08);gap:10px;font-size:12.5px}
+.pgsize{display:inline-flex;gap:6px;align-items:center;font-weight:600;color:var(--muted)}
+.pgsize select{padding:3px 22px 3px 8px;font-size:12.5px;width:auto;min-width:60px;background-position:right 6px center}
+.pgcount{color:var(--muted)}
+.pgbtns{display:inline-flex;gap:4px;align-items:center}
+.pgnum{padding:0 4px;white-space:nowrap}
+.pager .btn:disabled{opacity:.35}
+.pager.plain{position:static;border:0;box-shadow:none;background:none;padding:0 4px}
+.listcard>.pager{margin:8px 8px 8px auto}
+.daterow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.daterow .ff-l{margin-right:2px}
+.daterow .seg{max-width:100%;min-width:0;overflow-x:auto;scrollbar-width:none}
+.daterow .dates{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+@media (max-width:760px){:root{--toph:104px}}
+@media (max-width:560px){.pager{bottom:6px;width:100%;justify-content:space-between}.pgnum{display:none}}
+@media (max-width:560px){.score .kpis.k3{grid-template-columns:minmax(0,1fr)}.kpis.k3>:nth-child(3){grid-column:auto}}

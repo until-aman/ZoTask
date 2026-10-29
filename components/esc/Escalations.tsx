@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Esc, EscData } from "@/lib/escalations";
 import { raiseEscalation, updateEscalation } from "@/app/actions";
 import { CopyModal, InfoTip, Sec, Table, type Col } from "@/components/cc/parts";
-import { ActiveChip, Field, FilterBar, SavedView, Stats, sameFilters } from "@/components/ui/Filters";
+import { ActiveChip, DateRow, Field, FilterBar, SavedView, Stats, sameFilters } from "@/components/ui/Filters";
 import Photo from "@/components/Photo";
 
 const STATUS: Record<string, string> = { open: "Yet to start", wip: "In progress", done: "Closed", dropped: "Dropped" };
@@ -24,7 +24,19 @@ const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.p
 const median = (l: number[]) => { if (!l.length) return null; const s = [...l].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const fmtDays = (v: number | null) => (v === null ? "—" : v < 1 ? `${Math.max(1, Math.round(v * 24))}h` : `${Math.round(v * 10) / 10}d`);
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
-const PERIODS: [string, string, number][] = [["7", "7 days", 7], ["30", "30 days", 30], ["90", "90 days", 90], ["all", "All time", 100000]];
+const RAISED: [string, string][] = [["all", "All time"], ["today", "Today"], ["yday", "Yesterday"], ["7d", "Last 7 days"], ["30d", "Last 30 days"], ["custom", "Custom"]];
+const PERIODS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], ["7d", "Last 7 days"], ["30d", "Last 30 days"], ["90d", "Last 90 days"], ["all", "All time"], ["custom", "Custom"]];
+type Dates = { k: string; from: string; to: string };
+/** A date choice as a [start, end) window in ms, plus a label for headings. */
+const windowOf = (w: Dates, today: string): { start: number; end: number; label: string } => {
+  const T = (iso: string) => new Date(iso + "T00:00").getTime(), t0 = T(today);
+  const back = (n: number) => ({ start: t0 - (n - 1) * DAY, end: t0 + DAY });
+  if (w.k === "custom" && w.from && w.to) return { start: T(w.from), end: T(w.to) + DAY, label: w.from === w.to ? dayIso(w.from) : `${dayIso(w.from)} – ${dayIso(w.to)}` };
+  if (w.k === "today") return { ...back(1), label: "today" };
+  if (w.k === "yday") return { start: t0 - DAY, end: t0, label: "yesterday" };
+  const n = { "7d": 7, "30d": 30, "90d": 90 }[w.k];
+  return n ? { ...back(n), label: `last ${n} days` } : { start: 0, end: Infinity, label: "all time" };
+};
 
 type Quick = "open" | "overdue" | "soon" | "closed" | "all";
 type Focus = { label: string; ids: number[] } | null;
@@ -39,7 +51,8 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
   const [prop, setProp] = useState("");
   const [owner, setOwner] = useState("");
   const [by, setBy] = useState("");
-  const [period, setPeriod] = useState("30");
+  const [period, setPeriod] = useState<Dates>({ k: "30d", from: "", to: "" });
+  const [raisedW, setRaisedW] = useState<Dates>({ k: "all", from: "", to: "" });
   const [focus, setFocus] = useState<Focus>(null);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<number | null>(null);
@@ -57,9 +70,11 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
     && (!city || r.props.some((p) => p.city === city)) && (!cluster || r.props.some((p) => p.cluster === cluster)) && (!prop || r.props.some((p) => String(p.id) === prop))), [d.rows, dept, owner, by, city, cluster, prop]);
   const soon = addDays(d.today, 2);
   const isQuick = (r: Esc, q: Quick) => q === "all" ? true : q === "open" ? isOpen(r.status) : q === "overdue" ? r.overdue : q === "soon" ? isOpen(r.status) && !r.overdue && !!r.due && r.due <= soon : !isOpen(r.status);
+  const rw = windowOf(raisedW, d.today);
+  const inRaised = (r: Esc) => r.created >= rw.start && r.created < rw.end;
   const counts = { open: 0, overdue: 0, soon: 0, closed: 0, all: 0 } as Record<Quick, number>;
-  for (const r of scoped) for (const q of Object.keys(counts) as Quick[]) if (isQuick(r, q)) counts[q]++;
-  const list = focus ? d.rows.filter((r) => focus.ids.includes(r.id)) : scoped.filter((r) => isQuick(r, quick));
+  for (const r of scoped.filter((x) => inRaised(x))) for (const q of Object.keys(counts) as Quick[]) if (isQuick(r, q)) counts[q]++;
+  const list = focus ? d.rows.filter((r) => focus.ids.includes(r.id)) : scoped.filter((r) => isQuick(r, quick) && inRaised(r));
   const show = (label: string, rows: Esc[]) => { setFocus({ label, ids: rows.map((r) => r.id) }); setTab("tracker"); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const cities = [...new Set(d.geo.map((g) => g.city))];
@@ -67,8 +82,8 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
   const props = d.geo.filter((g) => (!city || g.city === city) && (!cluster || g.cluster === cluster));
   const owners = [...new Set(d.rows.map((r) => r.owner))].sort();
   const raisers = [...new Set(d.rows.map((r) => r.raisedBy))].sort();
-  const current = { dept, city, cluster, prop, owner, by };
-  const applyF = (f: Record<string, unknown>) => { const g = (k: string) => String(f[k] ?? ""); setDept(g("dept")); setCity(g("city")); setCluster(g("cluster")); setProp(g("prop")); setOwner(g("owner")); setBy(g("by")); setFocus(null); };
+  const current = { dept, city, cluster, prop, owner, by, raised: raisedW.k === "all" ? "" : raisedW.k, ...(raisedW.k === "custom" ? { from: raisedW.from, to: raisedW.to } : {}) };
+  const applyF = (f: Record<string, unknown>) => { const g = (k: string) => String(f[k] ?? ""); setDept(g("dept")); setCity(g("city")); setCluster(g("cluster")); setProp(g("prop")); setOwner(g("owner")); setBy(g("by")); setRaisedW({ k: g("raised") || "all", from: g("from"), to: g("to") }); setFocus(null); };
   const def = views.find((v) => v.def);
   useEffect(() => { if (def && !d.openNew && !sameFilters(def.f, current)) applyF(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const propName = d.geo.find((g) => String(g.id) === prop)?.property;
@@ -83,10 +98,12 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
   ];
   const bar = (summary: boolean) => (
     <FilterBar search={summary ? undefined : q} setSearch={summary ? undefined : setQ} searchLabel="Search ref, issue, property, person" chips={chips}
-      onClearAll={() => { applyF({}); }}
+      onClearAll={() => applyF(summary ? {} : { raised: current.raised, from: raisedW.from, to: raisedW.to })}
+      dates={summary
+        ? <DateRow label="Period" presets={PERIODS} value={period.k} from={period.from} to={period.to} max={d.today} onPick={(k) => setPeriod({ k, from: "", to: "" })} onCustom={(f, t) => setPeriod({ k: "custom", from: f, to: t })} />
+        : <DateRow label="Raised" presets={RAISED} value={raisedW.k} from={raisedW.from} to={raisedW.to} max={d.today} onPick={(k) => { setRaisedW({ k, from: "", to: "" }); setFocus(null); }} onCustom={(f, t) => { setRaisedW({ k: "custom", from: f, to: t }); setFocus(null); }} />}
       saved={{ page: "escalations", views, current, apply: applyF, notify: setToast, name: [propName || cluster || city, dept, owner].filter(Boolean).join(" · ") || "All escalations" }}
       panel={<>
-        {summary && <Field label="Period for raised and closed" wide><div className="seg">{PERIODS.map(([k, l]) => <button key={k} type="button" aria-pressed={period === k} onClick={() => setPeriod(k)}>{l}</button>)}</div></Field>}
         <Field label="Department"><select value={dept} onChange={(e) => setDept(e.target.value)}><option value="">All departments</option>{d.departments.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="City"><select value={city} onChange={(e) => { setCity(e.target.value); setCluster(""); setProp(""); }}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Cluster"><select value={cluster} onChange={(e) => { setCluster(e.target.value); setProp(""); }}><option value="">All clusters</option>{clusters.map((x) => <option key={x}>{x}</option>)}</select></Field>
@@ -150,14 +167,14 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
 }
 
 /** Totals for leadership: how many are open, how fast they close, and where they pile up. Every count opens the list behind it. */
-function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; period: string; show: (label: string, rows: Esc[]) => void; bar: React.ReactNode }) {
-  const days = PERIODS.find(([k]) => k === period)![2];
-  const since = d.now - days * DAY;
-  const pLabel = PERIODS.find(([k]) => k === period)![1].toLowerCase();
+function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; period: Dates; show: (label: string, rows: Esc[]) => void; bar: React.ReactNode }) {
+  const w = windowOf(period, d.today);
+  const inW = (ms: number | null) => ms !== null && ms >= w.start && ms < w.end;
+  const pLabel = w.label;
   const openRows = rows.filter((r) => isOpen(r.status));
   const overdue = rows.filter((r) => r.overdue);
-  const raised = rows.filter((r) => r.created >= since);
-  const closed = rows.filter((r) => r.status === "done" && (r.closed ?? 0) >= since);
+  const raised = rows.filter((r) => inW(r.created));
+  const closed = rows.filter((r) => r.status === "done" && inW(r.closed));
   const onTime = closed.filter((r) => r.onTime);
   const closeDays = (l: Esc[]) => median(l.map((r) => ((r.closed ?? d.now) - r.created) / DAY));
   const C = ({ l, label }: { l: Esc[]; label: string }) => l.length ? <button type="button" className="num" onClick={() => show(label, l)}>{l.length}</button> : <span className="muted">0</span>;
@@ -169,8 +186,8 @@ function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; peri
     return [...m].map(([key, l]) => ({ key, rows: l }));
   };
   const stat = (g: G) => {
-    const o = g.rows.filter((r) => isOpen(r.status)), od = g.rows.filter((r) => r.overdue), rs = g.rows.filter((r) => r.created >= since);
-    const cl = g.rows.filter((r) => r.status === "done" && (r.closed ?? 0) >= since), ot = cl.filter((r) => r.onTime);
+    const o = g.rows.filter((r) => isOpen(r.status)), od = g.rows.filter((r) => r.overdue), rs = g.rows.filter((r) => inW(r.created));
+    const cl = g.rows.filter((r) => r.status === "done" && inW(r.closed)), ot = cl.filter((r) => r.onTime);
     const oldest = o.length ? Math.max(...o.map((r) => (d.now - r.created) / DAY)) : null;
     return { ...g, open: o, overdue: od, raised: rs, closed: cl, onTime: ot, med: closeDays(cl), oldest };
   };
@@ -201,13 +218,13 @@ function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; peri
 
   return (
     <>
-      <div className="esc-kpis">
-        <div className="card esc-kpi"><span className="small muted">Open now</span><b><C l={openRows} label="Open now" /></b><span className="small muted">{openRows.filter((r) => r.status === "open").length} not started yet</span></div>
-        <div className={`card esc-kpi ${overdue.length ? "r" : ""}`}><span className="small muted">Past expected closure</span><b><C l={overdue} label="Past expected closure" /></b><span className="small muted">{pct(overdue.length, openRows.length)} of open</span></div>
-        <div className="card esc-kpi"><span className="small muted">Raised · {pLabel}</span><b><C l={raised} label={`Raised in ${pLabel}`} /></b><span className="small muted">{raised.filter((r) => r.priority === "high").length} high priority</span></div>
-        <div className="card esc-kpi"><span className="small muted">Closed · {pLabel}</span><b><C l={closed} label={`Closed in ${pLabel}`} /></b><span className="small muted">{pct(onTime.length, closed.length)} by expected date</span></div>
-        <div className="card esc-kpi"><span className="small muted">Usual time to close <InfoTip title="Usual time to close" rows={[["Means", "Median time from raising to closing, for escalations closed in the period"]]} /></span><b>{fmtDays(closeDays(closed))}</b><span className="small muted">median</span></div>
-      </div>
+      <Stats items={[
+        { key: "open", label: "Open now", value: <C l={openRows} label="Open now" />, sub: `${openRows.filter((r) => r.status === "open").length} not started yet` },
+        { key: "over", label: "Past expected closure", value: <C l={overdue} label="Past expected closure" />, sub: `${pct(overdue.length, openRows.length)} of open`, tone: overdue.length ? "r" : undefined },
+        { key: "raised", label: `Raised · ${pLabel}`, value: <C l={raised} label={`Raised in ${pLabel}`} />, sub: `${raised.filter((r) => r.priority === "high").length} high priority` },
+        { key: "closed", label: `Closed · ${pLabel}`, value: <C l={closed} label={`Closed in ${pLabel}`} />, sub: `${pct(onTime.length, closed.length)} by expected date` },
+        { key: "med", label: "Usual time to close", value: fmtDays(closeDays(closed)), sub: "median", tip: <InfoTip title="Usual time to close" rows={[["Means", "Median time from raising to closing, for escalations closed in the period"]]} /> },
+      ]} />
       {bar}
 
       <div className="grid g2h">

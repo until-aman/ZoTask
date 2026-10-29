@@ -6,7 +6,7 @@ import type { Issue, T } from "@/lib/command";
 import { acknowledgeIssues, remindTasks } from "@/app/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/statuses";
 import { InfoTip, dur, useDrill, CopyModal } from "./parts";
-import { ActiveChip, Field, FilterBar, Pager, PAGE, SortState, Stats, nextSort, sortRows } from "@/components/ui/Filters";
+import { ActiveChip, Field, FilterBar, Pager, SortState, clampPage, usePageSize, Stats, nextSort, sortRows } from "@/components/ui/Filters";
 
 const CATS: [Issue["cat"] | "all", string][] = [["all", "All"], ["critical", "Critical"], ["ground", "Ground team overdue"], ["review", "Review SLA breaches"], ["repeat", "Repeated rejections"], ["exception", "Exceptions"]];
 const SEVC: Record<string, string> = { Critical: "r", High: "r", Medium: "a", Low: "" };
@@ -27,14 +27,15 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<SortState>(null);
+  const [size, setSize] = usePageSize();
   const [ho, setHo] = useState<string | null>(null);
   const owners = useMemo(() => [...new Set(issues.map((i) => i.owner))].sort(), [issues]);
   const list = issues.filter((i) => (cat === "all" || i.cat === cat) && (!owner || i.owner === owner) && (!sev || i.sev === sev) && (!hideAck || (!i.ack && !i.esc))
     && (!q || `${i.task} ${i.property} ${i.owner} ${i.type} ${i.city} ${i.cluster}`.toLowerCase().includes(q.toLowerCase())));
   const sorted = sortRows(list, sort, (i, k) => k === "sev" ? SEVN[i.sev] : k === "issue" ? i.type : k === "prop" ? i.property : k === "owner" ? i.owner
     : k === "status" ? (i.id ? STATUS_LABEL[i.status] : "Property") : k === "over" ? i.overdue : k === "back" ? i.rejections : null);
-  const pg = Math.min(page, Math.max(0, Math.ceil(sorted.length / PAGE) - 1));
-  const view = sorted.slice(pg * PAGE, pg * PAGE + PAGE);
+  const pg = clampPage(page, sorted.length, size);
+  const view = sorted.slice(pg * size, pg * size + size);
   const chips: ActiveChip[] = [
     ...(owner ? [{ key: "owner", label: <>Owner: <b>{owner}</b></>, clear: () => setOwner("") }] : []),
     ...(sev ? [{ key: "sev", label: <>Severity: <b>{sev}</b></>, clear: () => setSev("") }] : []),
@@ -121,7 +122,7 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
           ))}</tbody>
         </table></div>
       )}
-      <Pager page={pg} total={sorted.length} setPage={setPage} />
+      <Pager page={pg} total={sorted.length} size={size} setPage={setPage} setSize={setSize} />
       {ho !== null && <CopyModal title="Daily handover" text={ho} close={() => setHo(null)} />}
     </section>
   );

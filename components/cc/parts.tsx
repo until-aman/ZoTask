@@ -3,7 +3,7 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import type { K, T } from "@/lib/command";
 import InfoTip from "@/components/InfoTip";
-import { PAGE, Pager, nextSort } from "@/components/ui/Filters";
+import { Pager, clampPage, nextSort, usePageSize } from "@/components/ui/Filters";
 
 export const HOUR = 3600_000;
 export const fmtP = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v}%`);
@@ -58,8 +58,8 @@ export function Tile({ label, def, k, rate = true, goodUp = true, band, target, 
   return (
     <div className={`kpi ${k.ids.length ? "click" : ""}`} role="button" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.key === "Enter") act(); }} aria-label={`${label}: show tasks`}>
       {band && <span className={`rag ${r}`} title={RAG_LABEL[r]} />}
-      <div className="lab">{label}<DefTip label={label} def={def} k={k} rate={rate} target={target} /></div>
-      <div className="v">{rate ? fmtP(v) : k.n}{rate && k.of !== undefined && <small>{k.n} of {k.of}</small>}</div>
+      <div className="kpi-h"><div className="v">{rate ? fmtP(v) : k.n}</div><div className="lab">{label}<DefTip label={label} def={def} k={k} rate={rate} target={target} /></div></div>
+      {rate && k.of !== undefined && <div className="sub mono">{k.n} of {k.of}</div>}
       <div className="foot">{k.prev !== undefined ? <Delta cur={v} prev={k.prev} goodUp={goodUp} unit={rate ? "pts" : ""} /> : <span />}{target && <span className="tgt">{target}</span>}</div>
     </div>
   );
@@ -96,7 +96,7 @@ export type Col<R> = { key: string; label: string; num?: boolean; value: (r: R) 
 
 /** Sortable, searchable table with column picker, paging, CSV export and optional row expansion.
  *  Pass `query` when the page has its own search box; the table then hides its own. */
-export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = PAGE, toolbar, initialSort, name, empty = "Nothing to show for these filters.", query }: {
+export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, toolbar, initialSort, name, empty = "Nothing to show for these filters.", query }: {
   cols: Col<R>[]; rows: R[]; rowKey: (r: R) => string | number; search?: (r: R) => string; expand?: (r: R) => ReactNode;
   pageSize?: number; toolbar?: ReactNode; initialSort?: { key: string; dir: 1 | -1 }; name: string; empty?: string; query?: string;
 }) {
@@ -105,6 +105,8 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = PAGE, 
   const [sort, setSort] = useState(initialSort ?? null);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(cols.filter((c) => c.hidden).map((c) => c.key)));
   const [page, setPage] = useState(0);
+  const [chosen, setSize] = usePageSize();
+  const pageSize = fixed ?? chosen;
   const [openRows, setOpenRows] = useState<Set<string | number>>(new Set());
   const [pick, setPick] = useState(false);
   const [csv, setCsv] = useState<string | null>(null);
@@ -125,8 +127,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = PAGE, 
     return l;
   }, [rows, q, sort, cols, search]);
   useEffect(() => setPage(0), [query]);
-  const pages = Math.max(1, Math.ceil(list.length / pageSize));
-  const pg = Math.min(page, pages - 1);
+  const pg = clampPage(page, list.length, pageSize);
   const view = list.slice(pg * pageSize, pg * pageSize + pageSize);
   const toCsv = () => {
     const esc = (v: unknown) => { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
@@ -149,7 +150,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = PAGE, 
         </span>
         <button type="button" className="btn sm" onClick={() => setCsv(toCsv())}>Export CSV</button>
       </div>
-      <div className="tbl sticky"><table className="tt">
+      <div className="tbl"><table className="tt">
         <thead><tr>
           {expand && <th style={{ width: 28 }} />}
           {shown.map((c) => (
@@ -175,7 +176,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = PAGE, 
           })}
         </tbody>
       </table></div>
-      <Pager page={pg} total={list.length} size={pageSize} setPage={setPage} />
+      <Pager page={pg} total={list.length} size={pageSize} setPage={setPage} setSize={fixed ? undefined : setSize} />
       {csv !== null && <CopyModal title={`Export ${name}`} text={csv} file={`${name.toLowerCase().replace(/\W+/g, "-")}.csv`} close={() => setCsv(null)} />}
     </div>
   );

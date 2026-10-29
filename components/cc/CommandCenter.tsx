@@ -79,7 +79,7 @@ function TimeTile({ label, t, band, def }: { label: string; t: { ms: number | nu
   const r = h === null ? "" : h <= band[0] ? "g" : h <= band[1] ? "a" : "r";
   return (
     <div className="kpi"><span className={`rag ${r}`} title={r === "g" ? "Healthy" : r === "a" ? "Watch" : r === "r" ? "Act now" : "No data"} />
-      <div className="lab">{label}<DefTip label={label} def={def} target={`Under ${band[0]}h`} /></div><div className="v">{dur(t.ms)}</div>
+      <div className="kpi-h"><div className="v">{dur(t.ms)}</div><div className="lab">{label}<DefTip label={label} def={def} target={`Under ${band[0]}h`} /></div></div>
       <div className="foot"><Delta cur={h === null ? null : Math.round(h)} prev={t.prev === null ? null : Math.round(t.prev / 3600_000)} goodUp={false} unit="h" /><span className="tgt">Under {band[0]}h</span></div>
     </div>
   );
