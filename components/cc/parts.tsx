@@ -107,7 +107,8 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, to
   const [csv, setCsv] = useState<string | null>(null);
   const shown = cols.filter((c) => !hidden.has(c.key));
   const list = useMemo(() => {
-    let l = q && search ? rows.filter((r) => search(r).toLowerCase().includes(q.toLowerCase())) : rows;
+    const text = search ?? ((r: R) => cols.map((c) => String(c.value(r) ?? "")).join(" "));
+    let l = q ? rows.filter((r) => text(r).toLowerCase().includes(q.toLowerCase())) : rows;
     if (sort) {
       const c = cols.find((x) => x.key === sort.key);
       if (c) l = [...l].sort((a, b) => {
@@ -130,7 +131,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, to
   return (
     <div className="ttable">
       <div className="ttool">
-        {search && <input type="search" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} aria-label={`Search ${name}`} className="search" />}
+        {<input type="search" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} aria-label={`Search ${name}`} className="search" />}
         {toolbar}
         <span className="spacer" />
         <span className="pickwrap">
@@ -144,7 +145,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, to
         </span>
         <button type="button" className="btn sm" onClick={() => setCsv(toCsv())}>Export CSV</button>
       </div>
-      <div className="tbl sticky"><table>
+      <div className="tbl sticky"><table className="tt">
         <thead><tr>
           {expand && <th style={{ width: 28 }} />}
           {shown.map((c) => (

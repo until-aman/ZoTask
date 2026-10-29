@@ -22,8 +22,8 @@ export default async function Admin() {
       <div className="row2"><h1>Admin</h1><span className="spacer" /><Link className="btn primary" href="/admin/templates/new">+ New task</Link></div>
       <section>
         <h2>Task setup</h2>
-        <div className="tbl"><table>
-          <thead><tr><th>Task</th><th>Category</th><th>Role</th><th>When</th><th>Window</th><th className="n">Review / audit SLA</th><th className="n">Attempts</th><th className="n">Audit sample</th><th>Reviewer · Auditor</th><th className="n">Properties</th><th /></tr></thead>
+        <div className="tbl"><table className="tt">
+          <thead><tr><th>Task</th><th>Category</th><th>Role</th><th>When</th><th>Window</th><th className="n">Review / audit SLA</th><th className="n">Attempts</th><th className="n">Audit sample</th><th>Reviewer / auditor</th><th className="n">Properties</th><th /></tr></thead>
           <tbody>{templates.map((t) => (
             <tr key={t.id} style={{ opacity: t.active ? 1 : 0.5 }}>
               <td><b>{t.name}</b>{t.criticality === "high" && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}{!t.active && <span className="pill" style={{ marginLeft: 6 }}>Paused</span>}</td>
@@ -31,7 +31,7 @@ export default async function Admin() {
               <td>{t.trigger === "scheduled" ? t.frequency : t.trigger === "event" ? `On “${t.event_name}”` : "On demand"}</td>
               <td>{t.window_start}–{t.window_end}</td>
               <td className="n">{t.review_sla_h}h / {t.audit_sla_h}h</td><td className="n">{t.attempts_allowed}</td><td className="n">{Math.round(t.audit_rate * 100)}%</td>
-              <td className="small">{t.reviewer ?? "—"} · {t.auditor ?? "—"}</td><td className="n">{t.props}</td>
+              <td className="small"><div>{t.reviewer ?? "—"}</div><div className="muted">{t.auditor ?? "—"}</div></td><td className="n">{t.props}</td>
               <td><Link href={`/admin/templates/${t.id}`}>Edit</Link></td>
             </tr>
           ))}</tbody>

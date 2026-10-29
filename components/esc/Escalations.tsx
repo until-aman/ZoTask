@@ -80,7 +80,7 @@ export default function Escalations({ data: d }: { data: EscData }) {
     { key: "due", label: "Expected closure", value: (r) => r.due, render: (r) => !r.due ? "—" : <span className={r.overdue ? "t-r" : ""} style={{ fontWeight: r.overdue ? 800 : 400 }}>{dayIso(r.due)}{r.overdue ? ` · ${daysBetween(r.due, d.today)}d late` : isOpen(r.status) && r.due <= soon ? " · due soon" : ""}</span> },
     { key: "status", label: "Status", value: (r) => STATUS[r.status], render: (r) => <span className={`pill ${PILL[r.status]}`}>{STATUS[r.status]}</span> },
     { key: "age", label: "Days open", num: true, value: (r) => Math.floor(((r.closed ?? d.now) - r.created) / DAY), hidden: true },
-    { key: "updated", label: "Last update", value: (r) => r.updated, render: (r) => { const u = r.updates[r.updates.length - 1]; return <span className="small"><span className="muted">{ago(r.updated, d.now)}</span>{u?.note ? <span className="ell" style={{ maxWidth: 200, display: "inline-block", verticalAlign: "bottom" }} title={u.note}> · {u.note}</span> : null}</span>; }, csv: (r) => r.updates[r.updates.length - 1]?.note ?? "" },
+    { key: "updated", label: "Last update", value: (r) => r.updated, render: (r) => { const u = r.updates[r.updates.length - 1]; return <div className="small esc-upd"><span>{ago(r.updated, d.now)}</span>{u?.note ? <span className="muted ell" title={u.note}>{u.note}</span> : null}</div>; }, csv: (r) => r.updates[r.updates.length - 1]?.note ?? "" },
     { key: "prio", label: "Priority", value: (r) => PRIO[r.priority], hidden: true },
     { key: "mail", label: "Email subject", value: (r) => r.mailSubject || null, hidden: true },
   ];

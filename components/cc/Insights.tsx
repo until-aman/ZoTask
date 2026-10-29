@@ -146,7 +146,7 @@ export function Recurring({ d }: { d: CC }) {
   return (
     <Sec title="Recurring problems" tip={<InfoTip title="Recurring problems" rows={[["Missed", "Same task missed 2+ times at a property"], ["Sent back", "Same task sent back on 3+ days"], ["Reason", "Same reason 3+ times at a property"], ["Reviews", "A cluster where 30%+ of tasks were reviewed late"]]} note="One-off incidents are left out." />}>
       {!d.recurring.length ? <p className="muted">No repeating patterns in this period.</p> : (
-        <div className="grid" style={{ gap: 0 }}>{d.recurring.map((r, i) => (
+        <div className="recur">{d.recurring.map((r, i) => (
           <div key={i} className="att" style={{ gridTemplateColumns: "minmax(0,1fr) auto auto" }}>
             <div style={{ minWidth: 0 }}><div className="tname" style={{ fontSize: 13.5 }}>{r.title}</div><div className="tsub">{r.sub}</div></div>
             <span className="small muted">{r.owner}</span>

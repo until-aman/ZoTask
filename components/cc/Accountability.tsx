@@ -116,25 +116,22 @@ export function Housekeeping({ d }: { d: CC }) {
   type S = CC["staff"][number];
   return (
     <Sec title="Housekeeping count" tip={<InfoTip title="Housekeeping count" rows={[["HK", "Housekeeper"], ["SHK", "Senior housekeeper (supervisor)"], ["Ideal", "How many the property should have"], ["Current", "How many are on the roster today"], ["To hire", "Ideal minus Current"]]} note="Sample numbers in this prototype." />}>
-      <div className="hkgrid">
-        {([["HK", hk.ihk, hk.chk], ["SHK", hk.ishk, hk.cshk]] as [string, number, number][]).map(([l, ideal, cur]) => {
-          const gap = Math.max(0, ideal - cur);
-          return <div key={l} className="kpi"><span className={`rag ${gap > 0 ? "r" : "g"}`} /><div className="lab">{l} to hire</div>
-            <div className="v" style={{ color: gap > 0 ? "var(--red)" : "var(--green)" }}>{gap}<small>{cur} of {ideal} in place</small></div></div>;
-        })}
-      </div>
-      <details>
-        <summary className="small" style={{ cursor: "pointer", color: "var(--blue-d)", fontWeight: 700 }}>By property</summary>
-        <div style={{ marginTop: 8 }}>
-          <Table<S> name="Housekeeping" rows={d.staff} rowKey={(x) => x.property_id} initialSort={{ key: "hkGap", dir: -1 }} cols={[
-            { key: "name", label: "Property", sticky: true, value: (x) => x.name },
-            { key: "ihk", label: "Ideal HK", num: true, value: (x) => x.ideal_hk }, { key: "chk", label: "Current HK", num: true, value: (x) => x.current_hk },
-            { key: "hkGap", label: "HK to hire", num: true, value: (x) => Math.max(0, x.ideal_hk - x.current_hk), render: (x) => { const g = Math.max(0, x.ideal_hk - x.current_hk); return <b className={g ? "t-r" : ""}>{g}</b>; } },
-            { key: "ishk", label: "Ideal SHK", num: true, value: (x) => x.ideal_shk }, { key: "cshk", label: "Current SHK", num: true, value: (x) => x.current_shk },
-            { key: "shkGap", label: "SHK to hire", num: true, value: (x) => Math.max(0, x.ideal_shk - x.current_shk), render: (x) => { const g = Math.max(0, x.ideal_shk - x.current_shk); return <b className={g ? "t-r" : ""}>{g}</b>; } },
-          ]} />
+      <div className="hkwrap">
+        <div className="hkgrid">
+          {([["HK", hk.ihk, hk.chk], ["SHK", hk.ishk, hk.cshk]] as [string, number, number][]).map(([l, ideal, cur]) => {
+            const gap = Math.max(0, ideal - cur);
+            return <div key={l} className="kpi"><span className={`rag ${gap > 0 ? "r" : "g"}`} /><div className="lab">{l} to hire</div>
+              <div className="v" style={{ color: gap > 0 ? "var(--red)" : "var(--green)" }}>{gap}<small>{cur} of {ideal} in place</small></div></div>;
+          })}
         </div>
-      </details>
+        <Table<S> name="Housekeeping" rows={d.staff} rowKey={(x) => x.property_id} initialSort={{ key: "hkGap", dir: -1 }} pageSize={6} cols={[
+          { key: "name", label: "Property", sticky: true, value: (x) => x.name },
+          { key: "ihk", label: "Ideal HK", num: true, value: (x) => x.ideal_hk }, { key: "chk", label: "Current HK", num: true, value: (x) => x.current_hk },
+          { key: "hkGap", label: "HK to hire", num: true, value: (x) => Math.max(0, x.ideal_hk - x.current_hk), render: (x) => { const g = Math.max(0, x.ideal_hk - x.current_hk); return <b className={g ? "t-r" : ""}>{g}</b>; } },
+          { key: "ishk", label: "Ideal SHK", num: true, value: (x) => x.ideal_shk }, { key: "cshk", label: "Current SHK", num: true, value: (x) => x.current_shk },
+          { key: "shkGap", label: "SHK to hire", num: true, value: (x) => Math.max(0, x.ideal_shk - x.current_shk), render: (x) => { const g = Math.max(0, x.ideal_shk - x.current_shk); return <b className={g ? "t-r" : ""}>{g}</b>; } },
+        ]} />
+      </div>
     </Sec>
   );
 }

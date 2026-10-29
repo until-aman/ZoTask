@@ -28,7 +28,7 @@ export default function DashFilters({ geo, init, range, cats = [], mine, reviewe
   const clusters = [...new Set(geo.filter((g) => !city || g.city === city).map((g) => g.cluster))];
   const props = geo.filter((g) => (!city || g.city === city) && (!cluster || g.cluster === cluster));
   return (
-    <div className="row2">
+    <div className="row2 dashf">
       <div className="seg">
         {PRESETS.map(([k, l]) => (
           <button key={k} type="button" aria-pressed={preset === k} onClick={() => { setPreset(k); if (k !== "custom") go({ range: k }); }}>{l}</button>
