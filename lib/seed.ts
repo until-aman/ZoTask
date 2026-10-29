@@ -56,6 +56,16 @@ function rng(seed: number) {
   };
 }
 
+/** Sample HK/SHK headcounts: ideal scales with property size, current runs a little short at some properties. */
+export function seedStaffing() {
+  const R = rng(7);
+  for (const { id } of all<{ id: number }>("SELECT id FROM properties ORDER BY id")) {
+    const idealHk = 4 + Math.floor(R() * 7), idealShk = idealHk >= 8 ? 2 : 1;
+    const currentHk = Math.max(1, idealHk - Math.floor(R() * 4)), currentShk = R() < 0.3 ? idealShk - 1 : idealShk;
+    run("INSERT OR REPLACE INTO staffing (property_id, ideal_hk, current_hk, ideal_shk, current_shk) VALUES (?,?,?,?,?)", id, idealHk, currentHk, idealShk, currentShk);
+  }
+}
+
 export function seed() {
   const R = rng(20261029);
   const pick = <T,>(a: T[]) => a[Math.floor(R() * a.length)];
@@ -96,6 +106,7 @@ export function seed() {
       }
     }
     const allProps = all<{ id: number }>("SELECT id FROM properties").map((p) => p.id);
+    seedStaffing();
     const reviewers = [ids["Vankadara Lakshmi Kavya"], ids["Hrithik Singh"], ids["Priya Menon"]];
     const auditors = [ids["Karthick L"], ids["Neeraj"]];
     TEMPLATES.forEach((t, ix) => {

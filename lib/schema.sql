@@ -75,3 +75,8 @@ CREATE TABLE IF NOT EXISTS saved_views (
   filters TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+-- Housekeeping headcount per property: ideal (as planned) vs current (on the roster). HK = housekeeper, SHK = senior housekeeper / supervisor.
+CREATE TABLE IF NOT EXISTS staffing (
+  property_id INTEGER PRIMARY KEY REFERENCES properties(id),
+  ideal_hk INTEGER NOT NULL, current_hk INTEGER NOT NULL, ideal_shk INTEGER NOT NULL, current_shk INTEGER NOT NULL
+);

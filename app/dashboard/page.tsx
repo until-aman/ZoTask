@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { boot } from "@/lib/boot";
 import { can, scopeProps } from "@/lib/auth";
 import { geo, Row } from "@/lib/queries";
+import { all } from "@/lib/db";
 import * as M from "@/lib/metrics";
 import { HOUR, fmtDate, isoDate } from "@/lib/time";
 import RemindAll from "@/components/RemindAll";
@@ -85,6 +86,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const cities = [...new Set(G.map((g) => g.city))];
   const clusters = [...new Set(G.filter((g) => !sp.city || g.city === sp.city).map((g) => g.cluster))];
   const propsOpts = G.filter((g) => (!sp.city || g.city === sp.city) && (!sp.cluster || g.cluster === sp.cluster));
+  const staff = all<{ property_id: number; ideal_hk: number; current_hk: number; ideal_shk: number; current_shk: number }>(
+    `SELECT * FROM staffing WHERE property_id IN (${props.join(",") || 0})`);
+  const hk = staff.reduce((t, x) => ({ ihk: t.ihk + x.ideal_hk, chk: t.chk + x.current_hk, ishk: t.ishk + x.ideal_shk, cshk: t.cshk + x.current_shk }), { ihk: 0, chk: 0, ishk: 0, cshk: 0 });
+  const gaps = staff.map((x) => ({ ...x, name: G.find((g) => g.id === x.property_id)!.property, hkGap: Math.max(0, x.ideal_hk - x.current_hk), shkGap: Math.max(0, x.ideal_shk - x.current_shk) }))
+    .sort((a, b) => b.hkGap + b.shkGap - (a.hkGap + a.shkGap));
   const recoverable = open.filter((r) => r.status === "notsub");
   const maxReason = Math.max(1, ...reasons.map((r) => r.n));
 
@@ -142,6 +148,31 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           </div>
         </section>
       </div>
+
+      <section className="card score">
+        <h3>Housekeeping count<InfoTip><b>Ideal</b>: how many the property should have. <b>Current</b>: how many are on the roster today. <b>To hire</b>: Ideal minus Current. HK is a housekeeper, SHK a senior housekeeper (supervisor). Sample numbers in this prototype.</InfoTip></h3>
+        <div className="hkgrid">
+          {[["HK", hk.ihk, hk.chk], ["SHK", hk.ishk, hk.cshk]].map(([l, ideal, cur]) => {
+            const gap = Math.max(0, (ideal as number) - (cur as number));
+            return (
+              <div key={l as string} className="kpi"><span className={`rag ${gap > 0 ? "r" : "g"}`} />
+                <div className="lab">{l} to hire</div><div className="v" style={{ color: gap > 0 ? "var(--red)" : "var(--green)" }}>{gap}<small>{cur}/{ideal} in place</small></div></div>
+            );
+          })}
+        </div>
+        <details>
+          <summary className="small" style={{ cursor: "pointer", color: "var(--blue-d)", fontWeight: 700 }}>By property</summary>
+          <div className="tbl" style={{ marginTop: 8 }}><table>
+            <thead><tr><th>Property</th><th className="n">Ideal HK</th><th className="n">Current HK</th><th className="n">HK to hire</th><th className="n">Ideal SHK</th><th className="n">Current SHK</th><th className="n">SHK to hire</th></tr></thead>
+            <tbody>{gaps.map((x) => (
+              <tr key={x.property_id}><td>{x.name}</td><td className="n">{x.ideal_hk}</td><td className="n">{x.current_hk}</td>
+                <td className="n" style={{ color: x.hkGap ? "var(--red)" : undefined, fontWeight: x.hkGap ? 700 : undefined }}>{x.hkGap}</td>
+                <td className="n">{x.ideal_shk}</td><td className="n">{x.current_shk}</td>
+                <td className="n" style={{ color: x.shkGap ? "var(--red)" : undefined, fontWeight: x.shkGap ? 700 : undefined }}>{x.shkGap}</td></tr>
+            ))}</tbody>
+          </table></div>
+        </details>
+      </section>
 
       <div className="grid g2">
         <section className="card">
