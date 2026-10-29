@@ -223,7 +223,6 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               {defView && <button type="button" className="link" onClick={() => { setF({ ...empty, ...defView.f }); setActiveView(defView.id); setDate("today"); setToast(`Back to “${defView.name}”`); }}>Reset to my default</button>}
               <button type="button" className="btn outline" onClick={() => setModal("save")}>Save these filters</button>
             </div>
-            <div className="info"><i>i</i><span>Dates apply to every tab. Use 7 days or Custom to see older pending work.</span></div>
           </section>
 
           <section className="listcard" aria-label="Tasks">
