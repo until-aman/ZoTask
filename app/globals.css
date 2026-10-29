@@ -313,3 +313,19 @@ table.aq td>.acts{display:flex}
 .tip-note{padding-top:5px}
 .tip-rows{grid-template-columns:auto minmax(0,1fr);gap:3px 10px}
 .tip-row{display:contents}
+/* Compare */
+.cc{--cmp-a:#2563eb;--cmp-b:#d97706}
+.cmp-ctl{display:grid;gap:10px}
+.cmp-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle;flex:none}
+.cmp-dot.a{background:var(--cmp-a)} .cmp-dot.b{background:var(--cmp-b)}
+.cmp-who{display:grid;gap:4px;border-top:3px solid var(--cmp-a)} .cmp-who.b{border-top-color:var(--cmp-b)}
+.cmp-name{font-size:17px}
+.cmp-tbl td,.cmp-tbl th{white-space:nowrap}
+.cmp-win{font-weight:800;background:var(--green-soft)}
+.cmp-bars{display:grid;gap:3px;min-width:80px}
+.cmp-bars i{display:block;height:6px;border-radius:3px;min-width:2px}
+.cmp-bars i.a{background:var(--cmp-a)} .cmp-bars i.b{background:var(--cmp-b)}
+.cmp-tag{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;white-space:nowrap;color:#fff;background:var(--cmp-a)} .cmp-tag.b{background:var(--cmp-b)}
+.cmp-list{margin:4px 0 8px;padding-left:18px;display:grid;gap:3px;font-size:13px}
+.cmp-h{font-weight:700;margin-top:4px}
+@media (max-width:640px){.cmp-tbl .hide-sm{display:none}}

@@ -193,7 +193,7 @@ export function CopyModal({ title, text, file, close }: { title: string; text: s
         <textarea ref={(el) => { ta = el; }} readOnly value={text} style={{ minHeight: 260, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 }} />
         <div className="row2">
           <button type="button" className="btn primary" onClick={() => copy(ta)}>Copy</button>
-          {file && <a className="btn" href={`data:text/csv;charset=utf-8,${encodeURIComponent(text)}`} download={file}>Download</a>}
+          {file && <a className="btn" href={`data:${file.endsWith(".csv") ? "text/csv" : "text/markdown"};charset=utf-8,${encodeURIComponent(text)}`} download={file}>Download</a>}
           {msg && <span className="small ok" style={{ padding: "4px 10px" }}>{msg}</span>}
         </div>
       </div>

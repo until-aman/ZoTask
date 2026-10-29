@@ -21,20 +21,20 @@ export type Issue = {
   owner: string; ownerRole: string; status: string; overdue: number | null; rejections: number; comment: string | null;
   ack: { by: string; at: number } | null; esc: { detail: string; by: string; at: number } | null; critical: boolean;
 };
-type Rv = { id: number; instance_id: number; reviewer_id: number; reviewer: string; kind: string; decision: string; decided_at: number;
+export type Rv = { id: number; instance_id: number; reviewer_id: number; reviewer: string; kind: string; decision: string; decided_at: number;
   due_at: number | null; submitted_at: number; attempt: number; property_id: number; category: string; i_reviewer: number | null; comment: string | null };
 
-const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : null);
-const dayStart = (d: string) => new Date(d + "T00:00").getTime();
-function quant(xs: number[], q: number) {
+export const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : null);
+export const dayStart = (d: string) => new Date(d + "T00:00").getTime();
+export function quant(xs: number[], q: number) {
   if (!xs.length) return null;
   const s = [...xs].sort((a, b) => a - b);
   return s[Math.min(s.length - 1, Math.floor(q * s.length))];
 }
-const uniq = (xs: number[]) => [...new Set(xs)];
-const REVIEW_ST = ["review", "resub"];
+export const uniq = (xs: number[]) => [...new Set(xs)];
+export const REVIEW_ST = ["review", "resub"];
 const INPROG = ["review", "resub", "changes", "audit", "auditflag", "flagans"];
-const PASSED_ST = ["audit", "auditflag", "flagans", "done"];
+export const PASSED_ST = ["audit", "auditflag", "flagans", "done"];
 export const REASON_GROUP: Record<string, string> = {
   "Photo missing": "Documentation", "Photo unclear": "Documentation", "Item not done": "Not done",
   "Count mismatch": "Data quality", "Wrong location": "Data quality", Other: "Other",
@@ -48,7 +48,7 @@ const toT = (r: Row): T => ({
 });
 
 /** Ground team figures for a set of tasks. `sentBack` counts send-backs per task. */
-function ground(list: Row[], sentBack: Map<number, number>, passed: Set<number>, now: number) {
+export function ground(list: Row[], sentBack: Map<number, number>, passed: Set<number>, now: number) {
   const act = list.filter((r) => r.status !== "waived");
   const due = act.filter((r) => r.window_end_at <= now);
   const ids = (xs: Row[]) => xs.map((r) => r.id);
@@ -74,7 +74,7 @@ function ground(list: Row[], sentBack: Map<number, number>, passed: Set<number>,
 type G = ReturnType<typeof ground>;
 
 /** Review figures for checks decided in a period plus the backlog now. Checks are review attempts; tasks are counted once. */
-function reviewing(revs: Rv[], backlog: Row[], now: number) {
+export function reviewing(revs: Rv[], backlog: Row[], now: number) {
   const checks = revs.filter((r) => r.kind === "review");
   const byTask = new Map<number, Rv[]>();
   for (const x of checks) byTask.set(x.instance_id, [...(byTask.get(x.instance_id) ?? []), x]);
