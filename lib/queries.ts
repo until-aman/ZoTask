@@ -28,18 +28,18 @@ export const ROW_SQL = `
   LEFT JOIN users uu ON uu.id=i.auditor_id
   LEFT JOIN users uc ON uc.id=p.cbm_id`;
 
-export function rows(where: string, ...params: unknown[]): Row[] {
-  return all<Row>(`${ROW_SQL} WHERE ${where}`, ...params);
+export async function rows(where: string, ...params: unknown[]): Promise<Row[]> {
+  return await all<Row>(`${ROW_SQL} WHERE ${where}`, ...params);
 }
 
-export function geo() {
-  return all<{ city: string; cluster: string; property: string; id: number }>(
+export async function geo() {
+  return await all<{ city: string; cluster: string; property: string; id: number }>(
     `SELECT c.name city, cl.name cluster, p.name property, p.id FROM properties p
      JOIN clusters cl ON cl.id=p.cluster_id JOIN cities c ON c.id=cl.city_id ORDER BY c.name, cl.name, p.name`);
 }
 
-export function eventsFor(instanceId: number) {
-  return all<{ id: number; at: number; type: string; detail: string; actor: string | null }>(
+export async function eventsFor(instanceId: number) {
+  return await all<{ id: number; at: number; type: string; detail: string; actor: string | null }>(
     `SELECT e.id, e.at, e.type, e.detail, u.name actor FROM events e LEFT JOIN users u ON u.id=e.actor_id
      WHERE e.instance_id=? ORDER BY e.at, e.id`, instanceId);
 }

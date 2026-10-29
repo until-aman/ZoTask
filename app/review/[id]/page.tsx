@@ -11,19 +11,19 @@ import Timeline from "@/components/Timeline";
 export default async function ReviewSheet({ params }: { params: Promise<{ id: string }> }) {
   const u = await boot();
   const id = Number((await params).id);
-  const [r] = rows("i.id=?", id);
+  const [r] = await rows("i.id=?", id);
   if (!r) notFound();
-  const items = itemsFor(r.template_id);
-  const subs = all<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; by_name: string }>(
+  const items = await itemsFor(r.template_id);
+  const subs = await all<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; by_name: string }>(
     "SELECT s.*, u.name AS by_name FROM submissions s JOIN users u ON u.id=s.submitted_by WHERE instance_id=? ORDER BY attempt", id);
-  const answers = all<{ submission_id: number; item_id: number; checked: number; value: string | null; note: string | null; photos: string; reply: string | null }>(
+  const answers = await all<{ submission_id: number; item_id: number; checked: number; value: string | null; note: string | null; photos: string; reply: string | null }>(
     `SELECT a.* FROM answers a JOIN submissions s ON s.id=a.submission_id WHERE s.instance_id=?`, id);
-  const reviews = all<{ id: number; kind: string; decision: string; decided_at: number; reviewer: string; comment: string | null; submission_id: number }>(
+  const reviews = await all<{ id: number; kind: string; decision: string; decided_at: number; reviewer: string; comment: string | null; submission_id: number }>(
     "SELECT r.*, u.name reviewer FROM reviews r JOIN users u ON u.id=r.reviewer_id WHERE instance_id=? ORDER BY decided_at", id);
-  const flags = all<{ id: number; review_id: number; item_id: number; reason: string; comment: string | null; answer: string | null }>(
+  const flags = await all<{ id: number; review_id: number; item_id: number; reason: string; comment: string | null; answer: string | null }>(
     "SELECT f.* FROM review_flags f JOIN reviews r ON r.id=f.review_id WHERE r.instance_id=?", id);
   const latest = subs[subs.length - 1];
-  const missing = latest ? missingEvidence(latest.id, r.template_id).map((m) => m.id) : [];
+  const missing = latest ? (await missingEvidence(latest.id, r.template_id)).map((m) => m.id) : [];
 
   const mode =
     ["review", "resub"].includes(r.status) && ["reviewer", "admin"].includes(u.access_role) ? "review" :
@@ -66,7 +66,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
       {mode === "waive" && <ReviewForm instanceId={id} mode="waive" items={[]} latest={{}} previous={null} prevFlags={[]} auditFlags={[]} missing={[]} />}
       <div className="card">
         <h2>History</h2>
-        <Timeline events={eventsFor(id)} />
+        <Timeline events={await eventsFor(id)} />
       </div>
     </div>
   );

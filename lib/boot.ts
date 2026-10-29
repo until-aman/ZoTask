@@ -3,6 +3,6 @@ import { sweep } from "./engine";
 
 /** Every page: bring task states up to date, then resolve the signed-in user. */
 export async function boot() {
-  sweep();
+  await sweep();
   return requireUser();
 }

@@ -7,5 +7,5 @@ import ComparePage from "@/components/cc/ComparePage";
 export default async function Compare({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const u = await boot();
   if (!can.dashboard(u)) redirect("/tasks");
-  return <ComparePage data={compareData(u, await searchParams)} />;
+  return <ComparePage data={await compareData(u, await searchParams)} />;
 }

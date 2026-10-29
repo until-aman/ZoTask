@@ -1,6 +1,7 @@
 "use client";
 // Escalation tracker: the central team raises issues with other teams, follows them to closure, and leadership sees the totals.
 import { useEffect, useMemo, useState } from "react";
+import { uploadPhoto } from "../upload";
 import { useRouter } from "next/navigation";
 import type { Esc, EscData } from "@/lib/escalations";
 import { raiseEscalation, updateEscalation } from "@/app/actions";
@@ -342,9 +343,8 @@ function PhotoAdd({ photos, setPhotos }: { photos: string[]; setPhotos: (p: stri
     setBusy(true);
     const names: string[] = [];
     for (const f of Array.from(files).slice(0, 6)) {
-      const fd = new FormData(); fd.append("file", f);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      if (res.ok) names.push((await res.json()).name);
+      const n = await uploadPhoto(f);
+      if (n) names.push(n);
     }
     setBusy(false);
     setPhotos([...photos, ...names]);

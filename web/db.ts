@@ -7,7 +7,6 @@ type Stmt = { bind(p: unknown[]): void; step(): boolean; getAsObject(): Record<s
 type SqlDb = { prepare(sql: string): Stmt; exec(sql: string): { values: unknown[][] }[]; run(sql: string): void; getRowsModified(): number };
 let raw: SqlDb | null = null;
 const cache = new Map<string, Stmt>();
-let depth = 0;
 export const UPLOAD_DIR = "";
 
 function stmt(sql: string) {
@@ -28,29 +27,27 @@ function prepare(sql: string) {
     },
   };
 }
-const api = {
-  prepare,
-  exec: (sql: string) => raw!.exec(sql),
-  pragma: () => undefined,
-  transaction: <T,>(fn: () => T) => () => {
-    const name = `sp${depth++}`;
-    raw!.run(`SAVEPOINT ${name}`);
-    try { const r = fn(); raw!.run(`RELEASE ${name}`); return r; }
-    catch (e) { raw!.run(`ROLLBACK TO ${name}`); raw!.run(`RELEASE ${name}`); throw e; }
-    finally { depth--; }
-  },
-};
+let inTx = false;
+async function transaction<T>(fn: () => Promise<T>): Promise<T> {
+  // One tab, one user: a tx() started while another runs simply joins it.
+  if (inTx) return fn();
+  inTx = true;
+  raw!.run("SAVEPOINT tx");
+  try { const r = await fn(); raw!.run("RELEASE tx"); return r; }
+  catch (e) { raw!.run("ROLLBACK TO tx"); raw!.run("RELEASE tx"); throw e; }
+  finally { inTx = false; }
+}
 
 export async function init(initSqlJs: (o?: unknown) => Promise<{ Database: new () => SqlDb }>) {
   const SQL = await initSqlJs();
   raw = new SQL.Database();
   raw.exec(schema);
-  seed();
-  seedEscalations();
+  await seed();
+  await seedEscalations();
   raw.run("INSERT INTO meta (k, v) VALUES ('seeded', '1')");
 }
-export function db() { return api; }
-export function all<T = any>(sql: string, ...params: unknown[]): T[] { return prepare(sql).all(...params) as T[]; }
-export function one<T = any>(sql: string, ...params: unknown[]): T | undefined { return prepare(sql).get(...params) as T | undefined; }
-export function run(sql: string, ...params: unknown[]) { return prepare(sql).run(...params); }
-export function tx<T>(fn: () => T): T { return api.transaction(fn)(); }
+export async function all<T = any>(sql: string, ...params: unknown[]): Promise<T[]> { return prepare(sql).all(...params) as T[]; }
+export async function one<T = any>(sql: string, ...params: unknown[]): Promise<T | undefined> { return prepare(sql).get(...params) as T | undefined; }
+export async function run(sql: string, ...params: unknown[]) { return prepare(sql).run(...params); }
+export function tx<T>(fn: () => Promise<T>): Promise<T> { return transaction(fn); }
+export async function batch(stmts: [sql: string, ...params: unknown[]][]) { await transaction(async () => { for (const [sql, ...p] of stmts) prepare(sql).run(...p); }); }

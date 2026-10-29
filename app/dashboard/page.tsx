@@ -7,5 +7,5 @@ import CommandCenter from "@/components/cc/CommandCenter";
 export default async function Dashboard({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const u = await boot();
   if (!can.dashboard(u)) redirect("/tasks");
-  return <CommandCenter data={buildCommand(u, await searchParams)} />;
+  return <CommandCenter data={await buildCommand(u, await searchParams)} />;
 }

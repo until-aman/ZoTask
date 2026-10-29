@@ -15,6 +15,17 @@ Open http://localhost:3000 and pick anyone on the sign-in page to see ZoTask fro
 
 For a production build: `npm run build && npm start`.
 
+## Put it online (Vercel + Turso, free plans)
+
+The app stores data in SQLite through libSQL, so the same code runs on a local file or on [Turso](https://turso.tech) (hosted SQLite). Photos go to `data/uploads` locally, or to Vercel Blob when it is connected.
+
+1. Import this repository in Vercel (Add New → Project). No build settings need changing.
+2. In the project's Storage tab, create a **Turso** database (free plan, region Mumbai) and connect it. That adds `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`.
+3. In the same tab, create a **Blob** store and connect it. That adds `BLOB_READ_WRITE_TOKEN`.
+4. Redeploy. The first visit creates the tables and loads the sample data (a few seconds).
+
+`vercel.json` pins the server to Mumbai (`bom1`) so it sits next to a Mumbai database. Photos are shrunk in the browser before upload to stay under Vercel's 4.5 MB request limit.
+
 ## Who sees what
 
 | Role | Screens |
@@ -46,6 +57,8 @@ Time-based moves (`lib/engine.ts → sweep`) run on every page load, and today's
 ## Code map
 
 - `lib/schema.sql` – tables
+- `lib/db.ts` – database access (local file or Turso), transactions, first-run seeding
+- `lib/files.ts` – photo storage (disk or Vercel Blob)
 - `lib/engine.ts` – lifecycle rules (generate, sweep, submit, review, audit, flags, waive, remind)
 - `lib/seed.ts` – sample data and history simulation
 - `lib/metrics.ts` – shared KPI helpers (date ranges, loaders)

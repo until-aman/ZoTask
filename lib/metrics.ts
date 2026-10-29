@@ -39,9 +39,9 @@ export function execution(list: Row[], now: number) {
 }
 
 type Rev = { id: number; instance_id: number; reviewer_id: number; reviewer: string; kind: string; decision: string; decided_at: number; due_at: number | null; submitted_at: number; property_id: number };
-export function reviewsIn(r: Range, props: number[]): Rev[] {
+export async function reviewsIn(r: Range, props: number[]): Promise<Rev[]> {
   const from = new Date(r.from + "T00:00").getTime(), to = new Date(r.to + "T00:00").getTime() + 864e5;
-  return all<Rev>(`SELECT rv.id, rv.instance_id, rv.reviewer_id, u.name reviewer, rv.kind, rv.decision, rv.decided_at, rv.due_at, s.submitted_at, i.property_id
+  return await all<Rev>(`SELECT rv.id, rv.instance_id, rv.reviewer_id, u.name reviewer, rv.kind, rv.decision, rv.decided_at, rv.due_at, s.submitted_at, i.property_id
     FROM reviews rv JOIN users u ON u.id=rv.reviewer_id JOIN submissions s ON s.id=rv.submission_id JOIN instances i ON i.id=rv.instance_id
     WHERE rv.decided_at>=? AND rv.decided_at<? AND i.property_id IN (${props.join(",") || 0})`, from, to);
 }
@@ -99,19 +99,19 @@ export function dailyOnTime(list: Row[], r: Range, now: number) {
   return out;
 }
 
-export function load(props: number[], r: Range) {
-  return rows(`i.task_date BETWEEN ? AND ? AND i.property_id IN (${props.join(",") || 0})`, r.from, r.to);
+export async function load(props: number[], r: Range) {
+  return await rows(`i.task_date BETWEEN ? AND ? AND i.property_id IN (${props.join(",") || 0})`, r.from, r.to);
 }
-export function loadOpen(props: number[]) {
-  return rows(`i.status IN ('review','resub','audit','auditflag','flagans','changes','notsub') AND i.property_id IN (${props.join(",") || 0})`);
+export async function loadOpen(props: number[]) {
+  return await rows(`i.status IN ('review','resub','audit','auditflag','flagans','changes','notsub') AND i.property_id IN (${props.join(",") || 0})`);
 }
-export function reasons(r: Range, props: number[]) {
+export async function reasons(r: Range, props: number[]) {
   const from = new Date(r.from + "T00:00").getTime(), to = new Date(r.to + "T00:00").getTime() + 864e5;
-  return all<{ reason: string; n: number }>(`SELECT f.reason, count(DISTINCT rv.instance_id) n FROM review_flags f JOIN reviews rv ON rv.id=f.review_id JOIN instances i ON i.id=rv.instance_id
+  return await all<{ reason: string; n: number }>(`SELECT f.reason, count(DISTINCT rv.instance_id) n FROM review_flags f JOIN reviews rv ON rv.id=f.review_id JOIN instances i ON i.id=rv.instance_id
     WHERE rv.kind='review' AND rv.decided_at>=? AND rv.decided_at<? AND i.property_id IN (${props.join(",") || 0}) GROUP BY f.reason ORDER BY n DESC`, from, to);
 }
-export function reopenAfterPass(r: Range) {
+export async function reopenAfterPass(r: Range) {
   const from = new Date(r.from + "T00:00").getTime(), to = new Date(r.to + "T00:00").getTime() + 864e5;
-  return all<{ instance_id: number }>("SELECT instance_id FROM events WHERE type='reopened' AND at>=? AND at<?", from, to).map((x) => x.instance_id);
+  return (await all<{ instance_id: number }>("SELECT instance_id FROM events WHERE type='reopened' AND at>=? AND at<?", from, to)).map((x) => x.instance_id);
 }
 export { isoDate };

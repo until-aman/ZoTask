@@ -1,4 +1,5 @@
 "use client";
+import { uploadPhoto } from "./upload";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { submitTask } from "@/app/actions";
@@ -36,10 +37,8 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
     if (!files) return;
     const names: string[] = [];
     for (const f of Array.from(files).slice(0, 10 - ans[id].photos.length)) {
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      if (res.ok) names.push((await res.json()).name);
+      const n = await uploadPhoto(f);
+      if (n) names.push(n);
     }
     set(id, { photos: [...ans[id].photos, ...names] });
   }

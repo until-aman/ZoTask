@@ -12,15 +12,15 @@ import Timeline from "@/components/Timeline";
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const u = await boot();
   const id = Number((await params).id);
-  const [r] = rows("i.id=?", id);
+  const [r] = await rows("i.id=?", id);
   if (!r) notFound();
-  const items = itemsFor(r.template_id);
-  const sub = latestSubmission(id);
-  const prev = sub ? all<{ item_id: number; checked: number; value: string | null; note: string | null; photos: string }>("SELECT * FROM answers WHERE submission_id=?", sub.id) : [];
-  const lastReview = one<{ id: number; decision: string; kind: string }>("SELECT id, decision, kind FROM reviews WHERE instance_id=? ORDER BY decided_at DESC LIMIT 1", id);
-  const flags = lastReview ? all<{ id: number; item_id: number; reason: string; comment: string | null; answer: string | null }>("SELECT * FROM review_flags WHERE review_id=?", lastReview.id) : [];
-  const prop = one<{ lat: number; lng: number }>("SELECT lat, lng FROM properties WHERE id=?", r.property_id)!;
-  const tpl = one<{ geofence: number }>("SELECT geofence FROM templates WHERE id=?", r.template_id)!;
+  const items = await itemsFor(r.template_id);
+  const sub = await latestSubmission(id);
+  const prev = sub ? await all<{ item_id: number; checked: number; value: string | null; note: string | null; photos: string }>("SELECT * FROM answers WHERE submission_id=?", sub.id) : [];
+  const lastReview = await one<{ id: number; decision: string; kind: string }>("SELECT id, decision, kind FROM reviews WHERE instance_id=? ORDER BY decided_at DESC LIMIT 1", id);
+  const flags = lastReview ? await all<{ id: number; item_id: number; reason: string; comment: string | null; answer: string | null }>("SELECT * FROM review_flags WHERE review_id=?", lastReview.id) : [];
+  const prop = (await one<{ lat: number; lng: number }>("SELECT lat, lng FROM properties WHERE id=?", r.property_id))!;
+  const tpl = (await one<{ geofence: number }>("SELECT geofence FROM templates WHERE id=?", r.template_id))!;
   const canSubmit = ["current", "notsub", "changes"].includes(r.status) && (r.assignee_id === u.id || r.cbm_id === u.id);
   const canAnswer = r.status === "auditflag" && (r.cbm_id === u.id || u.access_role === "admin");
 
@@ -53,7 +53,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       )}
       <div className="card">
         <h2>History</h2>
-        <Timeline events={eventsFor(id)} />
+        <Timeline events={await eventsFor(id)} />
       </div>
     </div>
   );

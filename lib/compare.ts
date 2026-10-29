@@ -13,27 +13,27 @@ type Focus = { types: { task: string; due: number; onTime: number | null; missed
 const MAX = 8;
 type Opt = { id: string; label: string; sub?: string };
 
-export function compareData(u: User, sp: Record<string, string | undefined>, now = Date.now()) {
+export async function compareData(u: User, sp: Record<string, string | undefined>, now = Date.now()) {
   const kind = (KINDS.find(([k]) => k === sp.kind)?.[0] ?? "property") as Kind;
   const preset = sp.range ?? "14d";
   const R = M.rangeFor(preset, isoDate(now), sp.from, sp.to);
-  const scope = scopeProps(u);
-  const G = geo().filter((g) => scope.includes(g.id));
+  const scope = await scopeProps(u);
+  const G = (await geo()).filter((g) => scope.includes(g.id));
   const inScope = `IN (${scope.join(",") || 0})`;
 
   // Options for each kind, limited to what this user can see.
   const people = (role: string) => all<{ id: number; name: string; op_role: string | null }>(
     `SELECT DISTINCT u.id, u.name, u.op_role FROM users u WHERE u.access_role=? ORDER BY u.name`, role);
-  const assignees = all<{ id: number; name: string; op_role: string | null; property: string }>(
+  const assignees = await all<{ id: number; name: string; op_role: string | null; property: string }>(
     `SELECT u.id, u.name, u.op_role, min(p.name) property FROM instances i JOIN users u ON u.id=i.assignee_id JOIN properties p ON p.id=i.property_id
      WHERE i.property_id ${inScope} GROUP BY u.id ORDER BY u.name`);
   const options: Opt[] =
     kind === "property" ? G.map((g) => ({ id: String(g.id), label: g.property, sub: `${g.cluster}, ${g.city}` })) :
     kind === "cluster" ? [...new Map(G.map((g) => [g.cluster, { id: g.cluster, label: g.cluster, sub: g.city }])).values()] :
     kind === "city" ? [...new Set(G.map((g) => g.city))].map((c) => ({ id: c, label: c })) :
-    kind === "cbm" ? people("cbm").map((p) => ({ id: String(p.id), label: p.name })) :
+    kind === "cbm" ? (await people("cbm")).map((p) => ({ id: String(p.id), label: p.name })) :
     kind === "assignee" ? assignees.map((p) => ({ id: String(p.id), label: p.name, sub: `${p.op_role ?? ""} · ${p.property}` })) :
-    people("reviewer").map((p) => ({ id: String(p.id), label: p.name }));
+    (await people("reviewer")).map((p) => ({ id: String(p.id), label: p.name }));
   // Picked ids come as a comma list; old a/b links still work. Default to the first three.
   const want = (sp.ids ?? [sp.a, sp.b].filter(Boolean).join(",")).split(",").filter(Boolean);
   let picked = [...new Set(want)].map((id) => options.find((o) => o.id === id)).filter((o): o is Opt => !!o).slice(0, MAX);
@@ -42,11 +42,11 @@ export function compareData(u: User, sp: Record<string, string | undefined>, now
   const base = { kind, preset, R, options, picked, max: MAX, kinds: KINDS, now, canEscalate: ["admin", "reviewer", "auditor"].includes(u.access_role) };
   if (picked.length < 2) return { ...base, metrics: [] as Metric[], series: null, tasks: {}, focus: [] as Focus[] };
 
-  const list = rows(`i.task_date BETWEEN ? AND ? AND i.property_id ${inScope}`, R.from, R.to);
+  const list = await rows(`i.task_date BETWEEN ? AND ? AND i.property_id ${inScope}`, R.from, R.to);
   const match = (o: Opt) => (r: Row) =>
     kind === "property" ? String(r.property_id) === o.id : kind === "cluster" ? r.cluster === o.id : kind === "city" ? r.city === o.id :
     kind === "cbm" ? String(r.cbm_id) === o.id : kind === "assignee" ? String(r.assignee_id) === o.id : String(r.reviewer_id) === o.id;
-  const revAll = all<Rv>(`SELECT rv.id, rv.instance_id, rv.reviewer_id, u.name reviewer, rv.kind, rv.decision, rv.decided_at, rv.due_at, rv.comment,
+  const revAll = await all<Rv>(`SELECT rv.id, rv.instance_id, rv.reviewer_id, u.name reviewer, rv.kind, rv.decision, rv.decided_at, rv.due_at, rv.comment,
       s.submitted_at, s.attempt, i.property_id, t.category, i.reviewer_id i_reviewer
     FROM reviews rv JOIN users u ON u.id=rv.reviewer_id JOIN submissions s ON s.id=rv.submission_id JOIN instances i ON i.id=rv.instance_id JOIN templates t ON t.id=i.template_id
     WHERE rv.decided_at>=? AND i.property_id ${inScope}`, dayStart(R.from) - 7 * 864e5);
@@ -56,22 +56,22 @@ export function compareData(u: User, sp: Record<string, string | undefined>, now
     if (x.decision === "pass") passed.add(x.instance_id);
   }
   const inR = (x: { decided_at: number }) => x.decided_at >= dayStart(R.from) && x.decided_at < dayStart(R.to) + 864e5;
-  const open = M.loadOpen(scope);
+  const open = await M.loadOpen(scope);
   const tasks = new Map<number, Row>();
   const days: string[] = []; for (let d = R.from; d <= R.to; d = addDays(d, 1)) days.push(d);
 
   // Fix time per task: first send-back to first resubmission.
-  const fixEv = all<{ instance_id: number; type: string; at: number }>(
+  const fixEv = await all<{ instance_id: number; type: string; at: number }>(
     `SELECT e.instance_id, e.type, e.at FROM events e JOIN instances i ON i.id=e.instance_id WHERE e.type IN ('changes_requested','resubmitted') AND i.task_date BETWEEN ? AND ? AND i.property_id ${inScope} ORDER BY e.at`, R.from, R.to);
   const fix = new Map<number, number>();
   { const asked = new Map<number, number>();
     for (const e of fixEv) if (e.type === "changes_requested") { if (!asked.has(e.instance_id)) asked.set(e.instance_id, e.at); }
       else if (asked.has(e.instance_id) && !fix.has(e.instance_id)) fix.set(e.instance_id, e.at - asked.get(e.instance_id)!); }
-  const flags = all<{ instance_id: number; reason: string }>(`SELECT DISTINCT rv.instance_id, f.reason FROM review_flags f JOIN reviews rv ON rv.id=f.review_id JOIN instances i ON i.id=rv.instance_id
+  const flags = await all<{ instance_id: number; reason: string }>(`SELECT DISTINCT rv.instance_id, f.reason FROM review_flags f JOIN reviews rv ON rv.id=f.review_id JOIN instances i ON i.id=rv.instance_id
     WHERE rv.kind='review' AND rv.decided_at>=? AND rv.decided_at<? AND i.property_id ${inScope}`, dayStart(R.from), dayStart(R.to) + 864e5);
   const audits = revAll.filter((x) => x.kind === "audit" && inR(x));
 
-  const side = (o: Opt) => {
+  const side = async (o: Opt) => {
     const mine = list.filter(match(o));
     for (const r of mine) tasks.set(r.id, r);
     const ids = new Set(mine.map((r) => r.id));
@@ -108,7 +108,7 @@ export function compareData(u: User, sp: Record<string, string | undefined>, now
     const backlog = open.filter((r) => r.reviewer_id === rid);
     for (const r of backlog) tasks.set(r.id, r);
     const v = reviewing(mineRev, backlog, now);
-    const extra = rows(`i.id IN (${uniq(mineRev.map((x) => x.instance_id)).join(",") || 0})`); for (const r of extra) tasks.set(r.id, r);
+    const extra = await rows(`i.id IN (${uniq(mineRev.map((x) => x.instance_id)).join(",") || 0})`); for (const r of extra) tasks.set(r.id, r);
     const submitted = mine.filter((r) => r.first_submitted_at).map((r) => r.id);
     const missedRev = mine.filter((r) => REVIEW_ST.includes(r.status) && now - r.status_since > r.review_sla_h * HOUR).map((r) => r.id);
     const passedByMe = new Set(mineRev.filter((x) => x.kind === "review" && x.decision === "pass").map((x) => x.instance_id));
@@ -132,7 +132,8 @@ export function compareData(u: User, sp: Record<string, string | undefined>, now
       types: types.slice(0, 3), reasons: [] as { reason: string; ids: number[] }[],
     };
   };
-  const S = picked.map(side);
+  const S: Awaited<ReturnType<typeof side>>[] = [];
+  for (const o of picked) S.push(await side(o));
   const DEF: [string, string, string, Metric["fmt"], Metric["better"]][] = kind === "reviewer" ? [
     ["reviewed", "Tasks reviewed", "Tasks reviewed in the period", "n", null],
     ["inSla", "Reviewed on time", "Reviewed tasks where every review was on time", "pct", "high"],
@@ -167,4 +168,4 @@ export function compareData(u: User, sp: Record<string, string | undefined>, now
     focus: S.map((x) => ({ types: x.types, reasons: x.reasons })),
   };
 }
-export type CompareData = ReturnType<typeof compareData>;
+export type CompareData = Awaited<ReturnType<typeof compareData>>;

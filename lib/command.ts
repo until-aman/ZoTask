@@ -93,7 +93,7 @@ export function reviewing(revs: Rv[], backlog: Row[], now: number) {
   };
 }
 
-export function buildCommand(u: User, sp: SP, now = Date.now()) {
+export async function buildCommand(u: User, sp: SP, now = Date.now()) {
   const today = isoDate(now);
   const preset = sp.range ?? "7d";
   const R = M.rangeFor(preset, today, sp.from, sp.to);
@@ -104,25 +104,26 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
   const mine = u.access_role === "reviewer" && sp.mine !== "0" && !sp.rv;
   // Reviewer filter: a picked reviewer, or yourself in My portfolio.
   const rvId = sp.rv ? Number(sp.rv) : mine ? u.id : null;
-  const reviewerOpts = all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' ORDER BY name");
-  const cats = all<{ category: string }>("SELECT DISTINCT category FROM templates ORDER BY category").map((c) => c.category);
+  const reviewerOpts = await all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' ORDER BY name");
+  const cats = (await all<{ category: string }>("SELECT DISTINCT category FROM templates ORDER BY category")).map((c) => c.category);
 
-  const G = geo().filter((g) => scopeProps(u).includes(g.id));
+  const scope = await scopeProps(u);
+  const G = (await geo()).filter((g) => scope.includes(g.id));
   const props = G.filter((g) => (!sp.city || g.city === sp.city) && (!sp.cluster || g.cluster === sp.cluster) && (!sp.prop || g.property === sp.prop)).map((g) => g.id);
   const keep = (r: { category: string; reviewer_id?: number | null; i_reviewer?: number | null }) =>
     (!sp.cat || r.category === sp.cat) && (rvId === null || (r.reviewer_id ?? r.i_reviewer) === rvId);
   const inProps = `IN (${props.join(",") || 0})`;
 
   const spanFrom = [P.from, tPrevFrom].sort()[0];
-  const span = rows(`i.task_date BETWEEN ? AND ? AND i.property_id ${inProps}`, spanFrom, R.to).filter(keep);
-  const open = M.loadOpen(props).filter(keep);
+  const span = (await rows(`i.task_date BETWEEN ? AND ? AND i.property_id ${inProps}`, spanFrom, R.to)).filter(keep);
+  const open = (await M.loadOpen(props)).filter(keep);
   const cur = span.filter((r) => r.task_date >= R.from && r.task_date <= R.to);
   const prev = span.filter((r) => r.task_date >= P.from && r.task_date <= P.to);
 
-  const revAll = all<Rv>(`SELECT rv.id, rv.instance_id, rv.reviewer_id, u.name reviewer, rv.kind, rv.decision, rv.decided_at, rv.due_at, rv.comment,
+  const revAll = (await all<Rv>(`SELECT rv.id, rv.instance_id, rv.reviewer_id, u.name reviewer, rv.kind, rv.decision, rv.decided_at, rv.due_at, rv.comment,
       s.submitted_at, s.attempt, i.property_id, t.category, i.reviewer_id i_reviewer
     FROM reviews rv JOIN users u ON u.id=rv.reviewer_id JOIN submissions s ON s.id=rv.submission_id JOIN instances i ON i.id=rv.instance_id JOIN templates t ON t.id=i.template_id
-    WHERE rv.decided_at>=? AND i.property_id ${inProps}`, dayStart(spanFrom) - 7 * 864e5).filter(keep);
+    WHERE rv.decided_at>=? AND i.property_id ${inProps}`, dayStart(spanFrom) - 7 * 864e5)).filter(keep);
   const inR = (r: { from: string; to: string }) => (x: { decided_at: number }) => x.decided_at >= dayStart(r.from) && x.decided_at < dayStart(r.to) + 864e5;
   const revCur = revAll.filter(inR(R)), revPrev = revAll.filter(inR(P));
   const sentBack = new Map<number, number>(), passed = new Set<number>();
@@ -137,11 +138,11 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
   // Every task any figure points at, so lists and the drawer use the same records.
   const tasks = new Map<number, T>();
   for (const r of [...cur, ...open]) tasks.set(r.id, toT(r));
-  const ensure = (want: number[]) => {
+  const ensure = async (want: number[]) => {
     const miss = uniq(want).filter((id) => !tasks.has(id));
-    if (miss.length) for (const r of rows(`i.id IN (${miss.join(",")})`)) tasks.set(r.id, toT(r));
+    if (miss.length) for (const r of await rows(`i.id IN (${miss.join(",")})`)) tasks.set(r.id, toT(r));
   };
-  ensure(revCur.map((x) => x.instance_id));
+  await ensure(revCur.map((x) => x.instance_id));
 
   const k = (ids: number[], of?: number[], prevIds?: number[], prevOf?: number[]): K =>
     ({ n: ids.length, ids, ...(of ? { of: of.length, rate: pct(ids.length, of.length) } : {}),
@@ -171,10 +172,10 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
 
   // ---------- Action queue ----------
   const openIds = open.map((r) => r.id);
-  const evs = openIds.length ? all<{ instance_id: number; type: string; at: number; detail: string; actor: string | null }>(
+  const evs = openIds.length ? await all<{ instance_id: number; type: string; at: number; detail: string; actor: string | null }>(
     `SELECT e.instance_id, e.type, e.at, e.detail, u.name actor FROM events e LEFT JOIN users u ON u.id=e.actor_id
      WHERE e.type IN ('acknowledged','escalated') AND e.instance_id IN (${openIds.join(",")}) ORDER BY e.at`) : [];
-  const lastRev = openIds.length ? all<{ instance_id: number; comment: string | null; fl: string | null; n: number }>(
+  const lastRev = openIds.length ? await all<{ instance_id: number; comment: string | null; fl: string | null; n: number }>(
     `SELECT rv.instance_id, rv.comment, (SELECT group_concat(f.reason || COALESCE(': ' || NULLIF(f.comment,''), ''), '; ') FROM review_flags f WHERE f.review_id=rv.id) fl,
        (SELECT count(*) FROM reviews x WHERE x.instance_id=rv.instance_id AND x.kind='review' AND x.decision='changes') n
      FROM reviews rv WHERE rv.instance_id IN (${openIds.join(",")}) ORDER BY rv.decided_at`) : [];
@@ -284,7 +285,7 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
   }).sort((a, b) => b.over.length - a.over.length || (a.inSla ?? 0) - (b.inSla ?? 0));
 
   // ---------- CBMs ----------
-  const fixEv = all<{ instance_id: number; type: string; at: number }>(
+  const fixEv = await all<{ instance_id: number; type: string; at: number }>(
     `SELECT e.instance_id, e.type, e.at FROM events e JOIN instances i ON i.id=e.instance_id WHERE e.type IN ('changes_requested','resubmitted') AND e.at>=? AND e.at<? AND i.property_id ${inProps} ORDER BY e.at`,
     dayStart(R.from), dayStart(R.to) + 864e5);
   const fixTimes = new Map<number, number[]>(); // property -> ms from send-back to resubmission
@@ -340,10 +341,10 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
 
   // ---------- Rejection reasons (tasks sent back in the period, by reason) ----------
   type F = { instance_id: number; reason: string; decided_at: number; property: string; task: string; city: string; category: string; i_reviewer: number | null };
-  const flagsAll = all<F>(`SELECT DISTINCT rv.instance_id, f.reason, rv.decided_at, p.name property, t.name task, c.name city, t.category, i.reviewer_id i_reviewer
+  const flagsAll = (await all<F>(`SELECT DISTINCT rv.instance_id, f.reason, rv.decided_at, p.name property, t.name task, c.name city, t.category, i.reviewer_id i_reviewer
     FROM review_flags f JOIN reviews rv ON rv.id=f.review_id JOIN instances i ON i.id=rv.instance_id JOIN templates t ON t.id=i.template_id
     JOIN properties p ON p.id=i.property_id JOIN clusters cl ON cl.id=p.cluster_id JOIN cities c ON c.id=cl.city_id
-    WHERE rv.kind='review' AND rv.decided_at>=? AND rv.decided_at<? AND i.property_id ${inProps}`, dayStart(P.from), dayStart(R.to) + 864e5).filter(keep);
+    WHERE rv.kind='review' AND rv.decided_at>=? AND rv.decided_at<? AND i.property_id ${inProps}`, dayStart(P.from), dayStart(R.to) + 864e5)).filter(keep);
   const fC = flagsAll.filter(inR(R)), fP = flagsAll.filter(inR(P));
   const top = (xs: string[]) => { const m = new Map<string, number>(); for (const x of xs) m.set(x, (m.get(x) ?? 0) + 1); return [...m].sort((a, b) => b[1] - a[1])[0] ?? null; };
   const reasonNames = [...new Set(fC.map((f) => f.reason))];
@@ -356,14 +357,14 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
       prev: uniq(fP.filter((f) => f.reason === reason).map((f) => f.instance_id)).length,
       topProperty: top(one.map((f) => f.property)), topTask: top(one.map((f) => f.task)), topCity: top(one.map((f) => f.city)) };
   }).sort((a, b) => b.ids.length - a.ids.length);
-  ensure(fC.map((f) => f.instance_id));
+  await ensure(fC.map((f) => f.instance_id));
 
   // ---------- Trends ----------
   const tDayList = (from: string) => Array.from({ length: tDays }, (_, i) => addDays(from, i));
-  const subsAll = all<{ instance_id: number; submitted_at: number; decided: number | null; category: string; i_reviewer: number | null }>(
+  const subsAll = (await all<{ instance_id: number; submitted_at: number; decided: number | null; category: string; i_reviewer: number | null }>(
     `SELECT s.instance_id, s.submitted_at, (SELECT min(rv.decided_at) FROM reviews rv WHERE rv.submission_id=s.id AND rv.kind='review') decided, t.category, i.reviewer_id i_reviewer
      FROM submissions s JOIN instances i ON i.id=s.instance_id JOIN templates t ON t.id=i.template_id
-     WHERE s.submitted_at>=? AND i.property_id ${inProps}`, dayStart(tPrevFrom) - 7 * 864e5).filter(keep);
+     WHERE s.submitted_at>=? AND i.property_id ${inProps}`, dayStart(tPrevFrom) - 7 * 864e5)).filter(keep);
   const firstData = span.length ? span.reduce((m, r) => (r.task_date < m ? r.task_date : m), span[0].task_date) : R.to;
   const point = (d: string) => {
     if (d < firstData) return null; // No records before the data starts: show a gap, not a zero.
@@ -381,7 +382,7 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
     } as Record<string, number[][] | null>;
   };
   const trend = { days: tDayList(tFrom), cur: tDayList(tFrom).map(point), prev: tDayList(tPrevFrom).map(point), firstData };
-  ensure([...trend.cur, ...trend.prev].flatMap((p) => (p ? Object.values(p).flatMap((v) => (v ? v.flat() : [])) : [])));
+  await ensure([...trend.cur, ...trend.prev].flatMap((p) => (p ? Object.values(p).flatMap((v) => (v ? v.flat() : [])) : [])));
 
   // ---------- Recurring patterns (repeats, not one-offs) ----------
   const recurring: { title: string; sub: string; ids: number[]; owner: string }[] = [];
@@ -403,14 +404,14 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
   const varied = recurring.filter((r) => { const k = r.title.replace(/[\d%]+/g, "").slice(0, 14); kinds.set(k, (kinds.get(k) ?? 0) + 1); return kinds.get(k)! <= 3; });
 
   // ---------- Handover ----------
-  const closedToday = all<{ instance_id: number }>(
+  const closedToday = (await all<{ instance_id: number }>(
     `SELECT DISTINCT e.instance_id FROM events e JOIN instances i ON i.id=e.instance_id WHERE e.type IN ('passed','audit_passed','flags_closed') AND e.at>=? AND i.property_id ${inProps}`,
-    dayStart(today)).map((x) => x.instance_id);
-  ensure(closedToday);
+    dayStart(today))).map((x) => x.instance_id);
+  await ensure(closedToday);
   const tomorrow = open.filter((r) => r.status === "notsub" && isoDate(r.late_until_at) === addDays(today, 1)).map((r) => r.id);
 
   // ---------- Housekeeping headcount (sample numbers) ----------
-  const staff = all<{ property_id: number; ideal_hk: number; current_hk: number; ideal_shk: number; current_shk: number }>(`SELECT * FROM staffing WHERE property_id ${inProps}`)
+  const staff = (await all<{ property_id: number; ideal_hk: number; current_hk: number; ideal_shk: number; current_shk: number }>(`SELECT * FROM staffing WHERE property_id ${inProps}`))
     .map((x) => ({ ...x, name: G.find((g) => g.id === x.property_id)!.property }));
 
   return {
@@ -421,4 +422,4 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
     reviewedTotal: vC.reviewed.length, trend, recurring: varied.slice(0, 8), prevHasData: prev.length > 0 && P.from >= (span.length ? span.reduce((m, r) => (r.task_date < m ? r.task_date : m), span[0].task_date) : P.from), closedToday, tomorrow, staff,
   };
 }
-export type CC = ReturnType<typeof buildCommand>;
+export type CC = Awaited<ReturnType<typeof buildCommand>>;

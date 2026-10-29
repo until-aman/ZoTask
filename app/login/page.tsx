@@ -9,8 +9,8 @@ const GROUPS: [string, string, string][] = [
   ["ground", "Ground team", "Do the daily checklists at a property"],
 ];
 
-export default function Login() {
-  const users = all<{ id: number; name: string; access_role: string; op_role: string | null; props: string | null }>(
+export default async function Login() {
+  const users = await all<{ id: number; name: string; access_role: string; op_role: string | null; props: string | null }>(
     `SELECT u.id, u.name, u.access_role, u.op_role,
       (SELECT group_concat(p.name, ', ') FROM user_properties up JOIN properties p ON p.id=up.property_id WHERE up.user_id=u.id) props
      FROM users u ORDER BY u.id`);

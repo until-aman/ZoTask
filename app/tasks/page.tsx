@@ -11,7 +11,7 @@ export default async function MyTasks({ searchParams }: { searchParams: Promise<
   const sp = await searchParams;
   const tab = sp.tab ?? "now";
   const date = sp.date ?? isoDate(Date.now());
-  const mine = rows("(i.assignee_id=? OR (p.cbm_id=? AND i.status='auditflag'))", u.id, u.id);
+  const mine = await rows("(i.assignee_id=? OR (p.cbm_id=? AND i.status='auditflag'))", u.id, u.id);
   const now = Date.now();
   const lists: Record<string, Row[]> = {
     now: mine.filter((r) => r.task_date === date && ["current", "upcoming"].includes(r.status)).sort((a, b) => (a.status === "current" ? -1 : 1) - (b.status === "current" ? -1 : 1) || a.window_start_at - b.window_start_at),

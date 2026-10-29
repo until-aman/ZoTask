@@ -14,10 +14,10 @@ export default async function Queue({ searchParams }: { searchParams: Promise<Re
   const u = await boot();
   if (!can.queue(u)) redirect("/tasks");
   const sp = await searchParams;
-  const props = scopeProps(u);
+  const props = await scopeProps(u);
   const now = Date.now();
-  const names = new Map(all<{ id: number; name: string }>("SELECT id, name FROM users").map((x) => [x.id, x.name]));
-  const list = rows(`i.status NOT IN ('upcoming','current') AND i.property_id IN (${props.join(",") || 0})`);
+  const names = new Map((await all<{ id: number; name: string }>("SELECT id, name FROM users")).map((x) => [x.id, x.name]));
+  const list = await rows(`i.status NOT IN ('upcoming','current') AND i.property_id IN (${props.join(",") || 0})`);
   const items: QItem[] = list.map((r) => {
     const sla = ["review", "resub"].includes(r.status) ? r.review_sla_h : ["audit", "flagans"].includes(r.status) ? r.audit_sla_h
       : r.status === "changes" ? FIX_SLA_H : r.status === "auditflag" ? ANSWER_SLA_H : 0;
@@ -30,10 +30,10 @@ export default async function Queue({ searchParams }: { searchParams: Promise<Re
       next: next ? names.get(next) ?? "" : "", mine: next === u.id,
     };
   });
-  const views = all<{ id: number; name: string; filters: string; is_default: number }>("SELECT * FROM saved_views WHERE user_id=? ORDER BY id", u.id)
+  const views = (await all<{ id: number; name: string; filters: string; is_default: number }>("SELECT * FROM saved_views WHERE user_id=? ORDER BY id", u.id))
     .map((v) => ({ id: v.id, name: v.name, def: !!v.is_default, f: JSON.parse(v.filters) }));
-  const reviewers = all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' ORDER BY name");
-  const g = geo().filter((x) => props.includes(x.id));
+  const reviewers = await all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' ORDER BY name");
+  const g = (await geo()).filter((x) => props.includes(x.id));
   const initial = {
     tab: sp.tab, city: sp.city?.split("|"), cluster: sp.cluster?.split("|"), prop: sp.prop?.split("|"),
     from: sp.from, to: sp.to, bucket: sp.bucket, over: sp.over === "1",
