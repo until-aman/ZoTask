@@ -128,10 +128,8 @@ export default function CommandCenter({ data: d }: { data: CC }) {
           <Lifecycle d={d} />
           <Reasons d={d} />
         </div>
-        <div className="grid g2w">
-          <Compare d={d} />
-          <Recurring d={d} />
-        </div>
+        <Compare d={d} />
+        <Recurring d={d} />
 
         <h2 className="band">4 · Who&apos;s accountable</h2>
         <Properties d={d} cbm={cbm} setCbm={setCbm} issues={d.issues} />
