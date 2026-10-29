@@ -344,3 +344,5 @@ table.aq td>.acts{display:flex}
 @media (max-width:560px){.esc-grid{grid-template-columns:minmax(0,1fr)}.esc-weeks .small{font-size:9px}}
 .outcome .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 12px}
 .legend b.lgn{font-weight:800;color:var(--fg)}
+.outcome .lgw{justify-content:center;gap:2px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 8px 3px 6px;min-width:0}
+.outcome .lgw .lg{white-space:nowrap}
