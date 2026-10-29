@@ -27,7 +27,7 @@ function Health({ d }: { d: CC }) {
         <h3>Ground team</h3>
         <div className="kpis k3">
           <Tile label="On time" def={{ means: "Tasks submitted by their deadline", calc: "Submitted on time ÷ tasks past deadline", note: "Cancelled tasks are left out." }} k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline" />
-          <Tile label="First-time approval" def={{ means: "Tasks approved at their first check", calc: "Approved first time ÷ tasks checked at least once", note: "Tasks still waiting for a first check are left out." }} k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first check" />
+          <Tile label="First-time approval" def={{ means: "Tasks approved at their first review", calc: "Approved first time ÷ tasks reviewed at least once", note: "Tasks still waiting for a first review are left out." }} k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first review" />
           <Tile label="Missed" def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} k={g.missed} band={[5, 10]} goodUp={false} target="Target under 5%" unitNote="Never submitted" />
         </div>
         <div className="minis">
@@ -42,16 +42,16 @@ function Health({ d }: { d: CC }) {
       <section className="card score">
         <h3>Reviewers</h3>
         <div className="kpis k3 k2">
-          <Tile label="Reviewed within SLA" def={{ means: "Reviewed tasks where every check met its time limit", calc: "In-time tasks ÷ tasks reviewed in the period", note: "SLA is set per task type, usually 24h from submission. Tasks still waiting are under Pending past SLA." }} k={v.inSla} band={[90, 75]} target="Target 90%+" unitNote="Every check met its limit" />
-          <TimeTile label="Median wait" t={v.median} band={[12, 24]} def={{ means: "Typical time from submission to a reviewer's decision", calc: "Middle value of all checks in the period", note: "Counts each check, including re-checks." }} />
+          <Tile label="Reviewed within SLA" def={{ means: "Reviewed tasks where every review was on time", calc: "In-time tasks ÷ tasks reviewed in the period", note: "SLA is set per task type, usually 24h from submission. Tasks still waiting are under Pending past SLA." }} k={v.inSla} band={[90, 75]} target="Target 90%+" unitNote="Every review was on time" />
+          <TimeTile label="Median wait" t={v.median} band={[12, 24]} def={{ means: "Typical time a task waits for its review", calc: "Middle value, per task, of submission to the reviewer's decision", note: "Each task counted once." }} />
         </div>
         <div className="minis">
           <Mini label="Needing review" k={v.requiring} def={{ means: "Tasks reviewed in the period plus tasks waiting now" }} />
-          <Mini label="Reviewed" k={v.reviewed} def={{ means: "Tasks with at least one check in the period", note: "Each task counted once, however many checks." }} />
-          <Mini label="After SLA" k={v.afterSla} tone="a" def={{ means: "Reviewed tasks where at least one check was late" }} />
-          <Mini label="Pending now" k={v.pending} def={{ means: "Submitted tasks waiting for a check right now" }} />
-          <Mini label="Pending past SLA" k={v.over} tone="r" def={{ means: "Waiting for a check longer than the time limit", note: "These are in Action required." }} />
-          <Mini label="Awaiting re-review" k={v.rereview} def={{ means: "Fixed and resubmitted, waiting for a check" }} />
+          <Mini label="Reviewed" k={v.reviewed} def={{ means: "Tasks reviewed in the period", note: "Each task counted once, however many times it was reviewed." }} />
+          <Mini label="After SLA" k={v.afterSla} tone="a" def={{ means: "Reviewed tasks that were reviewed late", note: "Late if any review on the task took longer than the limit." }} />
+          <Mini label="Pending now" k={v.pending} def={{ means: "Submitted tasks waiting for review right now" }} />
+          <Mini label="Pending past SLA" k={v.over} tone="r" def={{ means: "Tasks waiting for review longer than the time limit", note: "These are in Action required." }} />
+          <Mini label="Awaiting re-review" k={v.rereview} def={{ means: "Fixed and resubmitted, waiting for review" }} />
         </div>
       </section>
       <section className="card outcome">

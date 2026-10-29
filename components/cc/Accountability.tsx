@@ -54,7 +54,7 @@ export function Properties({ d, cbm, setCbm, issues }: { d: CC; cbm: string; set
           { key: "due", label: "Past deadline", num: true, value: (p) => p.due.length, render: (p) => <N ids={p.due} title={`${p.name}: tasks past deadline`} /> },
           { key: "onTime", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (p) => p.onTime, render: (p) => <span className={`pill ${rag(p.onTime, 85, 70)}`}>{fmtP(p.onTime)}</span> },
           { key: "d", label: "vs before", num: true, value: delta, render: (p) => { const x = delta(p); return x === null ? "—" : <span className={x >= 0 ? "t-g" : "t-r"}>{x > 0 ? "+" : ""}{x}</span>; } },
-          { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first check"], ["Formula", "Approved first time ÷ tasks checked"]]} />, value: (p) => p.fta, render: (p) => fmtP(p.fta) },
+          { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first review"], ["Formula", "Approved first time ÷ tasks reviewed"]]} />, value: (p) => p.fta, render: (p) => fmtP(p.fta) },
           { key: "approved", label: "Final approval", num: true, tip: <InfoTip title="Final approval" rows={[["Means", "Approved at any attempt"], ["Formula", "Approved ÷ tasks past deadline"]]} />, value: (p) => p.approved, render: (p) => fmtP(p.approved), hidden: true },
           { key: "overdue", label: "Overdue open", num: true, tip: <InfoTip title="Overdue open" rows={[["Means", "Past deadline, not submitted, grace period running"], ["Formula", "Count of tasks"]]} />, value: (p) => p.overdue.length, render: (p) => <N ids={p.overdue} title={`${p.name}: overdue, still open`} /> },
           { key: "missed", label: "Missed", num: true, value: (p) => p.missed.length, render: (p) => <N ids={p.missed} title={`${p.name}: missed`} className={p.missed.length ? "t-r" : ""} /> },
@@ -70,21 +70,20 @@ export function Properties({ d, cbm, setCbm, issues }: { d: CC; cbm: string; set
 export function Reviewers({ d }: { d: CC }) {
   type R = CC["reviewers"][number];
   return (
-    <Sec title="Reviewers" tip={<InfoTip title="Reviewers" rows={[["Tasks", "Columns marked tasks count each task once"], ["Checks", "First checks and re-checks count every review attempt"], ["Wait", "From submission to decision, for each check."], ["Send-back %", "Tasks sent back ÷ tasks reviewed"]]} note="A high send-back rate can mean a careful reviewer. Compare it with audit results before judging." />}>
+    <Sec title="Reviewers" tip={<InfoTip title="Reviewers" rows={[["Counts", "Every column counts tasks, each task once"], ["Wait", "Per task, from submission to the reviewer's decision"], ["Send-back %", "Tasks sent back ÷ tasks reviewed"]]} note="A high send-back rate can mean a careful reviewer. Compare it with audit results before judging." />}>
       <Table<R> name="Reviewers" rows={d.reviewers} rowKey={(r) => r.name} search={(r) => r.name} pageSize={20} cols={[
         { key: "name", label: "Reviewer", sticky: true, value: (r) => r.name, render: (r) => <b>{r.name}</b> },
         { key: "props", label: "Properties", num: true, value: (r) => r.props },
         { key: "req", label: "Tasks to review", num: true, value: (r) => r.requiring.length, render: (r) => <N ids={r.requiring} title={`${r.name}: tasks needing review`} /> },
         { key: "rev", label: "Reviewed", num: true, value: (r) => r.reviewed.length, render: (r) => <N ids={r.reviewed} title={`${r.name}: tasks reviewed`} /> },
-        { key: "sla", label: "Within SLA", num: true, tip: <InfoTip title="Within SLA" rows={[["Means", "Reviewed tasks where every check met its limit"], ["Formula", "In-time tasks ÷ tasks reviewed"]]} />, value: (r) => r.inSla, render: (r) => <span className={`pill ${rag(r.inSla, 90, 75)}`}>{fmtP(r.inSla)}</span> },
+        { key: "sla", label: "Within SLA", num: true, tip: <InfoTip title="Within SLA" rows={[["Means", "Reviewed tasks where every review was on time"], ["Formula", "In-time tasks ÷ tasks reviewed"]]} />, value: (r) => r.inSla, render: (r) => <span className={`pill ${rag(r.inSla, 90, 75)}`}>{fmtP(r.inSla)}</span> },
         { key: "after", label: "After SLA", num: true, value: (r) => r.afterSla.length, render: (r) => <N ids={r.afterSla} title={`${r.name}: reviewed after SLA`} /> },
         { key: "pend", label: "Pending", num: true, value: (r) => r.pending.length, render: (r) => <N ids={r.pending} title={`${r.name}: waiting now`} /> },
         { key: "over", label: "Pending past SLA", num: true, value: (r) => r.over.length, render: (r) => <N ids={r.over} title={`${r.name}: pending past SLA`} className={r.over.length ? "t-r" : ""} /> },
-        { key: "med", label: "Median wait", num: true, tip: <InfoTip title="Median wait" rows={[["Means", "Typical time from submission to decision"], ["Formula", "Middle value of all checks"]]} />, value: (r) => r.median, render: (r) => dur(r.median), csv: (r) => (r.median === null ? "" : Math.round(r.median / 60000)) },
-        { key: "first", label: "First checks", num: true, value: (r) => r.firstChecks },
-        { key: "re", label: "Re-checks", num: true, value: (r) => r.reChecks },
+        { key: "med", label: "Median wait", num: true, tip: <InfoTip title="Median wait" rows={[["Means", "Typical time a task waits for its review"], ["Formula", "Middle value across tasks reviewed"]]} />, value: (r) => r.median, render: (r) => dur(r.median), csv: (r) => (r.median === null ? "" : Math.round(r.median / 60000)) },
+        { key: "re", label: "Re-reviewed", num: true, tip: <InfoTip title="Re-reviewed" rows={[["Means", "Tasks this reviewer reviewed more than once in the period"]]} />, value: (r) => r.reReviewed.length, render: (r) => <N ids={r.reReviewed} title={`${r.name}: tasks re-reviewed`} /> },
         { key: "sb", label: "Send-back %", num: true, tip: <InfoTip title="Send-back %" rows={[["Means", "Share of reviewed tasks sent back. High is not always bad"], ["Formula", "Tasks sent back ÷ tasks reviewed"]]} />, value: (r) => r.sentBackRate, render: (r) => <N ids={r.sentBack} title={`${r.name}: tasks sent back`}>{fmtP(r.sentBackRate)}</N> },
-        { key: "daily", label: "Checks per day", value: () => null, render: (r) => <Spark data={r.daily} max={Math.max(1, ...r.daily)} color="var(--purple)" />, csv: (r) => r.daily.join(" ") },
+        { key: "daily", label: "Tasks reviewed per day", value: () => null, render: (r) => <Spark data={r.daily} max={Math.max(1, ...r.daily)} color="var(--purple)" />, csv: (r) => r.daily.join(" ") },
       ]} />
     </Sec>
   );
@@ -100,7 +99,7 @@ export function Cbms({ d, onPick }: { d: CC; onPick: (name: string) => void }) {
         { key: "due", label: "Past deadline", num: true, value: (c) => c.due.length, render: (c) => <N ids={c.due} title={`${c.name}: tasks past deadline`} /> },
         { key: "on", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (c) => c.onTime, render: (c) => <span className={`pill ${rag(c.onTime, 85, 70)}`}>{fmtP(c.onTime)}</span> },
         { key: "missed", label: "Missed", num: true, value: (c) => c.missed.length, render: (c) => <N ids={c.missed} title={`${c.name}: missed`} /> },
-        { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first check"], ["Formula", "Approved first time ÷ tasks checked"]]} />, value: (c) => c.fta, render: (c) => fmtP(c.fta) },
+        { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first review"], ["Formula", "Approved first time ÷ tasks reviewed"]]} />, value: (c) => c.fta, render: (c) => fmtP(c.fta) },
         { key: "rep", label: "Sent back 2+", num: true, value: (c) => c.repeat.length, render: (c) => <N ids={c.repeat} title={`${c.name}: repeated failures`} /> },
         { key: "iss", label: "Open issues", num: true, value: (c) => c.issues.length, render: (c) => <N ids={c.issues} title={`${c.name}: open issues`} /> },
         { key: "fix", label: "Fix time", num: true, tip: <InfoTip title="Fix time" rows={[["Means", "Typical time to fix and resubmit"], ["Formula", "Median from send-back to resubmission"]]} />, value: (c) => c.fix, render: (c) => dur(c.fix) },

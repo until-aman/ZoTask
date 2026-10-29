@@ -8,11 +8,11 @@ import { InfoTip, N, Sec, Table, dur, fmtP, pct, rag, useDrill } from "./parts";
 type Pt = Record<string, number[][] | null> | null;
 const METRICS: { key: string; label: string; rate: boolean; goodUp: boolean; tip: string }[] = [
   { key: "onTime", label: "On-time completion", rate: true, goodUp: true, tip: "Tasks submitted by the deadline ÷ tasks past deadline that day" },
-  { key: "inSla", label: "Reviews within SLA", rate: true, goodUp: true, tip: "Tasks whose every check that day met its limit ÷ tasks checked that day" },
-  { key: "fta", label: "First-time approval", rate: true, goodUp: true, tip: "Approved on the first check ÷ tasks checked at least once" },
+  { key: "inSla", label: "Reviews within SLA", rate: true, goodUp: true, tip: "Tasks reviewed that day with every review on time ÷ tasks reviewed that day" },
+  { key: "fta", label: "First-time approval", rate: true, goodUp: true, tip: "Approved on the first review ÷ tasks reviewed at least once" },
   { key: "approved", label: "Final approval", rate: true, goodUp: true, tip: "Tasks approved at any attempt ÷ tasks past deadline" },
   { key: "overdue", label: "Overdue or missed", rate: false, goodUp: false, tip: "Tasks with a deadline that day that are still open or were missed" },
-  { key: "backlog", label: "Review backlog", rate: false, goodUp: false, tip: "Submissions waiting for a check at the end of the day" },
+  { key: "backlog", label: "Review backlog", rate: false, goodUp: false, tip: "Tasks waiting for review at the end of the day" },
   { key: "rejections", label: "Tasks sent back", rate: false, goodUp: false, tip: "Tasks sent back for changes that day" },
   { key: "repeatRate", label: "Repeat send-backs", rate: true, goodUp: false, tip: "Send-backs on a second or later attempt ÷ all send-backs that day" },
 ];
@@ -105,7 +105,7 @@ export function Lifecycle({ d }: { d: CC }) {
     </div>
   );
   return (
-    <Sec title="Task lifecycle" tip={<InfoTip title="Task lifecycle" rows={[["Counts", "Tasks past deadline in the period, each counted once however many times it was checked"], ["%", "Share of the step before"], ["Time", "Median time for that step"], ["Stuck now", "All open tasks in the filters, any date"]]} />}
+    <Sec title="Task lifecycle" tip={<InfoTip title="Task lifecycle" rows={[["Counts", "Tasks past deadline in the period, each counted once however many times it was reviewed"], ["%", "Share of the step before"], ["Time", "Median time for that step"], ["Stuck now", "All open tasks in the filters, any date"]]} />}
       right={<span className="small">Final approval <b>{fmtP(pct(L.finalApproved.length, due))}</b> <span className="muted">({L.finalApproved.length} of {due})</span></span>}>
       {!due ? <p className="muted">No task deadlines passed in this period.</p> : <>
         <div className="stages">{L.stages.map((s, i) => <Row key={s.key} s={s} base={due} prevN={i ? L.stages[i - 1].ids.length : null} />)}</div>
@@ -121,7 +121,7 @@ export function Reasons({ d }: { d: CC }) {
   const max = Math.max(1, ...d.reasons.map((r) => r.ids.length));
   const groups = [...new Set(d.reasons.map((r) => r.group))].map((g) => ({ g, ids: [...new Set(d.reasons.filter((r) => r.group === g).flatMap((r) => r.ids))] }));
   return (
-    <Sec title="Why tasks get sent back" tip={<InfoTip title="Why tasks get sent back" rows={[["Count", "Tasks sent back for that reason in the period. One task can have more than one reason"], ["% of checked", `Share of the ${d.reviewedTotal} tasks checked in the period`], ["Most affected", "Property with the most of these"]]} note="New: ZoTask doesn't collect reasons today. This prototype adds a reason picker to the review step." />}
+    <Sec title="Why tasks get sent back" tip={<InfoTip title="Why tasks get sent back" rows={[["Count", "Tasks sent back for that reason in the period. One task can have more than one reason"], ["% of reviewed", `Share of the ${d.reviewedTotal} tasks reviewed in the period`], ["Most affected", "Property with the most of these"]]} note="New: ZoTask doesn't collect reasons today. This prototype adds a reason picker to the review step." />}
       right={<span className="small"><N ids={d.reasonsTotal} title="All tasks sent back" /> tasks <span className="muted">· {d.prevHasData ? `${d.reasonsPrevTotal} before` : "no earlier data"}</span></span>}>
       {!d.reasons.length ? <p className="muted">No tasks were sent back in this period.</p> : <>
         <div className="row2 small">{groups.map((g) => <span key={g.g} className="chipn"><N ids={g.ids} title={`${g.g} problems`} /> {g.g}</span>)}</div>
@@ -144,7 +144,7 @@ export function Reasons({ d }: { d: CC }) {
 
 export function Recurring({ d }: { d: CC }) {
   return (
-    <Sec title="Recurring problems" tip={<InfoTip title="Recurring problems" rows={[["Missed", "Same task missed 2+ times at a property"], ["Sent back", "Same task sent back on 3+ days"], ["Reason", "Same reason 3+ times at a property"], ["Reviews", "A cluster where 30%+ of tasks were checked late"]]} note="One-off incidents are left out." />}>
+    <Sec title="Recurring problems" tip={<InfoTip title="Recurring problems" rows={[["Missed", "Same task missed 2+ times at a property"], ["Sent back", "Same task sent back on 3+ days"], ["Reason", "Same reason 3+ times at a property"], ["Reviews", "A cluster where 30%+ of tasks were reviewed late"]]} note="One-off incidents are left out." />}>
       {!d.recurring.length ? <p className="muted">No repeating patterns in this period.</p> : (
         <div className="grid" style={{ gap: 0 }}>{d.recurring.map((r, i) => (
           <div key={i} className="att" style={{ gridTemplateColumns: "minmax(0,1fr) auto auto" }}>
@@ -179,8 +179,8 @@ export function Compare({ d }: { d: CC }) {
         { key: "onTime", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (r) => r.onTime, render: (r) => <span className={`pill ${rag(r.onTime, 85, 70)}`}>{fmtP(r.onTime)}</span> },
         { key: "dOn", label: "vs before", num: true, value: (r) => delta(r.onTime, r.onTimePrev), render: (r) => { const x = delta(r.onTime, r.onTimePrev); return x === null ? "—" : <span className={x >= 0 ? "t-g" : "t-r"}>{x > 0 ? "+" : ""}{x}</span>; } },
         { key: "missed", label: "Missed", num: true, value: (r) => r.missed.length, render: (r) => <N ids={r.missed} title={`${r.name}: missed`} /> },
-        { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first check"], ["Formula", "Approved first time ÷ tasks checked"]]} />, value: (r) => r.fta, render: (r) => fmtP(r.fta) },
-        { key: "inSla", label: "Reviews in SLA", num: true, tip: <InfoTip title="Reviews in SLA" rows={[["Means", "Reviewed tasks where every check met its limit"], ["Formula", "In-time tasks ÷ tasks reviewed"]]} />, value: (r) => r.inSla, render: (r) => <span className={`pill ${rag(r.inSla, 90, 75)}`}>{fmtP(r.inSla)}</span> },
+        { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first review"], ["Formula", "Approved first time ÷ tasks reviewed"]]} />, value: (r) => r.fta, render: (r) => fmtP(r.fta) },
+        { key: "inSla", label: "Reviews in SLA", num: true, tip: <InfoTip title="Reviews in SLA" rows={[["Means", "Reviewed tasks where every review was on time"], ["Formula", "In-time tasks ÷ tasks reviewed"]]} />, value: (r) => r.inSla, render: (r) => <span className={`pill ${rag(r.inSla, 90, 75)}`}>{fmtP(r.inSla)}</span> },
         { key: "over", label: "Reviews past SLA now", num: true, value: (r) => r.over.length, render: (r) => <N ids={r.over} title={`${r.name}: reviews past SLA`} className={r.over.length ? "t-r" : ""} /> },
         { key: "repeat", label: "Sent back 2+", num: true, value: (r) => r.repeat.length, render: (r) => <N ids={r.repeat} title={`${r.name}: sent back twice or more`} /> },
       ]} />

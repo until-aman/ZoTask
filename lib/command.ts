@@ -1,5 +1,5 @@
 // Operations command center: every number on the dashboard comes from here, with the task ids behind it,
-// so each figure can be opened as a list. Task counts and review-attempt (check) counts are kept apart.
+// so each figure can be opened as a list. Every figure counts tasks, each task once.
 import { all } from "./db";
 import { HOUR, addDays, isoDate } from "./time";
 import { geo, rows, Row } from "./queries";
@@ -82,12 +82,13 @@ function reviewing(revs: Rv[], backlog: Row[], now: number) {
   const inSla = reviewed.filter((id) => byTask.get(id)!.every((x) => x.due_at && x.decided_at <= x.due_at));
   const pend = backlog.filter((r) => REVIEW_ST.includes(r.status));
   const over = pend.filter((r) => now - r.status_since > r.review_sla_h * HOUR);
-  const tat = checks.map((x) => x.decided_at - x.submitted_at);
+  // Wait per task: from the submission to the first decision on it in the period.
+  const tat = [...byTask.values()].map((t) => { const f = [...t].sort((a, b) => a.decided_at - b.decided_at)[0]; return f.decided_at - f.submitted_at; });
   const sentBack = reviewed.filter((id) => byTask.get(id)!.some((x) => x.decision === "changes"));
   return {
     reviewed, inSla, afterSla: reviewed.filter((id) => !inSla.includes(id)), pending: pend.map((r) => r.id), over: over.map((r) => r.id),
     rereview: pend.filter((r) => r.status === "resub").map((r) => r.id), requiring: uniq([...reviewed, ...pend.map((r) => r.id)]),
-    sentBack, checks: checks.length, firstChecks: checks.filter((x) => x.attempt <= 1).length, reChecks: checks.filter((x) => x.attempt > 1).length,
+    sentBack, checks: checks.length, reReviewed: reviewed.filter((id) => byTask.get(id)!.length > 1),
     median: quant(tat, 0.5), p90: quant(tat, 0.9), checkIds: uniq(checks.map((x) => x.instance_id)),
   };
 }
@@ -270,9 +271,9 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
     const v = reviewing(mineRev, open.filter((r) => r.reviewer === name), now);
     const assignedProps = new Set([...cur, ...open].filter((r) => r.reviewer === name).map((r) => r.property_id));
     return { name, props: assignedProps.size, requiring: v.requiring, reviewed: v.reviewed, inSla: pct(v.inSla.length, v.reviewed.length), afterSla: v.afterSla,
-      pending: v.pending, over: v.over, median: v.median, p90: v.p90, firstChecks: v.firstChecks, reChecks: v.reChecks,
+      pending: v.pending, over: v.over, median: v.median, p90: v.p90, reReviewed: v.reReviewed,
       sentBack: v.sentBack, sentBackRate: pct(v.sentBack.length, v.reviewed.length),
-      daily: days.map((d) => mineRev.filter((x) => x.kind === "review" && x.decided_at >= dayStart(d) && x.decided_at < dayStart(d) + 864e5).length) };
+      daily: days.map((d) => uniq(mineRev.filter((x) => x.kind === "review" && x.decided_at >= dayStart(d) && x.decided_at < dayStart(d) + 864e5).map((x) => x.instance_id)).length) };
   }).sort((a, b) => b.over.length - a.over.length || (a.inSla ?? 0) - (b.inSla ?? 0));
 
   // ---------- CBMs ----------
@@ -280,10 +281,11 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
     `SELECT e.instance_id, e.type, e.at FROM events e JOIN instances i ON i.id=e.instance_id WHERE e.type IN ('changes_requested','resubmitted') AND e.at>=? AND e.at<? AND i.property_id ${inProps} ORDER BY e.at`,
     dayStart(R.from), dayStart(R.to) + 864e5);
   const fixTimes = new Map<number, number[]>(); // property -> ms from send-back to resubmission
-  { const asked = new Map<number, number>();
+  { const asked = new Map<number, number>(), fixed = new Set<number>();
     for (const e of fixEv) {
-      if (e.type === "changes_requested") asked.set(e.instance_id, e.at);
-      else if (asked.has(e.instance_id)) { const t = tasks.get(e.instance_id); if (t) fixTimes.set(t.pid, [...(fixTimes.get(t.pid) ?? []), e.at - asked.get(e.instance_id)!]); asked.delete(e.instance_id); }
+      if (e.type === "changes_requested") { if (!asked.has(e.instance_id)) asked.set(e.instance_id, e.at); }
+      // One fix time per task: its first send-back to its first resubmission.
+      else if (asked.has(e.instance_id) && !fixed.has(e.instance_id)) { fixed.add(e.instance_id); const t = tasks.get(e.instance_id); if (t) fixTimes.set(t.pid, [...(fixTimes.get(t.pid) ?? []), e.at - asked.get(e.instance_id)!]); }
     } }
   const cbms = [...new Set(properties.map((p) => p.cbm).filter(Boolean))].map((name) => {
     const ps = properties.filter((p) => p.cbm === name).map((p) => p.id);
@@ -304,19 +306,21 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
   const fixedT = returnedT.filter((r) => passed.has(r.id) || PASSED_ST.includes(r.status));
   const firstCheck = new Map<number, number>();
   for (const x of revAll) if (x.kind === "review" && x.attempt <= 1 && !firstCheck.has(x.instance_id)) firstCheck.set(x.instance_id, x.decided_at - x.submitted_at);
-  const recheck = revCur.filter((x) => x.kind === "review" && x.attempt > 1).map((x) => x.decided_at - x.submitted_at);
+  const recheckBy = new Map<number, number>();
+  for (const x of revCur) if (x.kind === "review" && x.attempt > 1 && !recheckBy.has(x.instance_id)) recheckBy.set(x.instance_id, x.decided_at - x.submitted_at);
+  const recheck = [...recheckBy.values()];
   const ids = (xs: Row[]) => xs.map((r) => r.id);
   const lifecycle = {
     stages: [
       { key: "due", label: "Deadline passed", ids: gC.due },
       { key: "sub", label: "Submitted", ids: ids(submitted), time: quant(submitted.map((r) => r.first_submitted_at! - r.window_start_at), 0.5), timeLabel: "to submit" },
-      { key: "rev", label: "Reviewed", ids: ids(reviewedT), time: quant(reviewedT.map((r) => firstCheck.get(r.id)).filter((x): x is number => x !== undefined), 0.5), timeLabel: "to first check" },
+      { key: "rev", label: "Reviewed", ids: ids(reviewedT), time: quant(reviewedT.map((r) => firstCheck.get(r.id)).filter((x): x is number => x !== undefined), 0.5), timeLabel: "to first review" },
       { key: "fta", label: "Approved first time", ids: gC.fta },
     ],
     fix: [
       { key: "ret", label: "Sent back", ids: ids(returnedT) },
       { key: "resub", label: "Resubmitted", ids: ids(resubT), time: quant([...fixTimes.values()].flat(), 0.5), timeLabel: "to fix" },
-      { key: "fixed", label: "Approved after fixing", ids: ids(fixedT), time: quant(recheck, 0.5), timeLabel: "to re-check" },
+      { key: "fixed", label: "Approved after fixing", ids: ids(fixedT), time: quant(recheck, 0.5), timeLabel: "to re-review" },
     ],
     finalApproved: gC.approved,
     stuck: [
