@@ -66,22 +66,22 @@ export function attention(openRows: Row[], period: Row[], now: number, q: string
     const age = (now - r.status_since) / HOUR, sla = slaOf(r);
     const href = `/review/${r.id}`;
     if (["review", "resub"].includes(r.status) && age > sla)
-      out.push({ id: r.id, sev: age > 2 * sla ? "r" : "a", title: `Review overdue · ${r.task}`, sub: `${r.property} · waiting ${Math.round(age)}h vs ${sla}h SLA`, owner: r.reviewer ?? "Unassigned", age, href });
+      out.push({ id: r.id, sev: age > 2 * sla ? "r" : "a", title: `Waiting too long for a check · ${r.task}`, sub: `${r.property} · waiting ${Math.round(age)} hours, should be checked within ${sla}`, owner: r.reviewer ?? "Unassigned", age, href });
     else if (r.status === "audit" && age > sla)
-      out.push({ id: r.id, sev: "a", title: `Audit overdue · ${r.task}`, sub: `${r.property} · waiting ${Math.round(age)}h vs ${sla}h SLA`, owner: r.auditor ?? "Unassigned", age, href });
+      out.push({ id: r.id, sev: "a", title: `Waiting too long for the auditor · ${r.task}`, sub: `${r.property} · waiting ${Math.round(age)} hours, should be done within ${sla}`, owner: r.auditor ?? "Unassigned", age, href });
     else if (r.status === "changes" && r.attempt >= r.attempts_allowed - 1)
-      out.push({ id: r.id, sev: r.criticality === "high" ? "r" : "a", title: `Rejected ${r.attempt}× · ${r.task}`, sub: `${r.property} · “${r.last_reason}” · next fail is final`, owner: r.assignee ?? "", age, href });
+      out.push({ id: r.id, sev: r.criticality === "high" ? "r" : "a", title: `Sent back ${r.attempt} times · ${r.task}`, sub: `${r.property} · “${r.last_reason}” · one more fail and it can't be fixed`, owner: r.assignee ?? "", age, href });
     else if (r.status === "auditflag" && age > 48)
-      out.push({ id: r.id, sev: "a", title: `Audit flags unanswered · ${r.task}`, sub: `${r.property} · ${Math.round(age)}h`, owner: r.cbm ?? "", age, href });
+      out.push({ id: r.id, sev: "a", title: `Auditor's questions not answered · ${r.task}`, sub: `${r.property} · waiting ${Math.round(age)} hours`, owner: r.cbm ?? "", age, href });
     else if (r.status === "notsub" && r.criticality === "high")
-      out.push({ id: r.id, sev: "r", title: `Critical task overdue · ${r.task}`, sub: `${r.property} · late window ends ${new Date(r.late_until_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`, owner: r.assignee ?? "", age, href });
+      out.push({ id: r.id, sev: "r", title: `Important task not done yet · ${r.task}`, sub: `${r.property} · last chance ends ${new Date(r.late_until_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`, owner: r.assignee ?? "", age, href });
   }
   const byProp = new Map<number, Row[]>();
   for (const r of period) byProp.set(r.property_id, [...(byProp.get(r.property_id) ?? []), r]);
   for (const [, list] of byProp) {
     const e = execution(list, now);
     if (e.due >= 5 && (e.missedRate ?? 0) > 20)
-      out.push({ sev: (e.missedRate ?? 0) > 30 ? "r" : "a", title: `${list[0].property} is missing ${e.missedRate}% of tasks`, sub: `${e.missed} of ${e.due} due tasks missed in this period`, owner: list[0].cbm ?? "", age: 0,
+      out.push({ sev: (e.missedRate ?? 0) > 30 ? "r" : "a", title: `${list[0].property} skipped ${e.missedRate}% of its tasks`, sub: `${e.missed} of ${e.due} tasks were never done in these dates`, owner: list[0].cbm ?? "", age: 0,
         href: `/queue?tab=missed&prop=${encodeURIComponent(list[0].property)}&${q}` });
   }
   return out.sort((a, b) => (a.sev === b.sev ? b.age - a.age : a.sev === "r" ? -1 : 1));
