@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CC, Issue } from "@/lib/command";
 import DashFilters from "@/components/DashFilters";
-import { DrillCtx, Drill, InfoTip, Mini, Tile, dur, Delta, useDrill } from "./parts";
+import { DrillCtx, Drill, Def, DefTip, Mini, Tile, dur, Delta, useDrill } from "./parts";
 import { DrillDrawer, TaskDrawer } from "./Drawers";
 import ActionQueue from "./ActionQueue";
 import { Compare, Lifecycle, Reasons, Recurring, Trends } from "./Insights";
@@ -16,64 +16,68 @@ const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from
 function Health({ d }: { d: CC }) {
   const g = d.ground, v = d.review, o = d.outcome;
   const { open } = useDrill();
-  const parts: [string, typeof o.done, string][] = [["Approved and closed", o.done, "var(--green)"], ["In review or being fixed", o.inprog, "var(--blue)"],
-    ["Not submitted yet", o.notsub, "var(--amber)"], ["Missed", o.missed, "var(--red)"], ["Not rectified", o.notrect, "var(--purple)"]];
+  const parts: [string, typeof o.done, string, string][] = [["Approved and closed", o.done, "var(--green)", "Approved, and audit done or not needed"],
+    ["In review or being fixed", o.inprog, "var(--blue)", "Submitted, still in review, audit or being corrected"],
+    ["Not submitted yet", o.notsub, "var(--amber)", "Past the deadline, grace period still running"], ["Missed", o.missed, "var(--red)", "Grace period ended with nothing submitted"],
+    ["Not rectified", o.notrect, "var(--purple)", "All attempts used without a pass"]];
   const due = g.due.n;
   return (
     <div className="grid g2h">
       <section className="card score">
-        <h3>Ground team<InfoTip title="Ground team" rows={[["Due", "Tasks whose deadline has passed. Cancelled (waived) tasks are left out"], ["On time", "Submitted by the deadline ÷ due"], ["First-time approval", "Approved on the first check ÷ tasks checked at least once"], ["Missed", "Grace period ended with nothing submitted ÷ due"]]} note="Every figure counts tasks. Click any figure to see them." /></h3>
+        <h3>Ground team</h3>
         <div className="kpis k3">
-          <Tile label="On time" k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline" />
-          <Tile label="First-time approval" k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first check" />
-          <Tile label="Missed" k={g.missed} band={[5, 10]} goodUp={false} target="Target under 5%" unitNote="Never submitted" />
+          <Tile label="On time" def={{ means: "Tasks submitted by their deadline", calc: "Submitted on time ÷ tasks due", note: "Due = deadline has passed. Cancelled tasks are left out." }} k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline" />
+          <Tile label="First-time approval" def={{ means: "Tasks approved at their first check", calc: "Approved first time ÷ tasks checked at least once", note: "Tasks still waiting for a first check are left out." }} k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first check" />
+          <Tile label="Missed" def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks due", note: "Lower is better." }} k={g.missed} band={[5, 10]} goodUp={false} target="Target under 5%" unitNote="Never submitted" />
         </div>
         <div className="minis">
-          <Mini label="Assigned" k={g.assigned} tip="All tasks in the period, excluding cancelled" />
-          <Mini label="Due" k={g.due} tip="Deadline has passed" />
-          <Mini label="Late" k={g.late} tone="a" tip="Submitted after the deadline" />
-          <Mini label="Overdue, still open" k={g.overdue} tone="a" tip="Past the deadline, still inside the grace period" />
-          <Mini label="Sent back" k={g.returned} tip="Sent back at least once" />
-          <Mini label="Sent back 2+" k={g.repeat} tone="r" tip="Sent back two or more times" />
+          <Mini label="Assigned" k={g.assigned} def={{ means: "All tasks scheduled in the period", note: "Cancelled tasks are left out." }} />
+          <Mini label="Due" k={g.due} def={{ means: "Assigned tasks whose deadline has passed", note: "This is the base for On time and Missed." }} />
+          <Mini label="Late" k={g.late} tone="a" def={{ means: "Submitted, but after the deadline" }} />
+          <Mini label="Overdue, still open" k={g.overdue} tone="a" def={{ means: "Past the deadline, not submitted, grace period still running", note: "These can still be saved today. Remind the owner." }} />
+          <Mini label="Sent back" k={g.returned} def={{ means: "Tasks a reviewer sent back for changes at least once" }} />
+          <Mini label="Sent back 2+" k={g.repeat} tone="r" def={{ means: "Tasks sent back two or more times", note: "A sign of a training or process problem." }} />
         </div>
       </section>
       <section className="card score">
-        <h3>Reviewers<InfoTip title="Reviewers" rows={[["Within SLA", "Tasks whose every check met its time limit ÷ tasks reviewed in the period"], ["SLA", "Set per task type, usually 24h from submission"], ["Wait", "Each check, from submission to decision. P90: 9 in 10 were faster"], ["Pending", "Waiting for a check right now"]]} note="Task counts, except wait times which use each check." /></h3>
+        <h3>Reviewers</h3>
         <div className="kpis k3">
-          <Tile label="Reviewed within SLA" k={v.inSla} band={[90, 75]} target="Target 90%+" unitNote="Every check met its limit" />
-          <TimeTile label="Median wait" t={v.median} band={[12, 24]} />
-          <TimeTile label="P90 wait" t={v.p90} band={[24, 48]} />
+          <Tile label="Reviewed within SLA" def={{ means: "Reviewed tasks where every check met its time limit", calc: "In-time tasks ÷ tasks reviewed in the period", note: "SLA is set per task type, usually 24h from submission. Tasks still waiting are under Pending past SLA." }} k={v.inSla} band={[90, 75]} target="Target 90%+" unitNote="Every check met its limit" />
+          <TimeTile label="Median wait" t={v.median} band={[12, 24]} def={{ means: "Typical time from submission to a reviewer's decision", calc: "Middle value of all checks in the period", note: "Counts each check, including re-checks." }} />
+          <TimeTile label="P90 wait" t={v.p90} band={[24, 48]} def={{ means: "9 in 10 checks were faster than this", calc: "90th percentile of submission-to-decision time", note: "Shows the slow tail the median hides." }} />
         </div>
         <div className="minis">
-          <Mini label="Needing review" k={v.requiring} tip="Reviewed in the period or waiting now" />
-          <Mini label="Reviewed" k={v.reviewed} tip="Tasks with at least one check in the period" />
-          <Mini label="After SLA" k={v.afterSla} tone="a" tip="Reviewed, but a check was late" />
-          <Mini label="Pending now" k={v.pending} tip="Waiting for a check" />
-          <Mini label="Pending past SLA" k={v.over} tone="r" tip="Waiting longer than the limit" />
-          <Mini label="Awaiting re-review" k={v.rereview} tip="Fixed and resubmitted, waiting for a check" />
+          <Mini label="Needing review" k={v.requiring} def={{ means: "Tasks reviewed in the period plus tasks waiting now" }} />
+          <Mini label="Reviewed" k={v.reviewed} def={{ means: "Tasks with at least one check in the period", note: "Each task counted once, however many checks." }} />
+          <Mini label="After SLA" k={v.afterSla} tone="a" def={{ means: "Reviewed tasks where at least one check was late" }} />
+          <Mini label="Pending now" k={v.pending} def={{ means: "Submitted tasks waiting for a check right now" }} />
+          <Mini label="Pending past SLA" k={v.over} tone="r" def={{ means: "Waiting for a check longer than the time limit", note: "These are in Action required." }} />
+          <Mini label="Awaiting re-review" k={v.rereview} def={{ means: "Fixed and resubmitted, waiting for a check" }} />
         </div>
       </section>
       <section className="card outcome">
         <div className="row2">
-          <h3 style={{ margin: 0, display: "flex", alignItems: "center" }}>Outcome of {due} tasks due<InfoTip title="Outcome" rows={[["Approved and closed", "Approved and audit done or skipped"], ["In review or being fixed", "Submitted, not finished yet"], ["Not rectified", "Attempts used up without a pass"], ["Approved at any attempt", "Includes tasks approved and now in audit. Recent tasks may still be in review, so this rises over the following days"]]} note={o.waived.n ? `${o.waived.n} cancelled tasks are not counted.` : undefined} /></h3>
+          <h3 style={{ margin: 0, display: "flex", alignItems: "center" }}>Outcome of {due} tasks due</h3>
           <span className="spacer" />
-          <span className="small">Approved at any attempt <b>{o.approved.rate ?? "—"}%</b> <Delta cur={o.approved.rate} prev={o.approved.prev} /></span>
+          <span className="small" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>Approved at any attempt <b>{o.approved.rate ?? "—"}%</b>
+            <DefTip label="Approved at any attempt" def={{ means: "Due tasks that passed review, first time or after fixing", calc: "Approved ÷ tasks due", note: `Includes tasks now in audit. Recent tasks may still be in review, so this rises over the next days.${o.waived.n ? ` ${o.waived.n} cancelled tasks are not counted.` : ""}` }} k={o.approved} rate /> <Delta cur={o.approved.rate} prev={o.approved.prev} /></span>
         </div>
         <div className="bar big" aria-label="Outcome of tasks due">{parts.map(([l, k, c]) => <i key={l} title={`${l}: ${k.n}`} style={{ width: `${due ? (k.n / due) * 100 : 0}%`, background: c }} />)}</div>
-        <div className="legend">{parts.map(([l, k, c]) => (
-          <button key={l} type="button" className="lg" disabled={!k.n} onClick={() => open({ title: l, ids: k.ids })}><b style={{ color: c }}>●</b> {l} <b>{k.n}</b> <span className="muted">{k.rate ?? 0}%</span></button>
+        <div className="legend">{parts.map(([l, k, c, m]) => (
+          <span key={l} className="lgw"><button type="button" className="lg" disabled={!k.n} onClick={() => open({ title: l, ids: k.ids })}><b style={{ color: c }}>●</b> {l} <b>{k.n}</b> <span className="muted">{k.rate ?? 0}%</span></button>
+            <DefTip label={l} def={{ means: m, calc: `${l} ÷ tasks due` }} k={k} rate /></span>
         ))}</div>
       </section>
     </div>
   );
 }
 
-function TimeTile({ label, t, band }: { label: string; t: { ms: number | null; prev: number | null; ids: number[] }; band: [number, number] }) {
+function TimeTile({ label, t, band, def }: { label: string; t: { ms: number | null; prev: number | null; ids: number[] }; band: [number, number]; def: Def }) {
   const h = t.ms === null ? null : t.ms / 3600_000;
   const r = h === null ? "" : h <= band[0] ? "g" : h <= band[1] ? "a" : "r";
   return (
     <div className="kpi"><span className={`rag ${r}`} title={r === "g" ? "Healthy" : r === "a" ? "Watch" : r === "r" ? "Act now" : "No data"} />
-      <div className="lab">{label}</div><div className="v">{dur(t.ms)}</div>
+      <div className="lab">{label}<DefTip label={label} def={def} target={`Under ${band[0]}h`} /></div><div className="v">{dur(t.ms)}</div>
       <div className="foot"><Delta cur={h === null ? null : Math.round(h)} prev={t.prev === null ? null : Math.round(t.prev / 3600_000)} goodUp={false} unit="h" /><span className="tgt">Under {band[0]}h</span></div>
     </div>
   );

@@ -299,3 +299,6 @@ tr.xrow td{background:#f8faff;padding-top:0}
 @media (max-width:900px){.g2h{grid-template-columns:minmax(0,1fr)}}
 table.aq td>.acts{display:flex}
 .g2w{align-items:start}
+.lgw{display:inline-flex;align-items:center}
+.mini{align-items:center}.mini .tip{margin-left:auto}
+.tip-pop{text-align:left;font-weight:500}

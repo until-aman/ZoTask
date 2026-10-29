@@ -36,9 +36,19 @@ export function Delta({ cur, prev, goodUp = true, unit = "pts" }: { cur: number 
   return <span className={`d ${good ? "up" : "down"}`} title={`Change vs the previous period of the same length (was ${prev}${unit === "pts" ? "%" : unit})`}>{d > 0 ? "▲" : "▼"} {Math.abs(d)}{unit === "pts" ? " pts" : unit}</span>;
 }
 
+/** What a figure means, shown in its own "i". */
+export type Def = { means: string; calc?: string; note?: string };
+function DefTip({ label, def, k, rate, target }: { label: string; def: Def; k?: K; rate?: boolean; target?: string }) {
+  const rows: [string, string][] = [["Means", def.means]];
+  if (def.calc) rows.push(["Formula", def.calc]);
+  if (k && rate && k.of !== undefined) rows.push(["Now", `${k.n} of ${k.of} = ${k.rate ?? "—"}%`]);
+  if (target) rows.push(["Target", target.replace(/^Target /, "")]);
+  return <InfoTip title={label} rows={rows} note={def.note ?? (k?.ids.length ? "Click the figure to see these tasks." : undefined)} />;
+}
+
 /** A headline figure. Clicking it lists the tasks behind it. */
-export function Tile({ label, tip, k, rate = true, goodUp = true, band, target, unitNote }: {
-  label: string; tip?: ReactNode; k: K; rate?: boolean; goodUp?: boolean; band?: [number, number]; target?: string; unitNote?: string;
+export function Tile({ label, def, k, rate = true, goodUp = true, band, target, unitNote }: {
+  label: string; def: Def; k: K; rate?: boolean; goodUp?: boolean; band?: [number, number]; target?: string; unitNote?: string;
 }) {
   const { open } = useDrill();
   const v = rate ? k.rate ?? null : k.n;
@@ -47,7 +57,7 @@ export function Tile({ label, tip, k, rate = true, goodUp = true, band, target, 
   return (
     <div className={`kpi ${k.ids.length ? "click" : ""}`} role="button" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.key === "Enter") act(); }} aria-label={`${label}: show tasks`}>
       {band && <span className={`rag ${r}`} title={RAG_LABEL[r]} />}
-      <div className="lab">{label}{tip}</div>
+      <div className="lab">{label}<DefTip label={label} def={def} k={k} rate={rate} target={target} /></div>
       <div className="v">{rate ? fmtP(v) : k.n}{rate && k.of !== undefined && <small>{k.n} of {k.of}</small>}</div>
       <div className="foot">{k.prev !== undefined ? <Delta cur={v} prev={k.prev} goodUp={goodUp} unit={rate ? "pts" : ""} /> : <span />}{target && <span className="tgt">{target}</span>}</div>
     </div>
@@ -55,12 +65,12 @@ export function Tile({ label, tip, k, rate = true, goodUp = true, band, target, 
 }
 
 /** A small clickable count in a strip under the headline tiles. */
-export function Mini({ label, k, tone, tip, of }: { label: string; k: K; tone?: "r" | "a" | "g"; tip?: string; of?: boolean }) {
+export function Mini({ label, k, tone, def, of }: { label: string; k: K; tone?: "r" | "a" | "g"; def: Def; of?: boolean }) {
   const { open } = useDrill();
-  const act = () => k.ids.length && open({ title: label, note: tip, ids: k.ids });
+  const act = () => k.ids.length && open({ title: label, note: def.means, ids: k.ids });
   return (
-    <div className={`mini ${k.ids.length ? "click" : ""}`} role="button" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.key === "Enter") act(); }} title={tip}>
-      <b className={tone ? `t-${tone}` : ""}>{k.n}</b><span>{label}{of && k.of !== undefined ? <small> of {k.of}</small> : null}</span>
+    <div className={`mini ${k.ids.length ? "click" : ""}`} role="button" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.key === "Enter") act(); }}>
+      <b className={tone ? `t-${tone}` : ""}>{k.n}</b><span>{label}{of && k.of !== undefined ? <small> of {k.of}</small> : null}</span><DefTip label={label} def={def} />
     </div>
   );
 }
@@ -191,4 +201,4 @@ export function CopyModal({ title, text, file, close }: { title: string; text: s
   );
 }
 
-export { InfoTip };
+export { InfoTip, DefTip };
