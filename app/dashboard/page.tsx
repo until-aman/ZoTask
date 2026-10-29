@@ -107,7 +107,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <div className="grid g3">
         <section className="card score">
-          <h3>Property team<InfoTip>Tasks whose deadline has passed ({E.due}). <b>On time</b>: finished before the deadline. <b>Right first time</b>: approved without being sent back. The dot is green when good, amber to watch, red when it needs help.</InfoTip></h3>
+          <h3>Property team<InfoTip title="Property team" rows={[["On time", "Finished before the deadline"], ["Right first time", "Approved without being sent back"]]} note={<>Counts the {E.due} tasks whose deadline has passed. Dot: green good, amber watch, red act.</>} /></h3>
           <div className="kpis">
             <Link className="kpi" href={qhref("done")}><span className={`rag ${rag(E.onTimeRate, 85, 70)}`} />
               <div className="lab">On time</div><div className="v">{fmtP(E.onTimeRate)}<small>{E.onTime}/{E.due}</small></div><Delta cur={E.onTimeRate} prev={Ep.onTimeRate} /></Link>
@@ -125,7 +125,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           </div>
         </section>
         <section className="card score">
-          <h3>Reviewers<InfoTip>All numbers count tasks, not checklist items. <b>Checked in time</b>: tasks checked within their time limit (every check, including re-checks), with tasks still waiting past the limit counted as late. <b>Usual wait</b>: half of tasks were checked faster than this. {V.audits ? `Auditors re-checked ${V.audits} approved tasks and found problems in ${V.auditFails}.` : ""}</InfoTip></h3>
+          <h3>Reviewers<InfoTip title="Reviewers" rows={[["Checked in time", "Every check on the task met its time limit. Tasks still waiting past the limit count as late"], ["Usual wait", "Half of tasks were checked faster than this"], ...(V.audits ? [["Audit", `${V.auditFails} of ${V.audits} re-checked tasks had problems`] as [string, string]] : [])]} note="All numbers count tasks, not checklist items." /></h3>
           <div className="kpis">
             <Link className="kpi" href={`/queue?tab=review&over=1&from=${M.isoDate(now - 60 * 864e5)}&to=${today}${loc ? "&" + loc : ""}`}><span className={`rag ${rag(V.slaRate, 90, 75)}`} />
               <div className="lab">Checked in time</div><div className="v">{fmtP(V.slaRate)}<small>{V.onTime}/{V.tasks + V.pendingOver}</small></div><Delta cur={V.slaRate} prev={Vp.slaRate} /></Link>
@@ -135,7 +135,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <div className="legend"><span>{V.pending} waiting now</span>{V.pendingOver ? <span style={{ color: "var(--red)" }}>{V.pendingOver} overdue</span> : null}</div>
         </section>
         <section className="card score">
-          <h3>Outcome<InfoTip><b>Approved</b>: tasks fully done and approved. The rest are still being checked or fixed, or were missed. <b>Missed</b>: never done at all, lower is better. {E.waived ? `${E.waived} cancelled tasks aren't counted.` : ""}</InfoTip></h3>
+          <h3>Outcome<InfoTip title="Outcome" rows={[["Approved", "Fully done and approved"], ["Missed", "Never done. Lower is better"], ["Late, still fixable", "Past the deadline but can still be submitted today"]]} note={E.waived ? `${E.waived} cancelled tasks are not counted.` : undefined} /></h3>
           <div className="kpis">
             <Link className="kpi" href={qhref("done")}><span className={`rag ${rag(E.verifiedRate, 80, 65)}`} />
               <div className="lab">Approved</div><div className="v">{fmtP(E.verifiedRate)}<small>{E.verified}/{E.due}</small></div><Delta cur={E.verifiedRate} prev={Ep.verifiedRate} /></Link>
@@ -151,7 +151,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </div>
 
       <section className="card score">
-        <h3>Housekeeping count<InfoTip><b>Ideal</b>: how many the property should have. <b>Current</b>: how many are on the roster today. <b>To hire</b>: Ideal minus Current. HK is a housekeeper, SHK a senior housekeeper (supervisor). Sample numbers in this prototype.</InfoTip></h3>
+        <h3>Housekeeping count<InfoTip title="Housekeeping count" rows={[["HK", "Housekeeper"], ["SHK", "Senior housekeeper (supervisor)"], ["Ideal", "How many the property should have"], ["Current", "How many are on the roster today"], ["To hire", "Ideal minus Current"]]} note="Sample numbers in this prototype." /></h3>
         <div className="hkgrid">
           {[["HK", hk.ihk, hk.chk], ["SHK", hk.ishk, hk.cshk]].map(([l, ideal, cur]) => {
             const gap = Math.max(0, (ideal as number) - (cur as number));
@@ -177,7 +177,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
       <div className="grid g2">
         <section className="card">
-          <div className="row2"><h2 style={{ margin: 0, display: "flex", alignItems: "center" }}>Fix these first<InfoTip>Problems ranked by how serious and how old they are. Each one names who needs to act. Click to open the task.</InfoTip></h2><span className="spacer" /><span className="pill">{att.length}</span></div>
+          <div className="row2"><h2 style={{ margin: 0, display: "flex", alignItems: "center" }}>Fix these first<InfoTip title="Fix these first" rows={[["Order", "Most serious first, then oldest"], ["Owner", "The person who needs to act"], ["Red / amber", "Act now / act soon"]]} note="Click a row to open the task." /></h2><span className="spacer" /><span className="pill">{att.length}</span></div>
           {!att.length && <p className="muted">Nothing is overdue. Good day.</p>}
           {att.slice(0, 12).map((a, i) => (
             <Link key={i} href={a.href} className="att" style={{ color: "var(--fg)" }}>
@@ -189,7 +189,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {att.length > 12 && <p className="small"><Link href={qhref("review", "&over=1")}>See all in the Review Queue</Link></p>}
         </section>
         <section className="card">
-          <h2 style={{ display: "flex", alignItems: "center" }}>Why tasks get sent back<InfoTip>ZoTask doesn&apos;t collect this today. This prototype adds one step: when a reviewer sends a task back, they pick a reason (Photo missing, Photo unclear, Wrong location and so on). A longer bar means it happened more often.</InfoTip><span className="pill b" style={{ marginLeft: 8 }}>New</span></h2>
+          <h2 style={{ display: "flex", alignItems: "center" }}>Why tasks get sent back<InfoTip title="Why tasks get sent back" rows={[["How", "When a reviewer sends a task back, they pick a reason"], ["Bar", "Number of tasks sent back for that reason"]]} note="New: ZoTask doesn't collect reasons today. This prototype adds the step." /><span className="pill b" style={{ marginLeft: 8 }}>New</span></h2>
           {!reasons.length && <p className="muted">No flags in this period.</p>}
           <div className="grid" style={{ gap: 8 }}>
             {reasons.map((r) => (
