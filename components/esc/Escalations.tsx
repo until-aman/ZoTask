@@ -115,7 +115,7 @@ export default function Escalations({ data: d }: { data: EscData }) {
           {focus ? <span className="chipn"><b>{focus.label}</b> · {focus.ids.length}<button type="button" className="link small" onClick={() => setFocus(null)} style={{ marginLeft: 6 }}>Show all ×</button></span> :
             <div className="bk">
               {([["open", "Open"], ["overdue", "Past expected closure"], ["soon", "Due in 2 days"], ["closed", "Closed or dropped"], ["all", "All"]] as [Quick, string][]).map(([k, l]) => (
-                <button key={k} type="button" aria-pressed={quick === k} onClick={() => setQuick(k)}>{l} <span className={k === "overdue" && counts[k] ? "r" : ""}>{counts[k]}</span></button>
+                <button key={k} type="button" className="qf" aria-pressed={quick === k} onClick={() => setQuick(k)}>{l}<span className={`cnt ${k === "overdue" && counts[k] ? "r" : ""}`}>{counts[k]}</span></button>
               ))}
             </div>}
         </div>

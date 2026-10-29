@@ -346,3 +346,8 @@ table.aq td>.acts{display:flex}
 .legend b.lgn{font-weight:800;color:var(--fg)}
 .outcome .lgw{justify-content:center;gap:2px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 8px 3px 6px;min-width:0}
 .outcome .lgw .lg{white-space:nowrap}
+.bk button.qf{display:inline-flex;align-items:center;gap:8px;padding:4px 5px 4px 12px}
+.qf .cnt{min-width:24px;padding:1px 7px;border-radius:999px;background:var(--line2);color:var(--fg);font-size:12px;text-align:center}
+.qf .cnt.r{background:var(--red-soft);color:var(--red)}
+.bk button.qf[aria-pressed="true"] .cnt{background:#fff;color:var(--fg)}
+.bk button.qf[aria-pressed="true"] .cnt.r{color:var(--red)}
