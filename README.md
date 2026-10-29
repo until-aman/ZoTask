@@ -48,9 +48,11 @@ Time-based moves (`lib/engine.ts → sweep`) run on every page load, and today's
 - `lib/schema.sql` – tables
 - `lib/engine.ts` – lifecycle rules (generate, sweep, submit, review, audit, flags, waive, remind)
 - `lib/seed.ts` – sample data and history simulation
-- `lib/metrics.ts` – KPI definitions
+- `lib/metrics.ts` – shared KPI helpers (date ranges, loaders)
+- `lib/command.ts` – the command-center dashboard: every figure with the task ids behind it, the action queue, trends, lifecycle, comparisons
+- `lib/detail.ts` – one task's full record for the dashboard's side drawer
 - `app/` – pages (`tasks`, `queue`, `review/[id]`, `dashboard`, `admin`) and server actions (`actions.ts`)
-- `components/` – client components (QueueClient, TaskForm, ReviewForm, TemplateEditor…)
+- `components/` – client components (QueueClient, TaskForm, ReviewForm, TemplateEditor…); `components/cc/` is the dashboard
 
 Not included yet: real notifications (reminders are logged in history only), SSO, and integration with the booking system (event tasks are triggered from Admin).
 

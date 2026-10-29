@@ -284,8 +284,11 @@ export function nextActor(i: Pick<Instance, "status" | "assignee_id" | "reviewer
 
 export function remind(instanceIds: number[], actorId: number, at: number) {
   const people = new Set<number>();
+  let skipped = 0;
   tx(() => {
     for (const id of instanceIds) {
+      // Don't nag: skip a task that already got a reminder in the last 4 hours.
+      if (one("SELECT 1 FROM events WHERE instance_id=? AND type='reminder' AND at>?", id, at - 4 * HOUR)) { skipped++; continue; }
       const i = one<Instance & { cbm_id: number | null }>(
         "SELECT i.*, p.cbm_id FROM instances i JOIN properties p ON p.id=i.property_id WHERE i.id=?", id);
       if (!i) continue;
@@ -296,5 +299,5 @@ export function remind(instanceIds: number[], actorId: number, at: number) {
       logEvent(id, at, actorId, "reminder", `Reminder sent to ${u?.name}`);
     }
   });
-  return people.size;
+  return { people: people.size, skipped };
 }

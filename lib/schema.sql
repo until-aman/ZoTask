@@ -80,3 +80,10 @@ CREATE TABLE IF NOT EXISTS staffing (
   property_id INTEGER PRIMARY KEY REFERENCES properties(id),
   ideal_hk INTEGER NOT NULL, current_hk INTEGER NOT NULL, ideal_shk INTEGER NOT NULL, current_shk INTEGER NOT NULL
 );
+-- Lookups used by the dashboard and review pages.
+CREATE INDEX IF NOT EXISTS ix_rev_inst ON reviews(instance_id, decided_at);
+CREATE INDEX IF NOT EXISTS ix_rev_sub ON reviews(submission_id);
+CREATE INDEX IF NOT EXISTS ix_rev_decided ON reviews(decided_at);
+CREATE INDEX IF NOT EXISTS ix_flag_rev ON review_flags(review_id);
+CREATE INDEX IF NOT EXISTS ix_sub_inst ON submissions(instance_id);
+CREATE INDEX IF NOT EXISTS ix_events_type_at ON events(type, at);

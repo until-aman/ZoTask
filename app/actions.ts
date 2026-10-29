@@ -90,8 +90,8 @@ export async function waiveTask(instanceId: number, reason: string): Promise<Res
 export async function remindTasks(ids: number[]): Promise<Result> {
   const u = await requireUser();
   return guard(() => {
-    const n = E.remind(ids, u.id, Date.now());
-    return `Reminder logged for ${n} ${n === 1 ? "person" : "people"}`;
+    const { people, skipped } = E.remind(ids, u.id, Date.now());
+    return `Reminder logged for ${people} ${people === 1 ? "person" : "people"}${skipped ? ` · ${skipped} skipped, already reminded in the last 4h` : ""}`;
   });
 }
 
@@ -174,6 +174,36 @@ export async function saveTemplate(id: number | null, t: TemplateInput): Promise
   });
   if (r.ok && !id) redirect(`/admin/templates/${newId}`);
   return r;
+}
+
+export async function getTaskDetail(instanceId: number) {
+  const u = await requireUser();
+  if (!can.dashboard(u)) return null;
+  const { taskDetail } = await import("@/lib/detail");
+  return taskDetail(instanceId, u);
+}
+
+/** Marks open issues as seen by the current user. Cleared automatically when the task moves on. */
+export async function acknowledgeIssues(ids: number[]): Promise<Result> {
+  const u = await requireUser();
+  return guard(() => {
+    if (!can.dashboard(u)) throw new Error("Only central roles can acknowledge issues.");
+    tx(() => ids.forEach((id) => E.logEvent(id, Date.now(), u.id, "acknowledged", "Issue acknowledged")));
+    return `Acknowledged ${ids.length} ${ids.length === 1 ? "issue" : "issues"}`;
+  });
+}
+
+/** Escalates an issue: ground team issues go to the property's CBM, everything else to the operations admin. */
+export async function escalateIssue(id: number, note: string): Promise<Result> {
+  const u = await requireUser();
+  return guard(() => {
+    if (!["admin", "reviewer", "auditor"].includes(u.access_role)) throw new Error("Only central operations can escalate.");
+    const i = one<{ status: string; cbm: string | null }>("SELECT i.status, uc.name cbm FROM instances i JOIN properties p ON p.id=i.property_id LEFT JOIN users uc ON uc.id=p.cbm_id WHERE i.id=?", id);
+    if (!i) throw new Error("Task not found.");
+    const to = ["notsub", "changes"].includes(i.status) ? i.cbm ?? "CBM" : one<{ name: string }>("SELECT name FROM users WHERE access_role='admin' LIMIT 1")?.name ?? "Ops Admin";
+    E.logEvent(id, Date.now(), u.id, "escalated", `Escalated to ${to}${note.trim() ? ` · ${note.trim()}` : ""}`);
+    return `Escalated to ${to}`;
+  });
 }
 
 export async function getHistory(instanceId: number) {
