@@ -1,0 +1,16 @@
+# Render Blueprint: one web service with a persistent disk for the SQLite database and uploaded photos.
+services:
+  - type: web
+    name: zotask
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    disk:
+      name: zotask-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
