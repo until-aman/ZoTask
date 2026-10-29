@@ -163,7 +163,7 @@ export function Compare({ d }: { d: CC }) {
   const [lvl, setLvl] = useState<"city" | "cluster">(d.filters.city ? "cluster" : "city");
   const rowsC = lvl === "city" ? d.cities : d.clusters;
   const go = (name: string, city: string) => {
-    const p = new URLSearchParams(Object.entries({ range: d.preset, from: d.preset === "custom" ? d.R.from : "", to: d.preset === "custom" ? d.R.to : "", cat: d.filters.cat ?? "", mine: d.role === "reviewer" && !d.mine ? "0" : "", city, cluster: lvl === "cluster" ? name : "" }).filter(([, v]) => v) as [string, string][]);
+    const p = new URLSearchParams(Object.entries({ range: d.preset, from: d.preset === "custom" ? d.R.from : "", to: d.preset === "custom" ? d.R.to : "", cat: d.filters.cat ?? "", rv: d.filters.rv ?? "", mine: d.role === "reviewer" && !d.mine ? "0" : "", city, cluster: lvl === "cluster" ? name : "" }).filter(([, v]) => v) as [string, string][]);
     router.push(`/dashboard?${p}`);
   };
   type C = (typeof rowsC)[number];
