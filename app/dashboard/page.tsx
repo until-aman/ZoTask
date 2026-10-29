@@ -174,7 +174,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       <section>
         <div className="row2" style={{ marginBottom: 8 }}><h2 style={{ margin: 0 }}>Properties</h2><span className="spacer" /><span className="small muted">Weakest first</span></div>
         <div className="tbl"><table>
-          <thead><tr><th>Property</th><th>City · Area</th><th>Manager (CBM)</th><th className="n">Tasks due</th><th className="n">Done on time</th><th className="n">Change</th><th className="n">Right first time</th><th className="n">Never done</th><th className="n">To check</th><th>Trend</th></tr></thead>
+          <thead><tr><th>Property</th><th>City · Cluster</th><th>Manager (CBM)</th><th className="n">Tasks due</th><th className="n">Done on time</th><th className="n">Change</th><th className="n">Right first time</th><th className="n">Never done</th><th className="n">To check</th><th>Trend</th></tr></thead>
           <tbody>{propRows.map(({ g, e, ep, pending, spark, cbm }) => {
             const pq = `&prop=${encodeURIComponent(g.property)}`;
             const d = e.onTimeRate !== null && ep.onTimeRate !== null ? Math.round(e.onTimeRate - ep.onTimeRate) : null;
