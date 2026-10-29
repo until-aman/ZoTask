@@ -87,3 +87,21 @@ CREATE INDEX IF NOT EXISTS ix_rev_decided ON reviews(decided_at);
 CREATE INDEX IF NOT EXISTS ix_flag_rev ON review_flags(review_id);
 CREATE INDEX IF NOT EXISTS ix_sub_inst ON submissions(instance_id);
 CREATE INDEX IF NOT EXISTS ix_events_type_at ON events(type, at);
+-- Escalations raised by the central team (replaces the per-person action item sheets).
+CREATE TABLE IF NOT EXISTS escalations (
+  id INTEGER PRIMARY KEY, department TEXT NOT NULL, title TEXT NOT NULL, detail TEXT,
+  priority TEXT NOT NULL DEFAULT 'medium',                          -- high | medium | low
+  status TEXT NOT NULL DEFAULT 'open',                              -- open | wip | done | dropped
+  raised_by INTEGER NOT NULL REFERENCES users(id),
+  owner_name TEXT NOT NULL, owner_email TEXT, owner_id INTEGER REFERENCES users(id), cc TEXT,
+  mail_subject TEXT, mail_sent_at INTEGER, link TEXT,
+  due_date TEXT,                                                    -- expected closure
+  photos TEXT NOT NULL DEFAULT '[]', instance_id INTEGER REFERENCES instances(id),
+  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, closed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS escalation_properties (escalation_id INTEGER NOT NULL REFERENCES escalations(id), property_id INTEGER NOT NULL REFERENCES properties(id), PRIMARY KEY (escalation_id, property_id));
+CREATE TABLE IF NOT EXISTS escalation_updates (
+  id INTEGER PRIMARY KEY, escalation_id INTEGER NOT NULL REFERENCES escalations(id), at INTEGER NOT NULL,
+  by_id INTEGER REFERENCES users(id), note TEXT, status TEXT, due_date TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_escu ON escalation_updates(escalation_id, at);

@@ -163,6 +163,7 @@ export function TaskDrawer({ id, now, back, close, issue, canEscalate, onDone }:
                 <button type="button" className="btn sm danger" disabled={busy} onClick={() => act(escalateIssue(id, esc))}>Escalate now</button>
                 <button type="button" className="link small" onClick={() => setEsc(null)}>Cancel</button>
               </span>)}
+          {canEscalate && <button type="button" className="btn sm" onClick={() => router.push(`/escalations?task=${id}`)}>Raise escalation</button>}
           <span className="spacer" />
           <Link className="btn sm outline" href={`/review/${id}`}>Open full page</Link>
         </div>}

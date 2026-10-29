@@ -179,7 +179,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, to
 }
 
 /** Shows text to copy or download. Falls back to selecting the text when the clipboard is blocked. */
-export function CopyModal({ title, text, file, close }: { title: string; text: string; file?: string; close: () => void }) {
+export function CopyModal({ title, text, file, close, extra }: { title: string; text: string; file?: string; close: () => void; extra?: ReactNode }) {
   const [msg, setMsg] = useState("");
   const copy = async (el: HTMLTextAreaElement | null) => {
     try { await navigator.clipboard.writeText(text); setMsg("Copied"); }
@@ -194,6 +194,7 @@ export function CopyModal({ title, text, file, close }: { title: string; text: s
         <div className="row2">
           <button type="button" className="btn primary" onClick={() => copy(ta)}>Copy</button>
           {file && <a className="btn" href={`data:${file.endsWith(".csv") ? "text/csv" : "text/markdown"};charset=utf-8,${encodeURIComponent(text)}`} download={file}>Download</a>}
+          {extra}
           {msg && <span className="small ok" style={{ padding: "4px 10px" }}>{msg}</span>}
         </div>
       </div>

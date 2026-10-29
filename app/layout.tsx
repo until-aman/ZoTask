@@ -16,6 +16,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     if (can.queue(u)) links.push(["/queue", "Review Queue"]);
     if (can.dashboard(u)) links.push(["/dashboard", "Review Dashboard"]);
     if (can.dashboard(u)) links.push(["/compare", "Compare"]);
+    if (can.dashboard(u)) links.push(["/escalations", "Escalations"]);
     if (can.admin(u)) links.push(["/admin", "Admin"]);
   }
   return (

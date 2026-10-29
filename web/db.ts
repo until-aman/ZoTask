@@ -1,6 +1,7 @@
 // Browser stand-in for lib/db.ts: the same small API over sql.js (SQLite compiled to JS), held in memory.
 import schema from "../lib/schema.sql";
 import { seed } from "../lib/seed";
+import { seedEscalations } from "../lib/escalations";
 
 type Stmt = { bind(p: unknown[]): void; step(): boolean; getAsObject(): Record<string, unknown>; reset(): void };
 type SqlDb = { prepare(sql: string): Stmt; exec(sql: string): { values: unknown[][] }[]; run(sql: string): void; getRowsModified(): number };
@@ -45,6 +46,7 @@ export async function init(initSqlJs: (o?: unknown) => Promise<{ Database: new (
   raw = new SQL.Database();
   raw.exec(schema);
   seed();
+  seedEscalations();
   raw.run("INSERT INTO meta (k, v) VALUES ('seeded', '1')");
 }
 export function db() { return api; }

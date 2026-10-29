@@ -211,3 +211,21 @@ export async function getHistory(instanceId: number) {
   const { eventsFor } = await import("@/lib/queries");
   return eventsFor(instanceId);
 }
+
+export async function raiseEscalation(x: import("@/lib/escalations").EscInput): Promise<Result & { id?: number }> {
+  const u = await requireUser();
+  const X = await import("@/lib/escalations");
+  let id = 0;
+  const r = guard(() => {
+    if (!X.canRaise(u)) throw new Error("Only the central team and CBMs can raise escalations.");
+    id = X.raise(u, x, Date.now());
+    return `ESC-${id} raised to ${x.ownerName.trim()}`;
+  });
+  return r.ok ? { ...r, id } : r;
+}
+
+export async function updateEscalation(id: number, p: import("@/lib/escalations").EscPatch): Promise<Result> {
+  const u = await requireUser();
+  const X = await import("@/lib/escalations");
+  return guard(() => `ESC-${id}: ${X.update(u, id, p, Date.now())}`);
+}
