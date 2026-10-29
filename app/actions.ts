@@ -105,27 +105,33 @@ export async function reassignReviewer(ids: number[], reviewerId: number): Promi
 }
 
 export type ViewFilters = { city: string[]; cluster: string[]; prop: string[]; role: string[]; asg: string[]; mine: boolean };
-export async function saveView(name: string, filters: ViewFilters, isDefault: boolean): Promise<Result> {
+/** Saved filters, per screen. `filters` is whatever that screen keeps (the queue's lists, or a dashboard's URL parameters). */
+export async function saveView(page: string, name: string, filters: object, isDefault: boolean): Promise<Result & { id?: number }> {
   const u = await requireUser();
-  return guard(async () => {
+  let id = 0;
+  const r = await guard(async () => {
     await tx(async () => {
-      if (isDefault) await run("UPDATE saved_views SET is_default=0 WHERE user_id=?", u.id);
-      await run("INSERT INTO saved_views (user_id, name, filters, is_default) VALUES (?,?,?,?)", u.id, name || "My filters", JSON.stringify(filters), isDefault ? 1 : 0);
+      if (isDefault) await run("UPDATE saved_views SET is_default=0 WHERE user_id=? AND page=?", u.id, page);
+      id = (await run("INSERT INTO saved_views (user_id, page, name, filters, is_default) VALUES (?,?,?,?,?)", u.id, page, name || "My filters", JSON.stringify(filters), isDefault ? 1 : 0)).lastInsertRowid;
     });
-    return isDefault ? "Saved. The queue will open with these filters every day." : "Saved";
+    return isDefault ? `Saved “${name}”. This page will open with it.` : `Saved “${name}”`;
   });
+  return r.ok ? { ...r, id } : r;
 }
 export async function deleteView(id: number): Promise<Result> {
   const u = await requireUser();
-  return guard(async () => { await run("DELETE FROM saved_views WHERE id=? AND user_id=?", id, u.id); });
+  return guard(async () => { await run("DELETE FROM saved_views WHERE id=? AND user_id=?", id, u.id); return "Deleted"; });
 }
-export async function setDefaultView(id: number): Promise<Result> {
+export async function setDefaultView(id: number, on = true): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
     await tx(async () => {
-      await run("UPDATE saved_views SET is_default=0 WHERE user_id=?", u.id);
-      await run("UPDATE saved_views SET is_default=1 WHERE id=? AND user_id=?", id, u.id);
+      const v = await one<{ page: string }>("SELECT page FROM saved_views WHERE id=? AND user_id=?", id, u.id);
+      if (!v) throw new Error("Saved filter not found.");
+      await run("UPDATE saved_views SET is_default=0 WHERE user_id=? AND page=?", u.id, v.page);
+      if (on) await run("UPDATE saved_views SET is_default=1 WHERE id=?", id);
     });
+    return on ? "This page now opens with it" : "No default for this page";
   });
 }
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Esc, EscData } from "@/lib/escalations";
 import { raiseEscalation, updateEscalation } from "@/app/actions";
 import { CopyModal, InfoTip, Sec, Table, type Col } from "@/components/cc/parts";
+import { ActiveChip, Field, FilterBar, SavedView, Stats, sameFilters } from "@/components/ui/Filters";
 import Photo from "@/components/Photo";
 
 const STATUS: Record<string, string> = { open: "Yet to start", wip: "In progress", done: "Closed", dropped: "Dropped" };
@@ -28,7 +29,7 @@ const PERIODS: [string, string, number][] = [["7", "7 days", 7], ["30", "30 days
 type Quick = "open" | "overdue" | "soon" | "closed" | "all";
 type Focus = { label: string; ids: number[] } | null;
 
-export default function Escalations({ data: d }: { data: EscData }) {
+export default function Escalations({ data: d, views }: { data: EscData; views: SavedView[] }) {
   const router = useRouter();
   const [tab, setTab] = useState<"tracker" | "summary">("tracker");
   const [quick, setQuick] = useState<Quick>("open");
@@ -40,6 +41,7 @@ export default function Escalations({ data: d }: { data: EscData }) {
   const [by, setBy] = useState("");
   const [period, setPeriod] = useState("30");
   const [focus, setFocus] = useState<Focus>(null);
+  const [q, setQ] = useState("");
   const [open, setOpen] = useState<number | null>(null);
   const [raising, setRaising] = useState(d.openNew && d.canRaise);
   const [toast, setToast] = useState("");
@@ -65,7 +67,34 @@ export default function Escalations({ data: d }: { data: EscData }) {
   const props = d.geo.filter((g) => (!city || g.city === city) && (!cluster || g.cluster === cluster));
   const owners = [...new Set(d.rows.map((r) => r.owner))].sort();
   const raisers = [...new Set(d.rows.map((r) => r.raisedBy))].sort();
-  const anyFilter = dept || city || cluster || prop || owner || by;
+  const current = { dept, city, cluster, prop, owner, by };
+  const applyF = (f: Record<string, unknown>) => { const g = (k: string) => String(f[k] ?? ""); setDept(g("dept")); setCity(g("city")); setCluster(g("cluster")); setProp(g("prop")); setOwner(g("owner")); setBy(g("by")); setFocus(null); };
+  const def = views.find((v) => v.def);
+  useEffect(() => { if (def && !d.openNew && !sameFilters(def.f, current)) applyF(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const propName = d.geo.find((g) => String(g.id) === prop)?.property;
+  const chips: ActiveChip[] = [
+    ...(focus ? [{ key: "focus", label: <>Showing: <b>{focus.label}</b> ({focus.ids.length})</>, clear: () => setFocus(null) }] : []),
+    ...(dept ? [{ key: "dept", label: <>Department: <b>{dept}</b></>, clear: () => setDept("") }] : []),
+    ...(city ? [{ key: "city", label: <>City: <b>{city}</b></>, clear: () => { setCity(""); setCluster(""); setProp(""); } }] : []),
+    ...(cluster ? [{ key: "cluster", label: <>Cluster: <b>{cluster}</b></>, clear: () => { setCluster(""); setProp(""); } }] : []),
+    ...(prop ? [{ key: "prop", label: <>Property: <b>{propName}</b></>, clear: () => setProp("") }] : []),
+    ...(owner ? [{ key: "owner", label: <>Raised to: <b>{owner}</b></>, clear: () => setOwner("") }] : []),
+    ...(by ? [{ key: "by", label: <>Raised by: <b>{by}</b></>, clear: () => setBy("") }] : []),
+  ];
+  const bar = (summary: boolean) => (
+    <FilterBar search={summary ? undefined : q} setSearch={summary ? undefined : setQ} searchLabel="Search ref, issue, property, person" chips={chips}
+      onClearAll={() => { applyF({}); }}
+      saved={{ page: "escalations", views, current, apply: applyF, notify: setToast, name: [propName || cluster || city, dept, owner].filter(Boolean).join(" · ") || "All escalations" }}
+      panel={<>
+        {summary && <Field label="Period for raised and closed" wide><div className="seg">{PERIODS.map(([k, l]) => <button key={k} type="button" aria-pressed={period === k} onClick={() => setPeriod(k)}>{l}</button>)}</div></Field>}
+        <Field label="Department"><select value={dept} onChange={(e) => setDept(e.target.value)}><option value="">All departments</option>{d.departments.map((x) => <option key={x}>{x}</option>)}</select></Field>
+        <Field label="City"><select value={city} onChange={(e) => { setCity(e.target.value); setCluster(""); setProp(""); }}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>
+        <Field label="Cluster"><select value={cluster} onChange={(e) => { setCluster(e.target.value); setProp(""); }}><option value="">All clusters</option>{clusters.map((x) => <option key={x}>{x}</option>)}</select></Field>
+        <Field label="Property"><select value={prop} onChange={(e) => setProp(e.target.value)}><option value="">All properties</option>{props.map((p) => <option key={p.id} value={String(p.id)}>{p.property}</option>)}</select></Field>
+        <Field label="Raised to"><select value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">Anyone</option>{owners.map((x) => <option key={x}>{x}</option>)}</select></Field>
+        <Field label="Raised by"><select value={by} onChange={(e) => setBy(e.target.value)}><option value="">Anyone</option>{raisers.map((x) => <option key={x}>{x}</option>)}</select></Field>
+      </>} />
+  );
   const cur = open !== null ? d.rows.find((r) => r.id === open) ?? null : null;
   const done = (msg: string, id?: number) => { setToast(msg); router.refresh(); if (id) setOpen(id); };
 
@@ -97,33 +126,21 @@ export default function Escalations({ data: d }: { data: EscData }) {
         {d.canRaise && <button type="button" className="btn primary" onClick={() => setRaising(true)}>+ Raise escalation</button>}
       </div>
 
-      <div className="row2">
-        <div className="seg" role="tablist">
-          <button type="button" role="tab" aria-pressed={tab === "tracker"} aria-selected={tab === "tracker"} onClick={() => setTab("tracker")}>Tracker</button>
-          <button type="button" role="tab" aria-pressed={tab === "summary"} aria-selected={tab === "summary"} onClick={() => setTab("summary")}>Leadership summary</button>
-        </div>
-        <select value={dept} onChange={(e) => setDept(e.target.value)} aria-label="Department"><option value="">All departments</option>{d.departments.map((x) => <option key={x}>{x}</option>)}</select>
-        <select value={city} onChange={(e) => { setCity(e.target.value); setCluster(""); setProp(""); }} aria-label="City"><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select>
-        <select value={cluster} onChange={(e) => { setCluster(e.target.value); setProp(""); }} aria-label="Cluster"><option value="">All clusters</option>{clusters.map((x) => <option key={x}>{x}</option>)}</select>
-        <select value={prop} onChange={(e) => setProp(e.target.value)} aria-label="Property"><option value="">All properties</option>{props.map((p) => <option key={p.id} value={String(p.id)}>{p.property}</option>)}</select>
-        <select value={owner} onChange={(e) => setOwner(e.target.value)} aria-label="Raised to"><option value="">Raised to: anyone</option>{owners.map((x) => <option key={x}>{x}</option>)}</select>
-        <select value={by} onChange={(e) => setBy(e.target.value)} aria-label="Raised by"><option value="">Raised by: anyone</option>{raisers.map((x) => <option key={x}>{x}</option>)}</select>
-        {anyFilter && <button type="button" className="link small" onClick={() => { setDept(""); setCity(""); setCluster(""); setProp(""); setOwner(""); setBy(""); }}>Clear</button>}
+      <div className="seg" role="tablist" style={{ width: "fit-content", maxWidth: "100%" }}>
+        <button type="button" role="tab" aria-pressed={tab === "tracker"} aria-selected={tab === "tracker"} onClick={() => setTab("tracker")}>Tracker</button>
+        <button type="button" role="tab" aria-pressed={tab === "summary"} aria-selected={tab === "summary"} onClick={() => setTab("summary")}>Leadership summary</button>
       </div>
 
       {tab === "tracker" ? <>
-        <div className="row2">
-          {focus ? <span className="chipn"><b>{focus.label}</b> · {focus.ids.length}<button type="button" className="link small" onClick={() => setFocus(null)} style={{ marginLeft: 6 }}>Show all ×</button></span> :
-            <div className="bk">
-              {([["open", "Open"], ["overdue", "Past expected closure"], ["soon", "Due in 2 days"], ["closed", "Closed or dropped"], ["all", "All"]] as [Quick, string][]).map(([k, l]) => (
-                <button key={k} type="button" className="qf" aria-pressed={quick === k} onClick={() => setQuick(k)}>{l}<span className={`cnt ${k === "overdue" && counts[k] ? "r" : ""}`}>{counts[k]}</span></button>
-              ))}
-            </div>}
-        </div>
-        <Table name="Escalations" rows={list} cols={cols} rowKey={(r) => r.id} initialSort={{ key: quick === "closed" ? "updated" : "due", dir: quick === "closed" ? -1 : 1 }}
+        <Stats items={([["open", "Open", "yet to start or in progress"], ["overdue", "Past expected closure", "still open"], ["soon", "Due in 2 days", "open, not late yet"], ["closed", "Closed or dropped", ""], ["all", "All", "every escalation"]] as [Quick, string, string][]).map(([k, l, sub]) => ({
+          key: k, label: l, value: counts[k], sub: sub || undefined, tone: k === "overdue" && counts[k] ? "r" as const : k === "soon" && counts[k] ? "a" as const : undefined,
+          active: !focus && quick === k, onClick: () => { setQuick(k); setFocus(null); },
+        }))} />
+        {bar(false)}
+        <Table name="Escalations" rows={list} cols={cols} rowKey={(r) => r.id} query={q} initialSort={{ key: quick === "closed" ? "updated" : "due", dir: quick === "closed" ? -1 : 1 }}
           search={(r) => `${r.ref} ${r.title} ${r.detail} ${r.owner} ${r.raisedBy} ${r.department} ${r.props.map((p) => `${p.name} ${p.cluster} ${p.city}`).join(" ")} ${r.mailSubject}`}
           empty={d.rows.length ? "No escalations match these filters." : "No escalations yet. Raise the first one."} />
-      </> : <Summary d={d} rows={scoped} period={period} setPeriod={setPeriod} show={show} />}
+      </> : <Summary d={d} rows={scoped} period={period} show={show} bar={bar(true)} />}
 
       {cur && <EscDrawer e={cur} d={d} close={() => setOpen(null)} onDone={done} />}
       {raising && <RaiseForm d={d} close={() => { setRaising(false); if (d.openNew) router.push("/escalations"); }} onDone={(msg, id) => { setRaising(false); if (d.openNew) router.push("/escalations"); done(msg, id); }} />}
@@ -133,7 +150,7 @@ export default function Escalations({ data: d }: { data: EscData }) {
 }
 
 /** Totals for leadership: how many are open, how fast they close, and where they pile up. Every count opens the list behind it. */
-function Summary({ d, rows, period, setPeriod, show }: { d: EscData; rows: Esc[]; period: string; setPeriod: (p: string) => void; show: (label: string, rows: Esc[]) => void }) {
+function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; period: string; show: (label: string, rows: Esc[]) => void; bar: React.ReactNode }) {
   const days = PERIODS.find(([k]) => k === period)![2];
   const since = d.now - days * DAY;
   const pLabel = PERIODS.find(([k]) => k === period)![1].toLowerCase();
@@ -184,8 +201,6 @@ function Summary({ d, rows, period, setPeriod, show }: { d: EscData; rows: Esc[]
 
   return (
     <>
-      <div className="row2"><span className="small muted">Period for raised and closed:</span>
-        <div className="seg">{PERIODS.map(([k, l]) => <button key={k} type="button" aria-pressed={period === k} onClick={() => setPeriod(k)}>{l}</button>)}</div></div>
       <div className="esc-kpis">
         <div className="card esc-kpi"><span className="small muted">Open now</span><b><C l={openRows} label="Open now" /></b><span className="small muted">{openRows.filter((r) => r.status === "open").length} not started yet</span></div>
         <div className={`card esc-kpi ${overdue.length ? "r" : ""}`}><span className="small muted">Past expected closure</span><b><C l={overdue} label="Past expected closure" /></b><span className="small muted">{pct(overdue.length, openRows.length)} of open</span></div>
@@ -193,6 +208,7 @@ function Summary({ d, rows, period, setPeriod, show }: { d: EscData; rows: Esc[]
         <div className="card esc-kpi"><span className="small muted">Closed · {pLabel}</span><b><C l={closed} label={`Closed in ${pLabel}`} /></b><span className="small muted">{pct(onTime.length, closed.length)} by expected date</span></div>
         <div className="card esc-kpi"><span className="small muted">Usual time to close <InfoTip title="Usual time to close" rows={[["Means", "Median time from raising to closing, for escalations closed in the period"]]} /></span><b>{fmtDays(closeDays(closed))}</b><span className="small muted">median</span></div>
       </div>
+      {bar}
 
       <div className="grid g2h">
         <Sec title="How long open ones have waited" tip={<InfoTip title="How long open ones have waited" rows={[["Counts", "Open escalations by days since they were raised"]]} />}>
@@ -218,14 +234,14 @@ function Summary({ d, rows, period, setPeriod, show }: { d: EscData; rows: Esc[]
       </div>
 
       <Sec title="By department" tip={<InfoTip title="By department" rows={[["Closed on time", "Closed on or before the expected closure date"], ["Usual time to close", "Median days from raising to closing"]]} />}>
-        <Table name="Escalations by department" rows={byDept} cols={gcols("Department")} rowKey={(s) => s.key} pageSize={10} />
+        <Table name="Escalations by department" rows={byDept} cols={gcols("Department")} rowKey={(s) => s.key} />
       </Sec>
       <Sec title="By who it was raised to" tip={<InfoTip title="By who it was raised to" rows={[["Means", "The team or person who has to act. Shows who is slow to close"]]} />}>
-        <Table name="Escalations by owner" rows={byOwner} cols={gcols("Raised to")} rowKey={(s) => s.key} pageSize={10} />
+        <Table name="Escalations by owner" rows={byOwner} cols={gcols("Raised to")} rowKey={(s) => s.key} />
       </Sec>
       <div className="grid g2w">
         <Sec title="By property" tip={<InfoTip title="By property" rows={[["Means", "An escalation covering two properties counts for both"]]} />}>
-          <Table name="Escalations by property" rows={byProp} cols={gcols("Property")} rowKey={(s) => s.key} pageSize={10} />
+          <Table name="Escalations by property" rows={byProp} cols={gcols("Property")} rowKey={(s) => s.key} />
         </Sec>
         <Sec title="Properties raised most often" tip={<InfoTip title="Properties raised most often" rows={[["Means", `Properties with 2 or more escalations raised in ${pLabel}. Worth a visit`]]} />}>
           {!repeat.length ? <p className="small muted">No property had more than one escalation in this period.</p> :
@@ -233,7 +249,7 @@ function Summary({ d, rows, period, setPeriod, show }: { d: EscData; rows: Esc[]
         </Sec>
       </div>
       <Sec title="By who raised it" tip={<InfoTip title="By who raised it" rows={[["Means", "Central team members who raised escalations, and how many of theirs are still open"]]} />}>
-        <Table name="Escalations by raiser" rows={byRaiser} cols={gcols("Raised by")} rowKey={(s) => s.key} pageSize={10} />
+        <Table name="Escalations by raiser" rows={byRaiser} cols={gcols("Raised by")} rowKey={(s) => s.key} />
       </Sec>
     </>
   );

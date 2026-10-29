@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { CompareData, Kind, Metric } from "@/lib/compare";
 import { CopyModal, DrillCtx, Drill, InfoTip, N, Sec, dur, fmtP } from "./parts";
 import { DrillDrawer, TaskDrawer } from "./Drawers";
+import { ActiveChip, Field, FilterBar, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
 
 const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from) : `${nice(r.from)} – ${nice(r.to)}`);
@@ -47,7 +48,7 @@ function standings(m: Metric) {
 type St = NonNullable<ReturnType<typeof standings>>;
 const better = (m: Metric, x: number, y: number) => (m.better === "high" ? x > y : x < y);
 
-export default function ComparePage({ data: d }: { data: CompareData }) {
+export default function ComparePage({ data: d, views, bare }: { data: CompareData; views: SavedView[]; bare: boolean }) {
   const router = useRouter();
   const [preset, setPreset] = useState(PRESETS.some(([k]) => k === d.preset) ? d.preset : "14d");
   const [from, setFrom] = useState(d.R.from);
@@ -56,6 +57,7 @@ export default function ComparePage({ data: d }: { data: CompareData }) {
   const [task, setTask] = useState<{ id: number; fromList: boolean } | null>(null);
   const [report, setReport] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const [sort, setSort] = useState<SortState>(null);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); }, [toast]);
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape" && !document.querySelector(".tip-pop")) { if (task) setTask(null); else setDrill(null); } };
@@ -71,6 +73,9 @@ export default function ComparePage({ data: d }: { data: CompareData }) {
     if (!patch.kind || patch.kind === d.kind) v.ids = (patch.ids ?? ids).join(",") || "-";
     router.push(`/compare?${new URLSearchParams(Object.entries(v).filter(([, x]) => x))}`);
   };
+  const current: Record<string, string> = { kind: d.kind, ids: ids.join(","), range: d.preset, ...(d.preset === "custom" ? { from: d.R.from, to: d.R.to } : {}) };
+  const def = views.find((v) => v.def);
+  useEffect(() => { if (bare && def && !sameFilters(def.f, current)) router.push(`/compare?${new URLSearchParams(def.f as Record<string, string>)}`); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const kindLabel = d.kinds.find(([k]) => k === d.kind)?.[1] ?? "";
   const one = kindLabel.replace(/ies$/, "y").replace(/s$/, "");
   const ready = P.length >= 2 && d.metrics.length > 0;
@@ -131,6 +136,8 @@ export default function ComparePage({ data: d }: { data: CompareData }) {
   };
 
   const unpicked = d.options.filter((o) => !ids.includes(o.id));
+  const spreadOf = (m: Metric) => { const vs = m.vals.map((x) => x.v).filter((x): x is number => x !== null); return vs.length > 1 ? Math.max(...vs) - Math.min(...vs) : null; };
+  const rowsM = sortRows(d.metrics.map((m, k) => ({ m, k })), sort, (r, key) => key === "metric" ? r.m.label : key === "spread" ? spreadOf(r.m) : r.m.vals[Number(key.slice(1))]?.v ?? null);
   return (
     <DrillCtx.Provider value={ctx}>
       <div className="page cc">
@@ -143,58 +150,60 @@ export default function ComparePage({ data: d }: { data: CompareData }) {
           {ready && <button type="button" className="btn primary" onClick={() => setReport(buildReport())}>Generate report</button>}
         </div>
 
-        <div className="card cmp-ctl">
-          <div className="seg" role="group" aria-label="What to compare">
-            {d.kinds.map(([k, l]) => <button key={k} type="button" aria-pressed={d.kind === k} onClick={() => go({ kind: k })}>{l}</button>)}
-          </div>
-          <div className="row2 cmp-picks">
-            {P.map((o, i) => (
-              <span key={o.id} className="cmp-chip" style={{ borderColor: COLORS[i] }}>
-                <span className="cmp-dot" style={{ background: COLORS[i] }} aria-hidden="true" />{o.label}
-                <button type="button" aria-label={`Remove ${o.label}`} onClick={() => go({ ids: ids.filter((x) => x !== o.id) })}>×</button>
-              </span>
-            ))}
-            {P.length < d.max && unpicked.length > 0 && (
-              <select id="cmp-add" value="" onChange={(e) => e.target.value && go({ ids: [...ids, e.target.value] })} aria-label={`Add a ${lc(one)}`}>
-                <option value="">+ Add {lc(one)}</option>
-                {unpicked.map((o) => <option key={o.id} value={o.id}>{o.label}{o.sub ? ` · ${o.sub}` : ""}</option>)}
-              </select>
-            )}
-            {P.length < Math.min(d.max, d.options.length) && <button type="button" className="link small" onClick={() => go({ ids: [...ids, ...unpicked.map((o) => o.id)].slice(0, d.max) })}>Add all{d.options.length > d.max ? ` (up to ${d.max})` : ""}</button>}
-            {P.length > 0 && <button type="button" className="link small" onClick={() => go({ ids: [] })}>Clear</button>}
-          </div>
-          <div className="row2">
-            <div className="seg">{PRESETS.map(([k, l]) => <button key={k} type="button" aria-pressed={preset === k} onClick={() => { setPreset(k); if (k !== "custom") go({ range: k }); }}>{l}</button>)}</div>
-            {preset === "custom" && <span className="row2">
-              <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} aria-label="From" /><span className="muted">to</span>
-              <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} aria-label="To" />
-              <button type="button" className="btn sm primary" disabled={!from || !to || from > to} onClick={() => go()}>Apply</button>
-            </span>}
-          </div>
-        </div>
+        {ready && <Stats items={ranking.map((r) => ({
+          key: r.o.id, label: `#${place.get(r.i)} ${r.o.label}`,
+          value: r.avgPos === null ? "—" : r.avgPos.toFixed(1),
+          sub: <>avg position · best on <b className="t-g">{r.bestOn}</b>, worst on <b className={r.worstOn ? "t-r" : ""}>{r.worstOn}</b> of {r.scored}{r.tasks < MIN_TASKS ? <span className="t-a"> · few tasks</span> : null}</>,
+          tone: place.get(r.i) === 1 ? "g" as const : place.get(r.i) === ranking.length ? "r" as const : undefined,
+          tip: <InfoTip title="Overall ranking" rows={[["Number", "Average position across the scored metrics. 1.0 means best on every one"], ["Best on / worst on", "Metrics where it is first or last in this group"], ["Tasks", `${r.tasks} ${d.kind === "reviewer" ? "reviewed" : "due"} in the period`]]} />,
+        }))} />}
+
+        <FilterBar
+          chips={[
+            ...P.map((o, i): ActiveChip => ({ key: o.id, label: <><span className="cmp-dot" style={{ background: COLORS[i] }} aria-hidden="true" />{o.label}</>, clear: () => go({ ids: ids.filter((x) => x !== o.id) }) })),
+            ...(d.preset !== "14d" ? [{ key: "range", label: <>Dates: <b>{span(d.R)}</b></>, clear: () => go({ range: "14d" }) }] : []),
+          ]}
+          onClearAll={() => go({ ids: [] })}
+          saved={{ page: "compare", views, current, notify: setToast, name: `${kindLabel}: ${P.map((o) => o.label).join(", ")}`.slice(0, 60),
+            apply: (f) => router.push(`/compare?${new URLSearchParams(f as Record<string, string>)}`), note: "Saves who is compared and the date range." }}
+          foot={(close) => preset === "custom"
+            ? <button type="button" className="btn sm primary" disabled={!from || !to || from > to} onClick={() => { go(); close(); }}>Apply dates</button>
+            : <button type="button" className="btn sm primary" onClick={close}>Done</button>}
+          panel={<>
+            <Field label="Compare" wide><div className="seg" role="group" aria-label="What to compare">
+              {d.kinds.map(([k, l]) => <button key={k} type="button" aria-pressed={d.kind === k} onClick={() => go({ kind: k })}>{l}</button>)}
+            </div></Field>
+            <Field label={`${kindLabel} (2 to ${d.max})`} wide>
+              <div className="row2 cmp-picks">
+                {P.map((o, i) => (
+                  <span key={o.id} className="cmp-chip" style={{ borderColor: COLORS[i] }}>
+                    <span className="cmp-dot" style={{ background: COLORS[i] }} aria-hidden="true" />{o.label}
+                    <button type="button" aria-label={`Remove ${o.label}`} onClick={() => go({ ids: ids.filter((x) => x !== o.id) })}>×</button>
+                  </span>
+                ))}
+                {P.length < d.max && unpicked.length > 0 && (
+                  <select id="cmp-add" value="" onChange={(e) => e.target.value && go({ ids: [...ids, e.target.value] })} aria-label={`Add a ${lc(one)}`}>
+                    <option value="">+ Add {lc(one)}</option>
+                    {unpicked.map((o) => <option key={o.id} value={o.id}>{o.label}{o.sub ? ` · ${o.sub}` : ""}</option>)}
+                  </select>
+                )}
+                {P.length < Math.min(d.max, d.options.length) && <button type="button" className="link small" onClick={() => go({ ids: [...ids, ...unpicked.map((o) => o.id)].slice(0, d.max) })}>Add all{d.options.length > d.max ? ` (up to ${d.max})` : ""}</button>}
+              </div>
+            </Field>
+            <Field label="Dates" wide>
+              <div className="seg">{PRESETS.map(([k, l]) => <button key={k} type="button" aria-pressed={preset === k} onClick={() => { setPreset(k); if (k !== "custom") go({ range: k }); }}>{l}</button>)}</div>
+              {preset === "custom" && <div className="dates">
+                <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} aria-label="From" /><span className="muted">to</span>
+                <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} aria-label="To" />
+              </div>}
+            </Field>
+          </>} />
 
         {!ready ? <div className="card empty"><b>Pick at least two</b>{d.options.length < 2 ? `You need at least two ${lc(kindLabel)} you can see.` : `Add ${lc(kindLabel)} above to compare them.`}</div> : <>
-          <Sec title="Overall ranking" tip={<InfoTip title="Overall ranking" rows={[["Order", "Average position across the scored metrics. 1.0 means best on every one"], ["Best on / worst on", "Metrics where it is first or last in this group"], ["Scored", "Metrics with a right direction. Volume, sent back % and re-reviewed are not scored"]]} />}>
-            <div className="tbl"><table className="cmp-tbl">
-              <thead><tr><th className="n">#</th><th>{one}</th><th className="n">Average position</th><th className="n">Best on</th><th className="n">Worst on</th><th className="n">{d.kind === "reviewer" ? "Tasks reviewed" : "Tasks"}</th></tr></thead>
-              <tbody>{ranking.map((r) => (
-                <tr key={r.o.id}>
-                  <td className="n"><b>{place.get(r.i)}</b></td>
-                  <td><span className="cmp-dot" style={{ background: COLORS[r.i] }} /><b>{r.o.label}</b>{r.o.sub && <span className="small muted"> · {r.o.sub}</span>}
-                    {r.tasks < MIN_TASKS && <span className="small t-a"> · few tasks, read with care</span>}</td>
-                  <td className="n">{r.avgPos === null ? "—" : r.avgPos.toFixed(1)}</td>
-                  <td className="n">{r.bestOn ? <b className="t-g">{r.bestOn}</b> : 0}<span className="muted small"> of {r.scored}</span></td>
-                  <td className="n">{r.worstOn ? <b className="t-r">{r.worstOn}</b> : 0}<span className="muted small"> of {r.scored}</span></td>
-                  <td className="n">{r.tasks}</td>
-                </tr>
-              ))}</tbody>
-            </table></div>
-          </Sec>
-
           <Sec title="Side by side" tip={<InfoTip title="Side by side" rows={[["Counted", "Per task. A task counts once however many checks or reviews it had"], ["Green / red", "Best and worst in this group. Not scored means there is no right direction"], ["Spread", "Gap between the best and the worst"], ["Click", "Any number to see its tasks"]]} />}>
             <div className="tbl"><table className="cmp-tbl">
-              <thead><tr><th>Metric</th>{P.map((o, i) => <th key={o.id} className="n"><span className="cmp-dot" style={{ background: COLORS[i] }} />{o.label}</th>)}<th>Best</th><th className="n">Spread</th></tr></thead>
-              <tbody>{d.metrics.map((m, k) => {
+              <thead><tr><th><SortHead k="metric" label="Metric" sort={sort} setSort={setSort} /></th>{P.map((o, i) => <th key={o.id} className="n"><span className="cmp-dot" style={{ background: COLORS[i] }} /><SortHead k={`v${i}`} label={o.label} sort={sort} setSort={setSort} /></th>)}<th>Best</th><th className="n"><SortHead k="spread" label="Spread" sort={sort} setSort={setSort} /></th></tr></thead>
+              <tbody>{rowsM.map(({ m, k }) => {
                 const s = st[k];
                 const vs = m.vals.map((x) => x.v).filter((x): x is number => x !== null);
                 return (

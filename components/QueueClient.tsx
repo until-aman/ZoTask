@@ -4,14 +4,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteView, getHistory, reassignReviewer, remindTasks, saveView, setDefaultView, ViewFilters } from "@/app/actions";
+import { getHistory, reassignReviewer, remindTasks, ViewFilters } from "@/app/actions";
+import { ActiveChip, Field, FilterBar, PAGE, Pager, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
 
 export type QItem = {
   id: number; t: string; p: string; cluster: string; city: string; a: string; r: string; s: string; h: number; sla: number; att: string;
   last: boolean; rv: string; au: string; cbm: string; date: string; why: string; win: string; crit: boolean; next: string; mine: boolean;
 };
 type Geo = { city: string; cluster: string; property: string; id: number };
-type View = { id: number; name: string; def: boolean; f: ViewFilters };
 type Ev = { id: number; at: number; type: string; detail: string; actor: string | null };
 
 const GROUPS = [
@@ -32,25 +32,25 @@ const bucket = (t: QItem) => (t.h > 72 ? "r" : t.h >= 24 ? "a" : "g");
 const empty: ViewFilters = { city: [], cluster: [], prop: [], role: [], asg: [], mine: false };
 
 export default function QueueClient({ items, geo, views, reviewers, me, canReview, today, initial }: {
-  items: QItem[]; geo: Geo[]; views: View[]; reviewers: { id: number; name: string }[]; me: string; canReview: boolean; today: string;
+  items: QItem[]; geo: Geo[]; views: SavedView[]; reviewers: { id: number; name: string }[]; me: string; canReview: boolean; today: string;
   initial: { tab?: string; city?: string[]; cluster?: string[]; prop?: string[]; from?: string; to?: string; bucket?: string; over?: boolean };
 }) {
   const router = useRouter();
   const fromLink = !!(initial.tab || initial.city || initial.prop || initial.from);
   const defView = views.find((v) => v.def);
-  const [f, setF] = useState<ViewFilters>(() => fromLink ? { ...empty, city: initial.city ?? [], cluster: initial.cluster ?? [], prop: initial.prop ?? [] } : defView ? { ...empty, ...defView.f } : empty);
-  const [activeView, setActiveView] = useState<number | null>(fromLink ? null : defView?.id ?? null);
+  const [f, setF] = useState<ViewFilters>(() => fromLink ? { ...empty, city: initial.city ?? [], cluster: initial.cluster ?? [], prop: initial.prop ?? [] } : defView ? { ...empty, ...(defView.f as Partial<ViewFilters>) } : empty);
   const [date, setDateMode] = useState(initial.from ? "custom" : "today");
   const [from, setFrom] = useState(initial.from ?? today);
   const [to, setTo] = useState(initial.to ?? today);
   const [tab, setTab] = useState(initial.tab ?? "review");
   const [bk, setBk] = useState(initial.bucket ?? (initial.over ? "over" : "all"));
   const [q, setQ] = useState("");
-  const [sort, setSort] = useState("age");
+  const [sort, setSort] = useState<SortState>(null);
+  const [page, setPage] = useState(0);
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [open, setOpen] = useState<number | null>(null);
   const [pop, setPop] = useState<string | null>(null);
-  const [modal, setModal] = useState<"save" | "reassign" | null>(null);
+  const [modal, setModal] = useState<"reassign" | null>(null);
   const [toast, setToast] = useState("");
   const [hist, setHist] = useState<Ev[]>([]);
 
@@ -61,7 +61,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     document.addEventListener("keydown", onKey); document.addEventListener("click", onClick);
     return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("click", onClick); };
   }, [pop, modal]);
-  useEffect(() => { if (open !== null) getHistory(open).then(setHist); }, [open]);
+  useEffect(() => { if (open !== null) getHistory(open).then(setHist, () => setHist([])); }, [open]);
 
   const setDate = (d: string) => {
     setDateMode(d);
@@ -69,7 +69,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     else if (d === "yday") { setFrom(addDays(today, -1)); setTo(addDays(today, -1)); }
     else if (d === "7d") { setFrom(addDays(today, -6)); setTo(today); }
   };
-  const change = (patch: Partial<ViewFilters>) => { setF((x) => prune({ ...x, ...patch })); setActiveView(null); };
+  const change = (patch: Partial<ViewFilters>) => { setF((x) => prune({ ...x, ...patch })); setPage(0); };
 
   // City → Cluster → Property: each column narrows the next.
   const cities = useMemo(() => [...new Set(geo.map((g) => g.city))].map((c) => ({ v: c, n: geo.filter((g) => g.city === c).length })), [geo]);
@@ -93,13 +93,15 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   const cnt = { all: all.length, r: 0, a: 0, g: 0, over: all.filter(over).length } as Record<string, number>;
   all.forEach((t) => cnt[bucket(t)]++);
   let list = g.open && bk !== "all" ? all.filter((t) => (bk === "over" ? over(t) : bucket(t) === bk)) : all;
-  list = [...list].sort((a, b) => sort === "group" ? a.p.localeCompare(b.p) || b.h - a.h : sort === "sla" ? (b.h - b.sla) - (a.h - a.sla) : g.open ? b.h - a.h : b.date.localeCompare(a.date));
+  list = sort ? sortRows(list, sort, (t, k) => k === "task" ? t.t : k === "asg" ? t.a : k === "next" ? t.next || nextStep(t).what : k === "wait" ? (g.open ? t.h : t.date) : null)
+    : [...list].sort((a, b) => (g.open ? b.h - a.h : b.date.localeCompare(a.date)));
+  const pg = Math.min(page, Math.max(0, Math.ceil(list.length / PAGE) - 1));
+  const shown = list.slice(pg * PAGE, pg * PAGE + PAGE);
   const hiddenByDate = items.filter((t) => t.s === tab && inScope(t) && !inDates(t)).length;
   const hiddenByFilter = items.filter((t) => t.s === tab && inDates(t)).length - all.length;
   const oldest = list.length && g.open ? Math.max(...list.map((t) => t.h)) : 0;
 
   const locText = f.prop.length ? (f.prop.length === 1 ? f.prop[0] : f.prop.length + " properties") : f.cluster.length ? (f.cluster.length === 1 ? f.cluster[0] : f.cluster.length + " clusters") : f.city.length ? (f.city.length === 1 ? f.city[0] : f.city.length + " cities") : "All properties";
-  const summary = (arr: string[], word: string, map?: Record<string, string>) => (arr.length === 0 ? "All" : arr.length === 1 ? (map?.[arr[0]] ?? arr[0]) : arr.length + " " + word);
 
   function nextStep(t: QItem) {
     if (t.s === "review" || t.s === "resub") return { who: t.next, what: "to review", sub: over(t) ? <span className="warn">Was due {fmtH(t.h - t.sla)} ago</span> : <>Due in {fmtH(t.sla - t.h)}</> };
@@ -130,6 +132,11 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     ...f.prop.map((v) => ["prop", v, "Property"] as [keyof ViewFilters, string, string]), ...f.role.map((v) => ["role", v, "Role", RNAME[v]] as [keyof ViewFilters, string, string, string]),
     ...f.asg.map((v) => ["asg", v, "Assignee"] as [keyof ViewFilters, string, string]),
   ];
+  const chipList: ActiveChip[] = [
+    ...chips.map(([k, v, l, d]) => ({ key: k + v, label: <>{l}: <b>{d ?? v}</b></>, clear: () => change({ [k]: (f[k] as string[]).filter((x) => x !== v) }) })),
+    ...(f.mine ? [{ key: "mine", label: <>Waiting on me</>, clear: () => change({ mine: false }) }] : []),
+    ...(date !== "today" ? [{ key: "date", label: <>Dates: <b>{from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}</b></>, clear: () => setDate("today") }] : []),
+  ];
   const openItem = items.find((t) => t.id === open);
   const selIds = [...sel];
 
@@ -142,21 +149,6 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     <div className="page" style={{ paddingTop: 16 }}>
       <div className="shell">
         <aside className="side" aria-label="Queue navigation">
-          <div className="box">
-            <h3>My saved filters</h3>
-            {views.map((v) => (
-              <div key={v.id} className="row2" style={{ gap: 0 }}>
-                <button type="button" className="si" style={{ flex: 1 }} aria-current={activeView === v.id}
-                  onClick={() => { setF({ ...empty, ...v.f }); setActiveView(v.id); setDate("today"); setSel(new Set()); }}>
-                  <span className="star" style={{ visibility: v.def ? "visible" : "hidden" }} title="Opens by default">★</span>{v.name}
-                </button>
-                {!v.def && <button type="button" className="link small" title="Open with this view every day" onClick={async () => { await setDefaultView(v.id); router.refresh(); }}>☆</button>}
-                <button type="button" className="link small" aria-label={`Delete ${v.name}`} onClick={async () => { await deleteView(v.id); router.refresh(); }}>×</button>
-              </div>
-            ))}
-            {!views.length && <p className="small muted" style={{ margin: "0 8px 6px" }}>Save the filters you use every day and the queue opens with them.</p>}
-            <button type="button" className="addview" onClick={() => setModal("save")}>+ Save current filters</button>
-          </div>
           <div className="box">
             {GROUPS.map((gr) => (
               <div key={gr.n}>
@@ -179,67 +171,41 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
         <main className="q">
           <div>
             <h1>{tabName(tab)}</h1>
-            <p className="muted" style={{ margin: "2px 0 0" }}>
-              {list.length} task{list.length === 1 ? "" : "s"}{cnt.over ? <> · <b style={{ color: "var(--red)" }}>{cnt.over} over SLA</b></> : null}
-              {oldest ? ` · oldest waiting ${fmtH(oldest)}` : ""} · {locText}
-            </p>
+            <p className="muted" style={{ margin: "2px 0 0" }}>{locText} · {from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}</p>
           </div>
 
-          <section className="fbar" aria-label="Filters">
-            <div className="row2">
-              <span style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-                <button type="button" className={`fbtn${f.city.length || f.cluster.length || f.prop.length ? " set" : ""}`} onClick={() => setPop(pop === "loc" ? null : "loc")}>
-                  <span className="k">Location</span><span>{locText}</span>
-                </button>
-                {pop === "loc" && <LocPop f={f} cities={cities} clusters={clusterList()} props={propList()} change={change} close={() => setPop(null)} />}
-              </span>
-              <div className="seg" role="group" aria-label="Date range">
-                {[["today", "Today"], ["yday", "Yesterday"], ["7d", "7 days"], ["custom", "Custom"]].map(([k, l]) => (
-                  <button key={k} type="button" aria-pressed={date === k} onClick={() => setDate(k)}>{l}</button>
-                ))}
-              </div>
-              {date === "custom" && <span className="row2"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From" /> – <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To" /></span>}
-              <span style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-                <button type="button" className={`fbtn${f.role.length ? " set" : ""}`} onClick={() => setPop(pop === "role" ? null : "role")}><span className="k">Role</span><span>{summary(f.role, "roles", RNAME)}</span></button>
-                {pop === "role" && <ListPop label="Role" options={ROLES} labels={RNAME} sel={f.role} set={(role) => change({ role })} close={() => setPop(null)} />}
-              </span>
-              <span style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-                <button type="button" className={`fbtn${f.asg.length ? " set" : ""}`} onClick={() => setPop(pop === "asg" ? null : "asg")}><span className="k">Assignee</span><span>{summary(f.asg, "people")}</span></button>
-                {pop === "asg" && <ListPop label="Assignee" options={people} sel={f.asg} set={(asg) => change({ asg })} close={() => setPop(null)} />}
-              </span>
-              <input type="search" className="search" placeholder="Search task or property" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" />
-              <label className="switch"><input type="checkbox" checked={f.mine} onChange={(e) => change({ mine: e.target.checked })} /> Waiting on me</label>
-            </div>
-            <div className="row2">
-              <div className="chips">
-                {activeView !== null && <span className="using">✓ Using your saved view “{views.find((v) => v.id === activeView)?.name}”</span>}
-                {chips.map(([k, v, l, d]) => (
-                  <span key={k + v} className="chip">{l}: <b>{d ?? v}</b><button type="button" aria-label={`Remove ${v}`} onClick={() => change({ [k]: (f[k] as string[]).filter((x) => x !== v) })}>×</button></span>
-                ))}
-                {f.mine && <span className="chip">Waiting on me<button type="button" aria-label="Remove" onClick={() => change({ mine: false })}>×</button></span>}
-                {chips.length || f.mine ? <button type="button" className="link" onClick={() => change(empty)}>Clear all</button> : activeView === null && <span className="info">No filters. Showing every property you can access.</span>}
-              </div>
-              <span className="spacer" />
-              {defView && <button type="button" className="link" onClick={() => { setF({ ...empty, ...defView.f }); setActiveView(defView.id); setDate("today"); setToast(`Back to “${defView.name}”`); }}>Reset to my default</button>}
-              <button type="button" className="btn outline" onClick={() => setModal("save")}>Save these filters</button>
-            </div>
-          </section>
+          <Stats items={g.open ? [
+            { key: "all", label: "Tasks", value: cnt.all, sub: oldest ? `oldest waiting ${fmtH(oldest)}` : "none waiting", active: bk === "all", onClick: () => { setBk("all"); setPage(0); } },
+            { key: "over", label: "Over SLA", value: cnt.over, tone: cnt.over ? "r" : undefined, sub: "past the time limit", active: bk === "over", onClick: () => { setBk("over"); setPage(0); } },
+            { key: "r", label: "Waiting 3+ days", value: cnt.r, tone: cnt.r ? "r" : undefined, active: bk === "r", onClick: () => { setBk("r"); setPage(0); } },
+            { key: "a", label: "Waiting 1–3 days", value: cnt.a, tone: cnt.a ? "a" : undefined, active: bk === "a", onClick: () => { setBk("a"); setPage(0); } },
+            { key: "g", label: "Under 1 day", value: cnt.g, active: bk === "g", onClick: () => { setBk("g"); setPage(0); } },
+          ] : [
+            { key: "all", label: "Tasks", value: cnt.all, sub: from === to ? nice(from) : `${nice(from)} – ${nice(to)}` },
+            { key: "crit", label: "Critical", value: all.filter((t) => t.crit).length, tone: all.some((t) => t.crit) ? "r" : undefined },
+            { key: "props", label: "Properties", value: new Set(all.map((t) => t.p)).size },
+          ]} />
 
-          <section className="listcard" aria-label="Tasks">
-            <div className="ltool">
-              {g.open ? (
-                <div className="bk" role="group" aria-label="Waiting time">
-                  {[["all", "All", ""], ["over", "Over SLA", "r"], ["r", "Over 3 days", "r"], ["a", "1–3 days", "a"], ["g", "Under 1 day", "g"]].map(([k, l, c]) => (
-                    <button key={k} type="button" className="qf" aria-pressed={bk === k} onClick={() => setBk(k)}><span className={c}>{l}</span><span className={`cnt ${c === "r" && cnt[k] ? "r" : ""}`}>{cnt[k]}</span></button>
+          <FilterBar search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search task or property" chips={chipList}
+            onClearAll={() => { change(empty); setDate("today"); }}
+            saved={{ page: "queue", views, current: f, apply: (v) => { setF({ ...empty, ...(v as Partial<ViewFilters>) }); setDate("today"); setSel(new Set()); setPage(0); },
+              name: locText + (f.role.length ? " · " + f.role.join(", ") : ""), notify: setToast, note: "Dates are not saved. The queue always starts at today." }}
+            panel={<>
+              <Field label="Location" wide><LocPicker f={f} cities={cities} clusters={clusterList()} props={propList()} change={change} /></Field>
+              <Field label="Dates" wide>
+                <div className="seg" role="group" aria-label="Date range">
+                  {[["today", "Today"], ["yday", "Yesterday"], ["7d", "7 days"], ["custom", "Custom"]].map(([k, l]) => (
+                    <button key={k} type="button" aria-pressed={date === k} onClick={() => setDate(k)}>{l}</button>
                   ))}
                 </div>
-              ) : <span className="info">{from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}</span>}
-              <label className="info" style={{ color: "var(--fg)" }}>Sort
-                <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                  <option value="age">{g.open ? "Longest waiting first" : "Newest first"}</option><option value="sla">Most over SLA first</option><option value="group">Group by property</option>
-                </select>
-              </label>
-            </div>
+                {date === "custom" && <div className="dates"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From" /><span className="muted">to</span><input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To" /></div>}
+              </Field>
+              <Field label="Role"><div className="checks">{ROLES.map((r) => <label key={r} title={RNAME[r]}><input type="checkbox" checked={f.role.includes(r)} onChange={(e) => change({ role: e.target.checked ? [...f.role, r] : f.role.filter((x) => x !== r) })} />{r}</label>)}</div></Field>
+              <Field label="Assignee"><select value="" onChange={(e) => e.target.value && change({ asg: [...f.asg, e.target.value] })}><option value="">{f.asg.length ? `${f.asg.length} picked · add another` : "Anyone"}</option>{people.filter((p) => !f.asg.includes(p)).map((p) => <option key={p}>{p}</option>)}</select></Field>
+              <Field label="Next step"><label className="switch"><input type="checkbox" checked={f.mine} onChange={(e) => change({ mine: e.target.checked })} /> Waiting on me</label></Field>
+            </>} />
+
+          <section className="listcard" aria-label="Tasks">
             {sel.size > 0 && (
               <div className="bulk">
                 <span>{sel.size} selected</span><span className="spacer" />
@@ -249,9 +215,10 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               </div>
             )}
             <div className="lhead">
-              <span><input type="checkbox" aria-label="Select all" checked={list.length > 0 && list.every((t) => sel.has(t.id))}
-                onChange={(e) => setSel(e.target.checked ? new Set(list.map((t) => t.id)) : new Set())} /></span>
-              <span>Task</span><span>Assignee</span><span>Next step</span><span>{g.open ? "Waiting" : "Date"}</span><span />
+              <span><input type="checkbox" aria-label="Select all" checked={shown.length > 0 && shown.every((t) => sel.has(t.id))}
+                onChange={(e) => setSel(e.target.checked ? new Set(shown.map((t) => t.id)) : new Set())} /></span>
+              <SortHead k="task" label="Task" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><SortHead k="asg" label="Assignee" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} />
+              <SortHead k="next" label="Next step" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><SortHead k="wait" label={g.open ? "Waiting" : "Date"} sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><span />
             </div>
             {!list.length ? (
               <div className="empty">
@@ -260,19 +227,17 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                 {hiddenByFilter > 0 && <>{hiddenByFilter} task{hiddenByFilter > 1 ? "s are" : " is"} hidden by your filters. <button type="button" className="link" onClick={() => { change(empty); setQ(""); }}>Clear filters</button></>}
                 {!hiddenByDate && !hiddenByFilter && "You are all caught up for this view."}
               </div>
-            ) : list.map((t, ix) => {
+            ) : shown.map((t) => {
               const n = nextStep(t);
               const sev = g.open ? (bucket(t) === "r" ? "var(--red)" : bucket(t) === "a" ? "var(--amber)" : "var(--green)") : "transparent";
-              const head = sort === "group" && (ix === 0 || list[ix - 1].p !== t.p);
               return (
                 <div key={t.id}>
-                  {head && <div className="ghead">{t.p}<span>{list.filter((x) => x.p === t.p).length} tasks</span></div>}
                   <div className="qrow" role="button" tabIndex={0} aria-selected={open === t.id} style={{ ["--sev" as string]: sev }}
                     onClick={(e) => { if ((e.target as HTMLElement).closest("input")) return; setOpen(t.id); }} onKeyDown={(e) => { if (e.key === "Enter") setOpen(t.id); }}>
                     <span><input type="checkbox" aria-label="Select" checked={sel.has(t.id)} onChange={(e) => { const s = new Set(sel); if (e.target.checked) s.add(t.id); else s.delete(t.id); setSel(s); }} /></span>
                     <div style={{ minWidth: 0 }}>
                       <div className="tname">{t.t}{t.crit && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}</div>
-                      <div className="tsub">{sort === "group" ? "" : t.p + " · "}{t.city}{t.att ? ` · Attempt ${t.att}` : ""}</div>
+                      <div className="tsub">{t.p} · {t.city}{t.att ? ` · Attempt ${t.att}` : ""}</div>
                     </div>
                     <div className="who">{t.a}<small>{t.r}</small></div>
                     <div className="next">{n.who ? <><b>{n.who}</b> {n.what}</> : <b>{n.what}</b>}<small>{n.sub}</small></div>
@@ -282,6 +247,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                 </div>
               );
             })}
+            <div style={{ padding: "8px 12px" }}><Pager page={pg} total={list.length} setPage={setPage} /></div>
           </section>
         </main>
       </div>
@@ -332,7 +298,6 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
         );
       })()}
 
-      {modal === "save" && <SaveModal f={f} locText={locText} close={() => setModal(null)} done={(msg) => { setModal(null); setToast(msg); router.refresh(); }} />}
       {modal === "reassign" && (
         <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) setModal(null); }}>
           <div className="mcard" role="dialog" aria-label="Reassign reviewer">
@@ -368,54 +333,22 @@ function Opts({ list, sel, onToggle, groups }: { list: { v: string; l?: string; 
   );
 }
 
-function LocPop({ f, cities, clusters, props, change, close }: {
+function LocPicker({ f, cities, clusters, props, change }: {
   f: ViewFilters; cities: { v: string; n: number }[]; clusters: { g: string; v: string; n: number }[]; props: { g: string; v: string }[];
-  change: (p: Partial<ViewFilters>) => void; close: () => void;
+  change: (p: Partial<ViewFilters>) => void;
 }) {
   const [q, setQ] = useState("");
   const m = (s: string) => !q || s.toLowerCase().includes(q.toLowerCase());
   const tog = (k: "city" | "cluster" | "prop") => (v: string, on: boolean) => change({ [k]: on ? [...f[k], v] : f[k].filter((x) => x !== v) });
   return (
-    <div className="pop" role="dialog" aria-label="Location" style={{ width: 640 }}>
-      <input type="search" placeholder="Search city, cluster or property" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+    <div className="locpick">
+      <input type="search" placeholder="Search city, cluster or property" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="loc">
         <div className="col"><h4>City <button type="button" onClick={() => change({ city: [] })}>Clear</button></h4><div className="opts"><Opts list={cities.filter((c) => m(c.v))} sel={f.city} onToggle={tog("city")} /></div></div>
         <div className="col"><h4>Cluster <button type="button" onClick={() => change({ cluster: [] })}>Clear</button></h4><div className="opts"><Opts list={clusters.filter((c) => m(c.v))} sel={f.cluster} onToggle={tog("cluster")} groups /></div></div>
         <div className="col"><h4>Property <button type="button" onClick={() => change({ prop: props.map((p) => p.v) })}>Select all</button></h4><div className="opts"><Opts list={props.filter((p) => m(p.v))} sel={f.prop} onToggle={tog("prop")} groups /></div></div>
       </div>
-      <div className="popfoot"><span className="info">Each column narrows the next. Leave a column empty to include all.</span><button type="button" className="btn primary sm" onClick={close}>Done</button></div>
-    </div>
-  );
-}
-
-function ListPop({ label, options, labels, sel, set, close }: { label: string; options: string[]; labels?: Record<string, string>; sel: string[]; set: (v: string[]) => void; close: () => void }) {
-  const [q, setQ] = useState("");
-  return (
-    <div className="pop" role="dialog" aria-label={label} style={{ width: labels ? 340 : 260 }}>
-      {options.length > 5 && <input type="search" placeholder={`Search ${label.toLowerCase()}`} value={q} onChange={(e) => setQ(e.target.value)} />}
-      <div className="opts">
-        <Opts list={options.filter((o) => !q || (labels?.[o] ?? o).toLowerCase().includes(q.toLowerCase())).map((v) => ({ v, l: labels?.[v] }))} sel={sel}
-          onToggle={(v, on) => set(on ? [...sel, v] : sel.filter((x) => x !== v))} />
-      </div>
-      <div className="popfoot"><button type="button" className="link" onClick={() => set([])}>Clear</button><button type="button" className="btn primary sm" onClick={close}>Done</button></div>
-    </div>
-  );
-}
-
-function SaveModal({ f, locText, close, done }: { f: ViewFilters; locText: string; close: () => void; done: (msg: string) => void }) {
-  const [name, setName] = useState(locText + (f.role.length ? " · " + f.role.join(", ") : ""));
-  const [def, setDef] = useState(true);
-  const parts = [locText, ...(f.role.length ? [f.role.join(", ")] : []), ...(f.asg.length ? [f.asg.length + " assignees"] : []), ...(f.mine ? ["waiting on me"] : []), "dates not saved, always start at today"];
-  return (
-    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
-      <div className="mcard" role="dialog" aria-label="Save filters">
-        <h2>Save these filters</h2>
-        <div className="info" style={{ background: "var(--bg)", borderRadius: 8, padding: "8px 10px" }}>{parts.join(" · ")}</div>
-        <label className="f">Name<input type="text" value={name} onChange={(e) => setName(e.target.value)} autoFocus /></label>
-        <label className="row2" style={{ fontWeight: 600 }}><input type="checkbox" checked={def} onChange={(e) => setDef(e.target.checked)} /> Open the queue with these filters every day</label>
-        <div className="row2"><span className="spacer" /><button type="button" className="btn" onClick={close}>Cancel</button>
-          <button type="button" className="btn primary" onClick={async () => { const r = await saveView(name.trim(), f, def); done(r.ok ? r.msg ?? "Saved" : r.error); }}>Save</button></div>
-      </div>
+      <span className="info small">Each column narrows the next. Leave a column empty to include all.</span>
     </div>
   );
 }

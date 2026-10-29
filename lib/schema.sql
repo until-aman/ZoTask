@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS ix_events_inst ON events(instance_id);
 CREATE TABLE IF NOT EXISTS saved_views (
   id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), name TEXT NOT NULL,
-  filters TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0
+  filters TEXT NOT NULL, is_default INTEGER NOT NULL DEFAULT 0,
+  page TEXT NOT NULL DEFAULT 'queue'                -- which screen the filters belong to
 );
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
 -- Housekeeping headcount per property: ideal (as planned) vs current (on the roster). HK = housekeeper, SHK = senior housekeeper / supervisor.

@@ -171,7 +171,7 @@ export function Compare({ d }: { d: CC }) {
   return (
     <Sec title="City and cluster comparison" tip={<InfoTip title="Comparison" rows={[["Order", "Lowest on-time first"], ["Counts", "Shown next to every rate, so small places aren't over- or under-stated"], ["Click a name", "Filters the whole dashboard to it"]]} />}
       right={<span className="seg"><button type="button" aria-pressed={lvl === "city"} onClick={() => setLvl("city")}>Cities</button><button type="button" aria-pressed={lvl === "cluster"} onClick={() => setLvl("cluster")}>Clusters</button></span>}>
-      <Table<C> name={lvl === "city" ? "Cities" : "Clusters"} rows={rowsC} rowKey={(r) => r.name} pageSize={20} cols={[
+      <Table<C> name={lvl === "city" ? "Cities" : "Clusters"} rows={rowsC} rowKey={(r) => r.name} cols={[
         { key: "name", label: lvl === "city" ? "City" : "Cluster", sticky: true, value: (r) => r.name, render: (r) => <button type="button" className="link" style={{ padding: 0 }} onClick={() => go(r.name, r.city)}>{r.name}</button> },
         ...(lvl === "cluster" ? [{ key: "city", label: "City", value: (r: C) => r.city }] : []),
         { key: "props", label: "Properties", num: true, value: (r) => r.props },

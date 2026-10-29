@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CC, Issue } from "@/lib/command";
 import DashFilters from "@/components/DashFilters";
+import type { SavedView } from "@/components/ui/Filters";
 import { DrillCtx, Drill, Def, DefTip, Mini, Tile, dur, Delta, useDrill } from "./parts";
 import { DrillDrawer, TaskDrawer } from "./Drawers";
 import ActionQueue from "./ActionQueue";
@@ -84,7 +85,7 @@ function TimeTile({ label, t, band, def }: { label: string; t: { ms: number | nu
   );
 }
 
-export default function CommandCenter({ data: d }: { data: CC }) {
+export default function CommandCenter({ data: d, views, bare }: { data: CC; views: SavedView[]; bare: boolean }) {
   const [drill, setDrill] = useState<Drill | null>(null);
   const [task, setTask] = useState<{ id: number; fromList: boolean } | null>(null);
   const [cbm, setCbm] = useState("");
@@ -112,17 +113,16 @@ export default function CommandCenter({ data: d }: { data: CC }) {
           <span className="spacer" />
           {d.issues.length > 0 && <a href="#actions" className={`alertpill ${crit ? "r" : "a"}`}>{crit ? `${crit} critical · ` : ""}{d.issues.length} need action</a>}
         </div>
-        <DashFilters geo={d.geo} cats={d.cats} init={{ range: d.preset, ...d.filters }} range={d.R} mine={d.role === "reviewer" ? d.mine : undefined} reviewers={d.reviewerOpts} />
-
-        <h2 className="band">1 · Health</h2>
         <Health d={d} />
+        <DashFilters geo={d.geo} cats={d.cats} init={{ range: d.preset, ...d.filters }} range={d.R} mine={d.role === "reviewer" ? d.mine : undefined} reviewers={d.reviewerOpts}
+          views={views} bare={bare} notify={setToast} />
 
-        <h2 className="band">2 · Action required</h2>
+        <h2 className="band">Action required</h2>
         <ActionQueue issues={d.issues} now={d.now} me={d.userName} canEscalate={d.canEscalate} toast={setToast}
           onIssue={(i: Issue) => i.id && setTask({ id: i.id, fromList: false })}
           handover={{ closedToday: d.closedToday, tomorrow: d.tomorrow, tasks: d.tasks, period: span(d.R), scope }} />
 
-        <h2 className="band">3 · Why it&apos;s happening</h2>
+        <h2 className="band">Why it&apos;s happening</h2>
         <Trends d={d} />
         <div className="grid g2">
           <Lifecycle d={d} />
@@ -131,7 +131,7 @@ export default function CommandCenter({ data: d }: { data: CC }) {
         <Compare d={d} />
         <Recurring d={d} />
 
-        <h2 className="band">4 · Who&apos;s accountable</h2>
+        <h2 className="band">Who&apos;s accountable</h2>
         <Properties d={d} cbm={cbm} setCbm={setCbm} issues={d.issues} />
         <Reviewers d={d} />
         <Cbms d={d} onPick={pickCbm} />

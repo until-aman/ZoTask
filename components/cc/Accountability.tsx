@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CC, Issue } from "@/lib/command";
 import { InfoTip, N, Sec, Spark, Table, dur, fmtP, rag } from "./parts";
+import { Field, FilterBar } from "@/components/ui/Filters";
 
 type Prop = CC["properties"][number];
 const W0 = { late: 30, missed: 25, repeat: 15, sla: 15, critical: 15 };
@@ -25,8 +26,12 @@ export function Properties({ d, cbm, setCbm, issues }: { d: CC; cbm: string; set
     <Sec id="properties" title="Properties" tip={<InfoTip title="Properties" rows={[["Order", "Highest risk first. Click any header to sort"], ["Counts", "Click a number to see its tasks"], ["▸", "Opens the property's open issues"]]} />}>
       <Table<Prop> name="Properties" rows={rowsP} rowKey={(p) => p.id} search={(p) => `${p.name} ${p.city} ${p.cluster} ${p.cbm}`} initialSort={{ key: "risk", dir: -1 }}
         toolbar={<>
-          <select value={lvl} onChange={(e) => setLvl(e.target.value)} aria-label="Risk level"><option value="">All risk levels</option><option>High</option><option>Medium</option><option>Low</option></select>
-          {cbm && <span className="chip">CBM: {cbm}<button type="button" onClick={() => setCbm("")} aria-label="Clear CBM filter">×</button></span>}
+          <FilterBar chips={[...(lvl ? [{ key: "lvl", label: <>Risk: <b>{lvl}</b></>, clear: () => setLvl("") }] : []), ...(cbm ? [{ key: "cbm", label: <>CBM: <b>{cbm}</b></>, clear: () => setCbm("") }] : [])]}
+            onClearAll={() => { setLvl(""); setCbm(""); }}
+            panel={<>
+              <Field label="Risk level"><select value={lvl} onChange={(e) => setLvl(e.target.value)}><option value="">All risk levels</option><option>High</option><option>Medium</option><option>Low</option></select></Field>
+              <Field label="CBM"><select value={cbm} onChange={(e) => setCbm(e.target.value)}><option value="">All CBMs</option>{[...new Set(d.properties.map((p) => p.cbm).filter(Boolean))].sort().map((c) => <option key={c}>{c}</option>)}</select></Field>
+            </>} />
           <span className="pickwrap">
             <button type="button" className="btn sm" onClick={() => setEditW(!editW)} aria-expanded={editW}>Risk weights</button>
             {editW && <div className="pop" style={{ width: 280 }}>
@@ -71,7 +76,7 @@ export function Reviewers({ d }: { d: CC }) {
   type R = CC["reviewers"][number];
   return (
     <Sec title="Reviewers" tip={<InfoTip title="Reviewers" rows={[["Counts", "Every column counts tasks, each task once"], ["Wait", "Per task, from submission to the reviewer's decision"], ["Send-back %", "Tasks sent back ÷ tasks reviewed"]]} note="A high send-back rate can mean a careful reviewer. Compare it with audit results before judging." />}>
-      <Table<R> name="Reviewers" rows={d.reviewers} rowKey={(r) => r.name} search={(r) => r.name} pageSize={20} cols={[
+      <Table<R> name="Reviewers" rows={d.reviewers} rowKey={(r) => r.name} search={(r) => r.name} cols={[
         { key: "name", label: "Reviewer", sticky: true, value: (r) => r.name, render: (r) => <b>{r.name}</b> },
         { key: "props", label: "Properties", num: true, value: (r) => r.props },
         { key: "req", label: "Reviewed + waiting", num: true, value: (r) => r.requiring.length, render: (r) => <N ids={r.requiring} title={`${r.name}: tasks needing review`} /> },
@@ -94,7 +99,7 @@ export function Cbms({ d, onPick }: { d: CC; onPick: (name: string) => void }) {
   type C = CC["cbms"][number];
   return (
     <Sec title="CBMs" tip={<InfoTip title="CBMs" rows={[["Owner", "Each property counts for one CBM, so rows add up to the total"], ["Open issues", "Tasks at their properties in Action required"], ["Fix time", "Median time from send-back to resubmission"], ["Name", "Click to filter Properties to that CBM"]]} />}>
-      <Table<C> name="CBMs" rows={d.cbms} rowKey={(c) => c.name} search={(c) => c.name} pageSize={20} cols={[
+      <Table<C> name="CBMs" rows={d.cbms} rowKey={(c) => c.name} search={(c) => c.name} cols={[
         { key: "name", label: "CBM", sticky: true, value: (c) => c.name, render: (c) => <button type="button" className="link" style={{ padding: 0 }} onClick={() => onPick(c.name)}>{c.name}</button> },
         { key: "props", label: "Properties", num: true, value: (c) => c.props },
         { key: "due", label: "Deadline passed", num: true, value: (c) => c.due.length, render: (c) => <N ids={c.due} title={`${c.name}: tasks past deadline`} /> },
@@ -124,7 +129,7 @@ export function Housekeeping({ d }: { d: CC }) {
               <div className="v" style={{ color: gap > 0 ? "var(--red)" : "var(--green)" }}>{gap}<small>{cur} of {ideal} in place</small></div></div>;
           })}
         </div>
-        <Table<S> name="Housekeeping" rows={d.staff} rowKey={(x) => x.property_id} initialSort={{ key: "hkGap", dir: -1 }} pageSize={6} cols={[
+        <Table<S> name="Housekeeping" rows={d.staff} rowKey={(x) => x.property_id} initialSort={{ key: "hkGap", dir: -1 }} cols={[
           { key: "name", label: "Property", sticky: true, value: (x) => x.name },
           { key: "ihk", label: "Ideal HK", num: true, value: (x) => x.ideal_hk }, { key: "chk", label: "Current HK", num: true, value: (x) => x.current_hk },
           { key: "hkGap", label: "HK to hire", num: true, value: (x) => Math.max(0, x.ideal_hk - x.current_hk), render: (x) => { const g = Math.max(0, x.ideal_hk - x.current_hk); return <b className={g ? "t-r" : ""}>{g}</b>; } },

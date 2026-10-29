@@ -4,6 +4,7 @@ import { can, scopeProps } from "@/lib/auth";
 import { all } from "@/lib/db";
 import { nextActor } from "@/lib/engine";
 import { rows, geo } from "@/lib/queries";
+import { viewsFor } from "@/lib/views";
 import { HOUR, isoDate } from "@/lib/time";
 import QueueClient, { QItem } from "@/components/QueueClient";
 
@@ -30,8 +31,7 @@ export default async function Queue({ searchParams }: { searchParams: Promise<Re
       next: next ? names.get(next) ?? "" : "", mine: next === u.id,
     };
   });
-  const views = (await all<{ id: number; name: string; filters: string; is_default: number }>("SELECT * FROM saved_views WHERE user_id=? ORDER BY id", u.id))
-    .map((v) => ({ id: v.id, name: v.name, def: !!v.is_default, f: JSON.parse(v.filters) }));
+  const views = await viewsFor(u.id, "queue");
   const reviewers = await all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' ORDER BY name");
   const g = (await geo()).filter((x) => props.includes(x.id));
   const initial = {

@@ -28,6 +28,9 @@ async function init(): Promise<Client> {
   const c = open();
   if (!REMOTE) await c.execute("PRAGMA journal_mode = WAL");
   await c.executeMultiple(schema());
+  // Columns added after a database was first created.
+  const cols = (await c.execute("PRAGMA table_info(saved_views)")).rows.map((r) => String(r.name));
+  if (!cols.includes("page")) await c.execute("ALTER TABLE saved_views ADD COLUMN page TEXT NOT NULL DEFAULT 'queue'");
   if (!(await c.execute("SELECT v FROM meta WHERE k='seeded'")).rows.length) await seedInto(c);
   // Databases created before headcounts or escalations existed get sample rows too.
   await scope.run(c, async () => {

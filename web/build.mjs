@@ -26,7 +26,7 @@ const sql = fs.readFileSync(path.join(root, "node_modules/sql.js/dist/sql-asm.js
 const css = fs.readFileSync(path.join(root, "app/globals.css"), "utf8")
   .replace(".top{position:sticky;top:0;", ".top{position:sticky;top:env(safe-area-inset-top,0px);");
 const html = `<title>ZoTask Prototype</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700;6..12,800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
 ${css}
 /* Single light theme on purpose: it mirrors the real ZoTask app. */

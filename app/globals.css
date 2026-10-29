@@ -8,7 +8,11 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font:14px/1.45 "Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;font-feature-settings:"cv11","ss01"}
+/* Figures in IBM Plex Mono so columns of numbers line up. */
+:root{--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+.mono,td.n,.kpi .v,.mini b,.stat>b,.esc-kpi>b,.num,.cnt,.fcount,.pager,.cmp-tbl td.n,.ref,code,kbd,textarea.code{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.kpi .v,.stat>b,.esc-kpi>b{letter-spacing:-.02em}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:var(--blue-d);text-decoration:none}
@@ -388,3 +392,72 @@ select{max-width:100%}
   .ttool .search{flex:1 1 160px}
 }
 @media (max-width:560px){.esc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.esc-kpis>:last-child:nth-child(odd){grid-column:1/-1}}
+
+/* ---------- Shared toolbar: search, Filters button, saved filters, active chips ---------- */
+.fbar2{display:grid;gap:8px}
+.fbrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fbrow>.search{flex:0 1 300px}
+.fwrap{position:relative;display:inline-flex}
+.filtbtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 12px;font-weight:700;white-space:nowrap}
+.filtbtn:hover,.filtbtn[aria-expanded="true"]{border-color:var(--blue)}
+.filtbtn.set{border-color:var(--blue);background:var(--blue-soft);color:var(--blue-d)}
+.fcount{min-width:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:11.5px;line-height:18px;text-align:center}
+.fpanel{position:absolute;z-index:60;top:calc(100% + 6px);left:0;width:min(640px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);display:grid}
+.fpanel-b{padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px 14px;max-height:min(70vh,560px);overflow:auto}
+.fpanel-f{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line2);background:var(--bg);border-radius:0 0 12px 12px}
+.ff{display:grid;gap:5px;align-content:start;min-width:0}
+.ff.wide{grid-column:1/-1}
+.ff-l{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.ff select,.ff input:not([type=checkbox]):not([type=radio]){width:100%}
+.ff .seg{width:fit-content;max-width:100%;flex-wrap:wrap}
+.ff .dates{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ff .dates input{width:auto;flex:1 1 130px}
+.ff .switch{font-weight:600}
+.ff .checks{display:flex;flex-wrap:wrap;gap:4px 12px}
+.ff .checks label{display:inline-flex;gap:6px;align-items:center;font-weight:500}
+.saved{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.saved-l{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-left:4px}
+.svchip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 12px;font-weight:600;font-size:13px;display:inline-flex;gap:5px;align-items:center;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.svchip:hover{border-color:var(--blue)}
+.svchip[aria-pressed="true"]{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.svchip .star{color:#d49b00}
+.svadd{border:1px dashed var(--line);background:transparent;border-radius:999px;padding:4px 12px;font-weight:700;font-size:13px;color:var(--blue)}
+.svadd:hover{border-color:var(--blue)}
+.svman{width:340px;max-height:none;display:grid;gap:2px}
+.svrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;padding:2px 4px}
+.svrow .on{color:#b07f00}
+@media (max-width:640px){
+  .fbrow>.search{flex:1 1 100%}
+  .fwrap{position:static}
+  .fbar2{position:relative}
+  .fpanel{left:0;right:0;width:auto}
+  .fpanel-b{grid-template-columns:minmax(0,1fr)}
+}
+
+/* ---------- Stat cards above a list ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{display:grid;gap:2px;align-content:start;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--fg);position:relative;min-width:0}
+.stat-l{font-size:12.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:2px}
+.stat>b{font-size:26px;font-weight:600;line-height:1.15}
+.stat-s{font-size:12px;color:var(--muted)}
+.stat.click{cursor:pointer}
+.stat.click:hover{border-color:var(--blue)}
+.stat.click[aria-pressed="true"]{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue);background:var(--blue-soft)}
+.stat.r{border-left:4px solid var(--red)} .stat.a{border-left:4px solid var(--amber)} .stat.g{border-left:4px solid var(--green)}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats>:last-child:nth-child(odd){grid-column:1/-1}.stat>b{font-size:22px}}
+
+/* ---------- Sortable headers outside tables ---------- */
+.sorth .sortbtn{text-transform:inherit;letter-spacing:inherit;font-weight:inherit}
+.sorth[aria-sort="ascending"] .sorti,.sorth[aria-sort="descending"] .sorti{color:var(--blue)}
+.pager{flex-wrap:wrap}
+
+/* ---------- My Tasks list ---------- */
+.mthead,.mtrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.1fr) minmax(0,1.3fr) auto;gap:12px;align-items:center;padding:10px 14px}
+.mthead{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--line);padding-block:7px}
+.mtrow{border-bottom:1px solid var(--line2);color:var(--fg)}
+.mtrow:hover{background:#f8faff;text-decoration:none}
+.mtst{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+@media (max-width:700px){.mthead{display:none}.mtrow{grid-template-columns:minmax(0,1fr);gap:4px}.mtst{justify-content:flex-start}}
+.locpick{display:grid;gap:8px}
+.lhead .sorth{min-width:0}
+@media (max-width:640px){.loc{grid-template-columns:minmax(0,1fr)}}

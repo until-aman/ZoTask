@@ -1,8 +1,9 @@
 "use client";
 // Shared pieces of the command center: the drill-down context, clickable figures, a sortable table and small charts.
-import { createContext, ReactNode, useContext, useMemo, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import type { K, T } from "@/lib/command";
 import InfoTip from "@/components/InfoTip";
+import { PAGE, Pager, nextSort } from "@/components/ui/Filters";
 
 export const HOUR = 3600_000;
 export const fmtP = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v}%`);
@@ -93,12 +94,14 @@ export function Sec({ title, tip, right, children, id }: { title: string; tip?: 
 
 export type Col<R> = { key: string; label: string; num?: boolean; value: (r: R) => number | string | null; render?: (r: R) => ReactNode; csv?: (r: R) => string | number | null; hidden?: boolean; tip?: ReactNode; sticky?: boolean };
 
-/** Sortable, searchable table with column picker, paging, CSV export and optional row expansion. */
-export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, toolbar, initialSort, name, empty = "Nothing to show for these filters." }: {
+/** Sortable, searchable table with column picker, paging, CSV export and optional row expansion.
+ *  Pass `query` when the page has its own search box; the table then hides its own. */
+export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = PAGE, toolbar, initialSort, name, empty = "Nothing to show for these filters.", query }: {
   cols: Col<R>[]; rows: R[]; rowKey: (r: R) => string | number; search?: (r: R) => string; expand?: (r: R) => ReactNode;
-  pageSize?: number; toolbar?: ReactNode; initialSort?: { key: string; dir: 1 | -1 }; name: string; empty?: string;
+  pageSize?: number; toolbar?: ReactNode; initialSort?: { key: string; dir: 1 | -1 }; name: string; empty?: string; query?: string;
 }) {
-  const [q, setQ] = useState("");
+  const [own, setQ] = useState("");
+  const q = query ?? own;
   const [sort, setSort] = useState(initialSort ?? null);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(cols.filter((c) => c.hidden).map((c) => c.key)));
   const [page, setPage] = useState(0);
@@ -121,6 +124,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, to
     }
     return l;
   }, [rows, q, sort, cols, search]);
+  useEffect(() => setPage(0), [query]);
   const pages = Math.max(1, Math.ceil(list.length / pageSize));
   const pg = Math.min(page, pages - 1);
   const view = list.slice(pg * pageSize, pg * pageSize + pageSize);
@@ -131,7 +135,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, to
   return (
     <div className="ttable">
       <div className="ttool">
-        {<input type="search" placeholder="Search" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} aria-label={`Search ${name}`} className="search" />}
+        {query === undefined && <input type="search" placeholder="Search" value={own} onChange={(e) => { setQ(e.target.value); setPage(0); }} aria-label={`Search ${name}`} className="search" />}
         {toolbar}
         <span className="spacer" />
         <span className="pickwrap">
@@ -150,7 +154,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, to
           {expand && <th style={{ width: 28 }} />}
           {shown.map((c) => (
             <th key={c.key} className={c.num ? "n" : ""} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
-              <button type="button" className="sortbtn" onClick={() => setSort(sort?.key === c.key ? { key: c.key, dir: sort.dir === 1 ? -1 : 1 } : { key: c.key, dir: c.num ? -1 : 1 })}>
+              <button type="button" className="sortbtn" onClick={() => { setSort(nextSort(sort, c.key)); setPage(0); }}>
                 {c.label}<span className="sorti">{sort?.key === c.key ? (sort.dir === 1 ? "▲" : "▼") : "↕"}</span>
               </button>{c.tip}
             </th>
@@ -171,9 +175,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize = 25, to
           })}
         </tbody>
       </table></div>
-      {pages > 1 && <div className="pager"><button type="button" className="btn sm" disabled={pg === 0} onClick={() => setPage(pg - 1)}>‹ Prev</button>
-        <span className="small muted">Page {pg + 1} of {pages} · {list.length} rows</span>
-        <button type="button" className="btn sm" disabled={pg >= pages - 1} onClick={() => setPage(pg + 1)}>Next ›</button></div>}
+      <Pager page={pg} total={list.length} size={pageSize} setPage={setPage} />
       {csv !== null && <CopyModal title={`Export ${name}`} text={csv} file={`${name.toLowerCase().replace(/\W+/g, "-")}.csv`} close={() => setCsv(null)} />}
     </div>
   );
