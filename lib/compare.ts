@@ -8,10 +8,9 @@ import { Rv, dayStart, ground, pct, quant, reviewing, uniq, REVIEW_ST } from "./
 
 export type Kind = "property" | "cluster" | "city" | "cbm" | "assignee" | "reviewer";
 export const KINDS: [Kind, string][] = [["property", "Properties"], ["cluster", "Clusters"], ["city", "Cities"], ["cbm", "CBMs"], ["assignee", "Assignees"], ["reviewer", "Reviewers"]];
-export type Metric = {
-  key: string; label: string; means: string; fmt: "pct" | "n" | "dur"; better: "high" | "low" | null;
-  a: number | null; b: number | null; aIds: number[]; bIds: number[]; aOf?: number; bOf?: number;
-};
+export type Metric = { key: string; label: string; means: string; fmt: "pct" | "n" | "dur"; better: "high" | "low" | null; vals: { v: number | null; ids: number[]; of?: number }[] };
+type Focus = { types: { task: string; due: number; onTime: number | null; missed: number; ids: number[] }[]; reasons: { reason: string; ids: number[] }[] };
+const MAX = 8;
 type Opt = { id: string; label: string; sub?: string };
 
 export function compareData(u: User, sp: Record<string, string | undefined>, now = Date.now()) {
@@ -35,11 +34,13 @@ export function compareData(u: User, sp: Record<string, string | undefined>, now
     kind === "cbm" ? people("cbm").map((p) => ({ id: String(p.id), label: p.name })) :
     kind === "assignee" ? assignees.map((p) => ({ id: String(p.id), label: p.name, sub: `${p.op_role ?? ""} · ${p.property}` })) :
     people("reviewer").map((p) => ({ id: String(p.id), label: p.name }));
-  const a = options.find((o) => o.id === sp.a) ?? options[0];
-  const b = options.find((o) => o.id === sp.b && o.id !== a?.id) ?? options.find((o) => o.id !== a?.id);
+  // Picked ids come as a comma list; old a/b links still work. Default to the first three.
+  const want = (sp.ids ?? [sp.a, sp.b].filter(Boolean).join(",")).split(",").filter(Boolean);
+  let picked = [...new Set(want)].map((id) => options.find((o) => o.id === id)).filter((o): o is Opt => !!o).slice(0, MAX);
+  if (!want.length) picked = options.slice(0, 3);
 
-  const base = { kind, preset, R, options, a: a ?? null, b: b ?? null, kinds: KINDS, now, canEscalate: ["admin", "reviewer", "auditor"].includes(u.access_role) };
-  if (!a || !b) return { ...base, metrics: [] as Metric[], series: null, tasks: {}, focus: null };
+  const base = { kind, preset, R, options, picked, max: MAX, kinds: KINDS, now, canEscalate: ["admin", "reviewer", "auditor"].includes(u.access_role) };
+  if (picked.length < 2) return { ...base, metrics: [] as Metric[], series: null, tasks: {}, focus: [] as Focus[] };
 
   const list = rows(`i.task_date BETWEEN ? AND ? AND i.property_id ${inScope}`, R.from, R.to);
   const match = (o: Opt) => (r: Row) =>
@@ -131,7 +132,7 @@ export function compareData(u: User, sp: Record<string, string | undefined>, now
       types: types.slice(0, 3), reasons: [] as { reason: string; ids: number[] }[],
     };
   };
-  const A = side(a), B = side(b);
+  const S = picked.map(side);
   const DEF: [string, string, string, Metric["fmt"], Metric["better"]][] = kind === "reviewer" ? [
     ["reviewed", "Tasks reviewed", "Tasks reviewed in the period", "n", null],
     ["inSla", "Reviewed on time", "Reviewed tasks where every review was on time", "pct", "high"],
@@ -152,18 +153,18 @@ export function compareData(u: User, sp: Record<string, string | undefined>, now
     ["fix", "Usual fix time", "Typical time from send-back to resubmission", "dur", "low"],
     ["overdue", "Overdue, not done now", "Past deadline and still not submitted", "n", "low"],
   ];
-  type MV = { v: number | null; ids: number[]; of?: number };
+  type MV = Metric["vals"][number];
   const metrics: Metric[] = DEF.map(([key, label, means, fmt, better]) => {
-    const x = (A.metrics as unknown as Record<string, MV>)[key], y = (B.metrics as unknown as Record<string, MV>)[key];
-    return { key, label, means, fmt, better, a: x.v, b: y.v, aIds: x.ids, bIds: y.ids, aOf: x.of, bOf: y.of };
+    const vals = S.map((x) => (x.metrics as unknown as Record<string, MV>)[key]);
+    return { key, label, means, fmt, better, vals };
   });
   const toT = (r: Row) => ({ id: r.id, pid: r.property_id, property: r.property, city: r.city, cluster: r.cluster, task: r.task, tid: r.template_id, category: r.category,
     crit: r.criticality === "high", assignee: r.assignee, reviewer: r.reviewer, cbm: r.cbm, status: r.status, date: r.task_date, start: r.window_start_at, due: r.window_end_at,
     lateUntil: r.late_until_at, sub: r.first_submitted_at, attempt: r.attempt, max: r.attempts_allowed, since: r.status_since, reason: r.last_reason });
   return {
     ...base, metrics, tasks: Object.fromEntries([...tasks].map(([id, r]) => [id, toT(r)])),
-    series: { days, a: A.series, b: B.series, label: kind === "reviewer" ? "Reviewed on time" : "Done on time" },
-    focus: { a: { types: A.types, reasons: A.reasons }, b: { types: B.types, reasons: B.reasons } },
+    series: { days, lines: S.map((x) => x.series), label: kind === "reviewer" ? "Reviewed on time" : "Done on time" },
+    focus: S.map((x) => ({ types: x.types, reasons: x.reasons })),
   };
 }
 export type CompareData = ReturnType<typeof compareData>;
