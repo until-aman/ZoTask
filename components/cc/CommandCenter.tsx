@@ -65,7 +65,7 @@ function Health({ d }: { d: CC }) {
         </div>
         <div className="bar big" aria-label="Outcome of tasks past deadline">{parts.map(([l, k, c]) => <i key={l} title={`${l}: ${k.n}`} style={{ width: `${due ? (k.n / due) * 100 : 0}%`, background: c }} />)}</div>
         <div className="legend">{parts.map(([l, k, c, m]) => (
-          <span key={l} className="lgw"><button type="button" className="lg" disabled={!k.n} onClick={() => open({ title: l, ids: k.ids })}><b style={{ color: c }}>●</b> {l} <b className="lgn">{k.n}</b> <b className="lgn">{k.rate ?? 0}%</b></button>
+          <span key={l} className="lgw"><button type="button" className="lg" disabled={!k.n} onClick={() => open({ title: l, ids: k.ids })}><b style={{ color: c }}>●</b> {l}: <b className="lgn">{k.n} ({k.rate ?? 0}%)</b></button>
             <DefTip label={l} def={{ means: m, calc: `${l} ÷ tasks past deadline` }} k={k} rate /></span>
         ))}</div>
       </section>
