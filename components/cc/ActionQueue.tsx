@@ -58,7 +58,7 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
         <button type="button" className="btn sm" onClick={() => setHo(makeHandover())}>Daily handover</button>
       </div>
       <div className="bk" role="tablist" aria-label="Issue type">
-        {CATS.map(([k, l]) => <button key={k} type="button" aria-pressed={cat === k} onClick={() => { setCat(k); setSel(new Set()); }}>{l} <span className={k === "critical" && count(k) ? "r" : ""}>{count(k)}</span></button>)}
+        {CATS.map(([k, l]) => <button key={k} type="button" className="qf" aria-pressed={cat === k} onClick={() => { setCat(k); setSel(new Set()); }}>{l}<span className={`cnt ${k === "critical" && count(k) ? "r" : ""}`}>{count(k)}</span></button>)}
       </div>
       <div className="row2">
         <input type="search" className="search" placeholder="Search task, property, person" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search issues" />

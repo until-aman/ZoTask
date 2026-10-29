@@ -231,7 +231,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               {g.open ? (
                 <div className="bk" role="group" aria-label="Waiting time">
                   {[["all", "All", ""], ["over", "Over SLA", "r"], ["r", "Over 3 days", "r"], ["a", "1–3 days", "a"], ["g", "Under 1 day", "g"]].map(([k, l, c]) => (
-                    <button key={k} type="button" aria-pressed={bk === k} onClick={() => setBk(k)}><span className={c}>{l}</span> · {cnt[k]}</button>
+                    <button key={k} type="button" className="qf" aria-pressed={bk === k} onClick={() => setBk(k)}><span className={c}>{l}</span><span className={`cnt ${c === "r" && cnt[k] ? "r" : ""}`}>{cnt[k]}</span></button>
                   ))}
                 </div>
               ) : <span className="info">{from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}</span>}
