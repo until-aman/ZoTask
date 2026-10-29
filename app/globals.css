@@ -302,3 +302,6 @@ table.aq td>.acts{display:flex}
 .lgw{display:inline-flex;align-items:center}
 .mini{align-items:center}.mini .tip{margin-left:auto}
 .tip-pop{text-align:left;font-weight:500}
+.score .kpis.k3.k2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.minis{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:420px){.minis{grid-template-columns:repeat(2,minmax(0,1fr))}}

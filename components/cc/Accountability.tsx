@@ -70,7 +70,7 @@ export function Properties({ d, cbm, setCbm, issues }: { d: CC; cbm: string; set
 export function Reviewers({ d }: { d: CC }) {
   type R = CC["reviewers"][number];
   return (
-    <Sec title="Reviewers" tip={<InfoTip title="Reviewers" rows={[["Tasks", "Columns marked tasks count each task once"], ["Checks", "First checks and re-checks count every review attempt"], ["Wait", "From submission to decision, for each check. P90: 9 in 10 were faster"], ["Send-back %", "Tasks sent back ÷ tasks reviewed"]]} note="A high send-back rate can mean a careful reviewer. Compare it with audit results before judging." />}>
+    <Sec title="Reviewers" tip={<InfoTip title="Reviewers" rows={[["Tasks", "Columns marked tasks count each task once"], ["Checks", "First checks and re-checks count every review attempt"], ["Wait", "From submission to decision, for each check."], ["Send-back %", "Tasks sent back ÷ tasks reviewed"]]} note="A high send-back rate can mean a careful reviewer. Compare it with audit results before judging." />}>
       <Table<R> name="Reviewers" rows={d.reviewers} rowKey={(r) => r.name} search={(r) => r.name} pageSize={20} cols={[
         { key: "name", label: "Reviewer", sticky: true, value: (r) => r.name, render: (r) => <b>{r.name}</b> },
         { key: "props", label: "Properties", num: true, value: (r) => r.props },
@@ -81,7 +81,6 @@ export function Reviewers({ d }: { d: CC }) {
         { key: "pend", label: "Pending", num: true, value: (r) => r.pending.length, render: (r) => <N ids={r.pending} title={`${r.name}: waiting now`} /> },
         { key: "over", label: "Pending past SLA", num: true, value: (r) => r.over.length, render: (r) => <N ids={r.over} title={`${r.name}: pending past SLA`} className={r.over.length ? "t-r" : ""} /> },
         { key: "med", label: "Median wait", num: true, tip: <InfoTip title="Median wait" rows={[["Means", "Typical time from submission to decision"], ["Formula", "Middle value of all checks"]]} />, value: (r) => r.median, render: (r) => dur(r.median), csv: (r) => (r.median === null ? "" : Math.round(r.median / 60000)) },
-        { key: "p90", label: "P90 wait", num: true, tip: <InfoTip title="P90 wait" rows={[["Means", "9 in 10 checks were faster than this"], ["Formula", "90th percentile of all checks"]]} />, value: (r) => r.p90, render: (r) => dur(r.p90), csv: (r) => (r.p90 === null ? "" : Math.round(r.p90 / 60000)) },
         { key: "first", label: "First checks", num: true, value: (r) => r.firstChecks },
         { key: "re", label: "Re-checks", num: true, value: (r) => r.reChecks },
         { key: "sb", label: "Send-back %", num: true, tip: <InfoTip title="Send-back %" rows={[["Means", "Share of reviewed tasks sent back. High is not always bad"], ["Formula", "Tasks sent back ÷ tasks reviewed"]]} />, value: (r) => r.sentBackRate, render: (r) => <N ids={r.sentBack} title={`${r.name}: tasks sent back`}>{fmtP(r.sentBackRate)}</N> },

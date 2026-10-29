@@ -41,10 +41,9 @@ function Health({ d }: { d: CC }) {
       </section>
       <section className="card score">
         <h3>Reviewers</h3>
-        <div className="kpis k3">
+        <div className="kpis k3 k2">
           <Tile label="Reviewed within SLA" def={{ means: "Reviewed tasks where every check met its time limit", calc: "In-time tasks ÷ tasks reviewed in the period", note: "SLA is set per task type, usually 24h from submission. Tasks still waiting are under Pending past SLA." }} k={v.inSla} band={[90, 75]} target="Target 90%+" unitNote="Every check met its limit" />
           <TimeTile label="Median wait" t={v.median} band={[12, 24]} def={{ means: "Typical time from submission to a reviewer's decision", calc: "Middle value of all checks in the period", note: "Counts each check, including re-checks." }} />
-          <TimeTile label="P90 wait" t={v.p90} band={[24, 48]} def={{ means: "9 in 10 checks were faster than this", calc: "90th percentile of submission-to-decision time", note: "Shows the slow tail the median hides." }} />
         </div>
         <div className="minis">
           <Mini label="Needing review" k={v.requiring} def={{ means: "Tasks reviewed in the period plus tasks waiting now" }} />
