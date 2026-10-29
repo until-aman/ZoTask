@@ -46,16 +46,22 @@ export function reviewsIn(r: Range, props: number[]): Rev[] {
     WHERE rv.decided_at>=? AND rv.decided_at<? AND i.property_id IN (${props.join(",") || 0})`, from, to);
 }
 
+/** Review metrics counted per task: a task is checked in time when every check on it met its time limit. */
 export function review(revs: Rev[], openRows: Row[], now: number) {
-  const rv = revs.filter((x) => x.kind === "review");
-  const onTime = rv.filter((x) => x.due_at && x.decided_at <= x.due_at).length;
+  const byTask = new Map<number, Rev[]>();
+  for (const x of revs.filter((r) => r.kind === "review")) byTask.set(x.instance_id, [...(byTask.get(x.instance_id) ?? []), x]);
+  const tasks = [...byTask.values()];
+  const onTime = tasks.filter((t) => t.every((x) => x.due_at && x.decided_at <= x.due_at)).length;
   const backlog = openRows.filter((r) => ["review", "resub"].includes(r.status));
   const pendingOver = backlog.filter((r) => now - r.status_since > r.review_sla_h * HOUR).length;
+  const audited = new Map<number, boolean>();
+  for (const x of revs.filter((r) => r.kind === "audit")) audited.set(x.instance_id, (audited.get(x.instance_id) ?? false) || x.decision === "fail");
   return {
-    decisions: rv.length, unique: new Set(rv.map((x) => x.instance_id)).size, onTime, pending: backlog.length, pendingOver,
-    slaRate: pct(onTime, rv.length + pendingOver),
-    medianTat: median(rv.map((x) => x.decided_at - x.submitted_at)),
-    audits: revs.filter((x) => x.kind === "audit").length, auditFails: revs.filter((x) => x.kind === "audit" && x.decision === "fail").length,
+    tasks: tasks.length, onTime, pending: backlog.length, pendingOver,
+    slaRate: pct(onTime, tasks.length + pendingOver),
+    // Time from a task's first submission in range to its first check.
+    medianTat: median(tasks.map((t) => { const f = [...t].sort((a, b) => a.decided_at - b.decided_at)[0]; return f.decided_at - f.submitted_at; })),
+    audits: audited.size, auditFails: [...audited.values()].filter(Boolean).length,
   };
 }
 
@@ -101,7 +107,7 @@ export function loadOpen(props: number[]) {
 }
 export function reasons(r: Range, props: number[]) {
   const from = new Date(r.from + "T00:00").getTime(), to = new Date(r.to + "T00:00").getTime() + 864e5;
-  return all<{ reason: string; n: number }>(`SELECT f.reason, count(*) n FROM review_flags f JOIN reviews rv ON rv.id=f.review_id JOIN instances i ON i.id=rv.instance_id
+  return all<{ reason: string; n: number }>(`SELECT f.reason, count(DISTINCT rv.instance_id) n FROM review_flags f JOIN reviews rv ON rv.id=f.review_id JOIN instances i ON i.id=rv.instance_id
     WHERE rv.kind='review' AND rv.decided_at>=? AND rv.decided_at<? AND i.property_id IN (${props.join(",") || 0}) GROUP BY f.reason ORDER BY n DESC`, from, to);
 }
 export function reopenAfterPass(r: Range) {

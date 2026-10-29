@@ -80,8 +80,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     const v = M.review(mine, open.filter((r) => r.reviewer === name), now);
     const passed = new Set(mine.filter((r) => r.kind === "review" && r.decision === "pass").map((r) => r.instance_id));
     const audited = revs.filter((r) => r.kind === "audit" && passed.has(r.instance_id));
-    return { name, v, reopen: [...passed].filter((id) => reopened.has(id)).length, audited: audited.length, disagree: audited.filter((a) => a.decision === "fail").length };
-  }).filter((r) => r.v.decisions + r.v.pending > 0).sort((a, b) => (a.v.slaRate ?? 0) - (b.v.slaRate ?? 0));
+    const auditedTasks = new Set(audited.map((a) => a.instance_id)), failedTasks = new Set(audited.filter((a) => a.decision === "fail").map((a) => a.instance_id));
+    return { name, v, reopen: [...passed].filter((id) => reopened.has(id)).length, audited: auditedTasks.size, disagree: failedTasks.size };
+  }).filter((r) => r.v.tasks + r.v.pending > 0).sort((a, b) => (a.v.slaRate ?? 0) - (b.v.slaRate ?? 0));
 
   const cities = [...new Set(G.map((g) => g.city))];
   const clusters = [...new Set(G.filter((g) => !sp.city || g.city === sp.city).map((g) => g.cluster))];
@@ -124,10 +125,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           </div>
         </section>
         <section className="card score">
-          <h3>Reviewers<InfoTip><b>In time</b>: checks done within each task&apos;s time limit, counting tasks still waiting past the limit as late. <b>Usual wait</b>: half of tasks were checked faster than this. {V.audits ? `Auditors re-checked ${V.audits} approved tasks and found problems in ${V.auditFails}.` : ""}</InfoTip></h3>
+          <h3>Reviewers<InfoTip>All numbers count tasks, not checklist items. <b>Checked in time</b>: tasks checked within their time limit (every check, including re-checks), with tasks still waiting past the limit counted as late. <b>Usual wait</b>: half of tasks were checked faster than this. {V.audits ? `Auditors re-checked ${V.audits} approved tasks and found problems in ${V.auditFails}.` : ""}</InfoTip></h3>
           <div className="kpis">
             <Link className="kpi" href={`/queue?tab=review&over=1&from=${M.isoDate(now - 60 * 864e5)}&to=${today}${loc ? "&" + loc : ""}`}><span className={`rag ${rag(V.slaRate, 90, 75)}`} />
-              <div className="lab">Checked in time</div><div className="v">{fmtP(V.slaRate)}<small>{V.onTime}/{V.decisions + V.pendingOver}</small></div><Delta cur={V.slaRate} prev={Vp.slaRate} /></Link>
+              <div className="lab">Checked in time</div><div className="v">{fmtP(V.slaRate)}<small>{V.onTime}/{V.tasks + V.pendingOver}</small></div><Delta cur={V.slaRate} prev={Vp.slaRate} /></Link>
             <div className="kpi"><div className="lab">Usual wait</div><div className="v">{hrs(V.medianTat)}</div>
               <Delta cur={V.medianTat === null ? null : V.medianTat / HOUR} prev={Vp.medianTat === null ? null : Vp.medianTat / HOUR} goodUp={false} unit="h" /></div>
           </div>
@@ -230,9 +231,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <section>
           <h2>Reviewers</h2>
           <div className="tbl"><table>
-            <thead><tr><th>Reviewer</th><th className="n">Checks</th><th className="n">Checked in time</th><th className="n">Usual wait</th><th className="n">Waiting now</th><th className="n">Overdue</th><th className="n">Reopened</th><th className="n">Audit fails</th></tr></thead>
+            <thead><tr><th>Reviewer</th><th className="n">Tasks checked</th><th className="n">Checked in time</th><th className="n">Usual wait</th><th className="n">Waiting now</th><th className="n">Overdue</th><th className="n">Reopened</th><th className="n">Audit fails</th></tr></thead>
             <tbody>{reviewers.map((r) => (
-              <tr key={r.name}><td>{r.name}</td><td className="n">{r.v.decisions} <span className="muted small">({r.v.unique} tasks)</span></td>
+              <tr key={r.name}><td>{r.name}</td><td className="n">{r.v.tasks}</td>
                 <td className="n"><span className={`pill ${rag(r.v.slaRate, 90, 75)}`}>{fmtP(r.v.slaRate)}</span></td><td className="n">{hrs(r.v.medianTat)}</td>
                 <td className="n">{r.v.pending}</td><td className="n" style={{ color: r.v.pendingOver ? "var(--red)" : undefined }}>{r.v.pendingOver}</td>
                 <td className="n">{r.reopen}</td><td className="n">{r.audited ? `${r.disagree} of ${r.audited}` : "—"}</td></tr>
