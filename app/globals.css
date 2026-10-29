@@ -342,3 +342,5 @@ table.aq td>.acts{display:flex}
 .esc-grid .span2{grid-column:1/-1}
 .esc-grid input,.esc-grid select,.esc-grid textarea{width:100%;font-weight:400}
 @media (max-width:560px){.esc-grid{grid-template-columns:minmax(0,1fr)}.esc-weeks .small{font-size:9px}}
+.outcome .legend{justify-content:space-between}
+.legend b.lgn{font-weight:800;color:var(--fg)}
