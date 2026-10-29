@@ -52,6 +52,7 @@ function Health({ d }: { d: CC }) {
           <Mini label="Waiting for review" k={v.pending} def={{ means: "Submitted tasks waiting for review right now" }} />
           <Mini label="Waiting too long" k={v.over} tone="r" def={{ means: "Tasks waiting for review longer than the time limit", note: "These are in Action required." }} />
           <Mini label="Waiting for re-review" k={v.rereview} def={{ means: "Fixed and resubmitted, waiting for review" }} />
+          <Mini label="Review missed" k={v.missed} tone="r" of def={{ means: "Tasks from this period that were submitted but not reviewed within the time limit, and still aren't reviewed", note: "Base: tasks submitted in the period. Waiting too long also includes older tasks." }} />
         </div>
       </section>
       <section className="card outcome">

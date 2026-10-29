@@ -144,6 +144,9 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
     ({ n: ids.length, ids, ...(of ? { of: of.length, rate: pct(ids.length, of.length) } : {}),
       ...(prevIds ? { prev: prevOf ? pct(prevIds.length, prevOf.length) : prevIds.length } : {}) });
 
+  // Review missed: tasks from the period that were submitted but are still unreviewed after their review time limit.
+  const reviewMissed = (list: Row[]) => list.filter((r) => REVIEW_ST.includes(r.status) && now - r.status_since > r.review_sla_h * HOUR).map((r) => r.id);
+  const submittedIn = cur.filter((r) => r.first_submitted_at).map((r) => r.id);
   const groundK = {
     assigned: k(gC.assigned, undefined, gP.assigned), due: k(gC.due, undefined, gP.due),
     onTime: k(gC.onTime, gC.due, gP.onTime, gP.due), late: k(gC.late, gC.due, gP.late, gP.due),
@@ -154,7 +157,7 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
   const reviewK = {
     requiring: k(vC.requiring), reviewed: k(vC.reviewed, undefined, vP.reviewed),
     inSla: k(vC.inSla, vC.reviewed, vP.inSla, vP.reviewed), afterSla: k(vC.afterSla, vC.reviewed, vP.afterSla, vP.reviewed),
-    pending: k(vC.pending), over: k(vC.over, vC.pending), rereview: k(vC.rereview),
+    pending: k(vC.pending), over: k(vC.over, vC.pending), rereview: k(vC.rereview), missed: k(reviewMissed(cur), submittedIn),
     median: { ms: vC.median, prev: vP.median, ids: vC.checkIds }, p90: { ms: vC.p90, prev: vP.p90, ids: vC.checkIds },
     checks: vC.checks,
   };
@@ -272,6 +275,7 @@ export function buildCommand(u: User, sp: SP, now = Date.now()) {
     const assignedProps = new Set([...cur, ...open].filter((r) => r.reviewer === name).map((r) => r.property_id));
     return { name, props: assignedProps.size, requiring: v.requiring, reviewed: v.reviewed, inSla: pct(v.inSla.length, v.reviewed.length), afterSla: v.afterSla,
       pending: v.pending, over: v.over, median: v.median, p90: v.p90, reReviewed: v.reReviewed,
+      missed: reviewMissed(cur.filter((r) => r.reviewer === name)),
       sentBack: v.sentBack, sentBackRate: pct(v.sentBack.length, v.reviewed.length),
       daily: days.map((d) => uniq(mineRev.filter((x) => x.kind === "review" && x.decided_at >= dayStart(d) && x.decided_at < dayStart(d) + 864e5).map((x) => x.instance_id)).length) };
   }).sort((a, b) => b.over.length - a.over.length || (a.inSla ?? 0) - (b.inSla ?? 0));
