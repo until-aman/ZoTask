@@ -7,14 +7,14 @@ import { InfoTip, N, Sec, Table, dur, fmtP, pct, rag, useDrill } from "./parts";
 
 type Pt = Record<string, number[][] | null> | null;
 const METRICS: { key: string; label: string; rate: boolean; goodUp: boolean; tip: string }[] = [
-  { key: "onTime", label: "On-time completion", rate: true, goodUp: true, tip: "Tasks submitted by the deadline ÷ tasks past deadline that day" },
-  { key: "inSla", label: "Reviews within SLA", rate: true, goodUp: true, tip: "Tasks reviewed that day with every review on time ÷ tasks reviewed that day" },
-  { key: "fta", label: "First-time approval", rate: true, goodUp: true, tip: "Approved on the first review ÷ tasks reviewed at least once" },
-  { key: "approved", label: "Final approval", rate: true, goodUp: true, tip: "Tasks approved at any attempt ÷ tasks past deadline" },
-  { key: "overdue", label: "Overdue or missed", rate: false, goodUp: false, tip: "Tasks with a deadline that day that are still open or were missed" },
-  { key: "backlog", label: "Review backlog", rate: false, goodUp: false, tip: "Tasks waiting for review at the end of the day" },
+  { key: "onTime", label: "Done on time", rate: true, goodUp: true, tip: "Tasks submitted by the deadline ÷ tasks past deadline that day" },
+  { key: "inSla", label: "Reviewed on time", rate: true, goodUp: true, tip: "Tasks reviewed that day with every review on time ÷ tasks reviewed that day" },
+  { key: "fta", label: "Approved first time", rate: true, goodUp: true, tip: "Approved on the first review ÷ tasks reviewed at least once" },
+  { key: "approved", label: "Approved (any attempt)", rate: true, goodUp: true, tip: "Tasks approved at any attempt ÷ tasks past deadline" },
+  { key: "overdue", label: "Not done or missed", rate: false, goodUp: false, tip: "Tasks with a deadline that day that are still open or were missed" },
+  { key: "backlog", label: "Waiting for review", rate: false, goodUp: false, tip: "Tasks waiting for review at the end of the day" },
   { key: "rejections", label: "Tasks sent back", rate: false, goodUp: false, tip: "Tasks sent back for changes that day" },
-  { key: "repeatRate", label: "Repeat send-backs", rate: true, goodUp: false, tip: "Send-backs on a second or later attempt ÷ all send-backs that day" },
+  { key: "repeatRate", label: "Sent back again", rate: true, goodUp: false, tip: "Send-backs on a second or later attempt ÷ all send-backs that day" },
 ];
 const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
@@ -106,7 +106,7 @@ export function Lifecycle({ d }: { d: CC }) {
   );
   return (
     <Sec title="Task lifecycle" tip={<InfoTip title="Task lifecycle" rows={[["Counts", "Tasks past deadline in the period, each counted once however many times it was reviewed"], ["%", "Share of the step before"], ["Time", "Median time for that step"], ["Stuck now", "All open tasks in the filters, any date"]]} />}
-      right={<span className="small">Final approval <b>{fmtP(pct(L.finalApproved.length, due))}</b> <span className="muted">({L.finalApproved.length} of {due})</span></span>}>
+      right={<span className="small">Approved (any attempt) <b>{fmtP(pct(L.finalApproved.length, due))}</b> <span className="muted">({L.finalApproved.length} of {due})</span></span>}>
       {!due ? <p className="muted">No task deadlines passed in this period.</p> : <>
         <div className="stages">{L.stages.map((s, i) => <Row key={s.key} s={s} base={due} prevN={i ? L.stages[i - 1].ids.length : null} />)}</div>
         <div className="small muted" style={{ fontWeight: 700, marginTop: 4 }}>When a task is sent back</div>
@@ -175,14 +175,14 @@ export function Compare({ d }: { d: CC }) {
         { key: "name", label: lvl === "city" ? "City" : "Cluster", sticky: true, value: (r) => r.name, render: (r) => <button type="button" className="link" style={{ padding: 0 }} onClick={() => go(r.name, r.city)}>{r.name}</button> },
         ...(lvl === "cluster" ? [{ key: "city", label: "City", value: (r: C) => r.city }] : []),
         { key: "props", label: "Properties", num: true, value: (r) => r.props },
-        { key: "due", label: "Past deadline", num: true, value: (r) => r.due.length, render: (r) => <N ids={r.due} title={`${r.name}: tasks past deadline`} /> },
-        { key: "onTime", label: "On time", num: true, tip: <InfoTip title="On time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (r) => r.onTime, render: (r) => <span className={`pill ${rag(r.onTime, 85, 70)}`}>{fmtP(r.onTime)}</span> },
+        { key: "due", label: "Deadline passed", num: true, value: (r) => r.due.length, render: (r) => <N ids={r.due} title={`${r.name}: tasks past deadline`} /> },
+        { key: "onTime", label: "Done on time", num: true, tip: <InfoTip title="Done on time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (r) => r.onTime, render: (r) => <span className={`pill ${rag(r.onTime, 85, 70)}`}>{fmtP(r.onTime)}</span> },
         { key: "dOn", label: "vs before", num: true, value: (r) => delta(r.onTime, r.onTimePrev), render: (r) => { const x = delta(r.onTime, r.onTimePrev); return x === null ? "—" : <span className={x >= 0 ? "t-g" : "t-r"}>{x > 0 ? "+" : ""}{x}</span>; } },
         { key: "missed", label: "Missed", num: true, value: (r) => r.missed.length, render: (r) => <N ids={r.missed} title={`${r.name}: missed`} /> },
-        { key: "fta", label: "First-time approval", num: true, tip: <InfoTip title="First-time approval" rows={[["Means", "Approved at the first review"], ["Formula", "Approved first time ÷ tasks reviewed"]]} />, value: (r) => r.fta, render: (r) => fmtP(r.fta) },
-        { key: "inSla", label: "Reviews in SLA", num: true, tip: <InfoTip title="Reviews in SLA" rows={[["Means", "Reviewed tasks where every review was on time"], ["Formula", "In-time tasks ÷ tasks reviewed"]]} />, value: (r) => r.inSla, render: (r) => <span className={`pill ${rag(r.inSla, 90, 75)}`}>{fmtP(r.inSla)}</span> },
-        { key: "over", label: "Reviews past SLA now", num: true, value: (r) => r.over.length, render: (r) => <N ids={r.over} title={`${r.name}: reviews past SLA`} className={r.over.length ? "t-r" : ""} /> },
-        { key: "repeat", label: "Sent back 2+", num: true, value: (r) => r.repeat.length, render: (r) => <N ids={r.repeat} title={`${r.name}: sent back twice or more`} /> },
+        { key: "fta", label: "Approved first time", num: true, tip: <InfoTip title="Approved first time" rows={[["Means", "Approved at the first review"], ["Formula", "Approved first time ÷ tasks reviewed"]]} />, value: (r) => r.fta, render: (r) => fmtP(r.fta) },
+        { key: "inSla", label: "Reviewed on time", num: true, tip: <InfoTip title="Reviewed on time" rows={[["Means", "Reviewed tasks where every review was on time"], ["Formula", "In-time tasks ÷ tasks reviewed"]]} />, value: (r) => r.inSla, render: (r) => <span className={`pill ${rag(r.inSla, 90, 75)}`}>{fmtP(r.inSla)}</span> },
+        { key: "over", label: "Waiting too long", num: true, value: (r) => r.over.length, render: (r) => <N ids={r.over} title={`${r.name}: reviews past SLA`} className={r.over.length ? "t-r" : ""} /> },
+        { key: "repeat", label: "Sent back 2+ times", num: true, value: (r) => r.repeat.length, render: (r) => <N ids={r.repeat} title={`${r.name}: sent back twice or more`} /> },
       ]} />
     </Sec>
   );
