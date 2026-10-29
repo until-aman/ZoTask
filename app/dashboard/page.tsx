@@ -7,6 +7,7 @@ import * as M from "@/lib/metrics";
 import { HOUR, fmtDate, isoDate } from "@/lib/time";
 import RemindAll from "@/components/RemindAll";
 import InfoTip from "@/components/InfoTip";
+import DashFilters from "@/components/DashFilters";
 
 type SP = Record<string, string | undefined>;
 const PRESETS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], ["7d", "7 days"], ["14d", "14 days"], ["30d", "30 days"]];
@@ -94,17 +95,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <h1>Operations command center</h1>
           <p className="muted" style={{ margin: "2px 0 0" }}>{R.from === R.to ? fmtDate(R.from) : `${fmtDate(R.from)} – ${fmtDate(R.to)}`} vs {P.from === P.to ? fmtDate(P.from) : `${fmtDate(P.from)} – ${fmtDate(P.to)}`} · {props.length} properties · updated {new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</p>
         </div>
-        <span className="spacer" />
-        <div className="seg">{PRESETS.map(([k, l]) => <Link key={k} href={self({ range: k })} aria-pressed={preset === k}>{l}</Link>)}</div>
       </div>
-      <form className="row2" action="/dashboard">
-        <input type="hidden" name="range" value={preset} />
-        <select name="city" defaultValue={sp.city ?? ""} aria-label="City"><option value="">All cities</option>{cities.map((c) => <option key={c}>{c}</option>)}</select>
-        <select name="cluster" defaultValue={sp.cluster ?? ""} aria-label="Cluster"><option value="">All clusters</option>{clusters.map((c) => <option key={c}>{c}</option>)}</select>
-        <select name="prop" defaultValue={sp.prop ?? ""} aria-label="Property"><option value="">All properties</option>{propsOpts.map((p) => <option key={p.id}>{p.property}</option>)}</select>
-        <button className="btn sm">Apply</button>
-        {(sp.city || sp.cluster || sp.prop) && <Link className="link small" href={self({ city: undefined, cluster: undefined, prop: undefined })}>Clear</Link>}
-      </form>
+      <DashFilters geo={G} init={{ range: preset, city: sp.city, cluster: sp.cluster, prop: sp.prop }} range={R} />
 
       <div className="grid g3">
         <section className="card score">

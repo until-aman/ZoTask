@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { boot } from "@/lib/boot";
 import { rows, STATUS_LABEL, STATUS_PILL, Row } from "@/lib/queries";
+import DateJump from "@/components/DateJump";
 import { isoDate, fmtDate, fmtDur, fmtDateTime } from "@/lib/time";
 
 const TABS: [string, string][] = [["now", "Current and upcoming"], ["overdue", "Overdue"], ["changes", "Changes required"], ["flags", "Audit flags"], ["done", "Completed"]];
@@ -30,11 +31,7 @@ export default async function MyTasks({ searchParams }: { searchParams: Promise<
             : "Nothing overdue. Nice."}</p>
         </div>
         <span className="spacer" />
-        <form className="row2">
-          <input type="hidden" name="tab" value={tab} />
-          <input type="date" name="date" defaultValue={date} aria-label="Date" />
-          <button className="btn sm">Go</button>
-        </form>
+        <DateJump tab={tab} date={date} />
       </div>
       <div className="seg" role="tablist" style={{ width: "fit-content", maxWidth: "100%", overflowX: "auto" }}>
         {TABS.map(([k, l]) => (
