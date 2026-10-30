@@ -104,7 +104,7 @@ export async function reassignReviewer(ids: number[], reviewerId: number): Promi
   });
 }
 
-export type ViewFilters = { city: string[]; cluster: string[]; prop: string[]; role: string[]; asg: string[]; mine: boolean };
+export type ViewFilters = { city: string[]; cluster: string[]; prop: string[]; role: string[]; asg: string[]; cbm: string[]; rv: string[]; mine: boolean };
 /** Saved filters, per screen. `filters` is whatever that screen keeps (the queue's lists, or a dashboard's URL parameters). */
 export async function saveView(page: string, name: string, filters: object, isDefault: boolean): Promise<Result & { id?: number }> {
   const u = await requireUser();

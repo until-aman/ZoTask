@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { CompareData, Kind, Metric } from "@/lib/compare";
 import { CopyModal, DrillCtx, Drill, InfoTip, N, Sec, dur, fmtP } from "./parts";
 import { DrillDrawer, TaskDrawer } from "./Drawers";
-import { ActiveChip, DateRow, Field, FilterBar, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
+import { ActiveChip, DateRow, Field, FilterBar, SearchPick, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
 
 const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from) : `${nice(r.from)} – ${nice(r.to)}`);
@@ -176,10 +176,8 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
                   </span>
                 ))}
                 {P.length < d.max && unpicked.length > 0 && (
-                  <select id="cmp-add" value="" onChange={(e) => e.target.value && go({ ids: [...ids, e.target.value] })} aria-label={`Add a ${lc(one)}`}>
-                    <option value="">+ Add {lc(one)}</option>
-                    {unpicked.map((o) => <option key={o.id} value={o.id}>{o.label}{o.sub ? ` · ${o.sub}` : ""}</option>)}
-                  </select>
+                  <span style={{ flex: "1 1 220px", maxWidth: 320 }}><SearchPick multi id="cmp-add" onChange={(v) => go({ ids: [...ids, v] })} placeholder={`+ Add ${lc(one)} (type to search)`}
+                    options={unpicked.map((o) => ({ v: o.id, label: o.label, sub: o.sub }))} /></span>
                 )}
                 {P.length < Math.min(d.max, d.options.length) && <button type="button" className="link small" onClick={() => go({ ids: [...ids, ...unpicked.map((o) => o.id)].slice(0, d.max) })}>Add all{d.options.length > d.max ? ` (up to ${d.max})` : ""}</button>}
               </div>

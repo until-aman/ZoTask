@@ -20,7 +20,8 @@ function useOutside(open: boolean, close: () => void) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;
-    const click = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node) && !(e.target as HTMLElement).closest(".modal")) close(); };
+    // composedPath, not contains(): a click can remove its own target (a picked option) before this runs.
+    const click = (e: MouseEvent) => { const path = e.composedPath(); if (ref.current && !path.includes(ref.current) && !path.some((n) => n instanceof HTMLElement && n.classList.contains("modal"))) close(); };
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     document.addEventListener("mousedown", click); document.addEventListener("keydown", key);
     return () => { document.removeEventListener("mousedown", click); document.removeEventListener("keydown", key); };
@@ -249,6 +250,62 @@ export function DateRow({ label = "Dates", presets = DATE_PRESETS, value, from =
           </>}
       </span>}
     </div>
+  );
+}
+
+export type PickOpt = { v: string; label?: string; sub?: string };
+/** A dropdown you can type into: type part of a name to narrow the list, then pick. With `multi`, each pick is added and the box clears. */
+export function SearchPick({ options, value = "", onChange, placeholder = "Type to search", allLabel, multi, id }: {
+  options: PickOpt[]; value?: string; onChange: (v: string) => void; placeholder?: string; allLabel?: string; multi?: boolean; id?: string;
+}) {
+  const name = (o?: PickOpt) => (o ? o.label ?? o.v : "");
+  const picked = options.find((o) => o.v === value);
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const close = useMemo(() => () => { setOpen(false); setText(""); }, []);
+  const ref = useOutside(open, close);
+  // The list is fixed to the screen so a scrolling filters panel can't clip it.
+  const [box, setBox] = useState<{ top: number; left: number; width: number; up: boolean } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = ref.current?.querySelector("input")?.getBoundingClientRect();
+      if (r) { const up = r.bottom + 270 > innerHeight && r.top > 280; setBox({ top: up ? r.top - 4 : r.bottom + 4, left: r.left, width: Math.max(r.width, 220), up }); }
+    };
+    place();
+    window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open, ref]);
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+  const list = options.filter((o) => words.every((w) => `${name(o)} ${o.sub ?? ""}`.toLowerCase().includes(w))).slice(0, 60);
+  const pick = (v: string) => { onChange(v); close(); };
+  return (
+    <span className="spick" ref={ref}>
+      <input type="search" id={id} role="combobox" aria-expanded={open} aria-autocomplete="list" autoComplete="off"
+        value={open ? text : multi ? "" : name(picked)} placeholder={!multi && !picked && allLabel ? allLabel : placeholder}
+        onFocus={() => { setOpen(true); setHi(0); }} onClick={() => setOpen(true)}
+        onChange={(e) => { setText(e.target.value); setOpen(true); setHi(0); }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => Math.min(h + 1, list.length - 1)); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setHi((h) => Math.max(h - 1, 0)); }
+          else if (e.key === "Enter") { e.preventDefault(); if (list[hi]) pick(list[hi].v); }
+          else if (e.key === "Escape" && open) { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); close(); (e.target as HTMLInputElement).blur(); }
+        }} />
+      {!multi && picked && !open && <button type="button" className="spick-x" aria-label="Clear" onClick={() => onChange("")}>×</button>}
+      {open && (
+        <ul className="spick-l" role="listbox" style={box ? { top: box.top, left: Math.min(box.left, innerWidth - box.width - 8), width: box.width, transform: box.up ? "translateY(-100%)" : undefined } : { visibility: "hidden" }}>
+          {!multi && allLabel && !text && <li role="option" aria-selected={!value} className={!value ? "on" : ""} onMouseDown={(e) => { e.preventDefault(); pick(""); }}>{allLabel}</li>}
+          {list.map((o, i) => (
+            <li key={o.v} role="option" aria-selected={o.v === value} className={`${i === hi ? "hi" : ""}${o.v === value ? " on" : ""}`}
+              onMouseEnter={() => setHi(i)} onMouseDown={(e) => { e.preventDefault(); pick(o.v); }}>
+              <span>{name(o)}</span>{o.sub && <small>{o.sub}</small>}
+            </li>
+          ))}
+          {!list.length && <li className="none">No match for “{text}”</li>}
+        </ul>
+      )}
+    </span>
   );
 }
 

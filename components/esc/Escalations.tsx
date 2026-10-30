@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { Esc, EscData } from "@/lib/escalations";
 import { raiseEscalation, updateEscalation } from "@/app/actions";
 import { CopyModal, InfoTip, Sec, Table, type Col } from "@/components/cc/parts";
-import { ActiveChip, DateRow, Field, FilterBar, SavedView, Stats, sameFilters } from "@/components/ui/Filters";
+import { ActiveChip, DateRow, Field, FilterBar, SavedView, SearchPick, Stats, sameFilters } from "@/components/ui/Filters";
 import Photo from "@/components/Photo";
 
 const STATUS: Record<string, string> = { open: "Yet to start", wip: "In progress", done: "Closed", dropped: "Dropped" };
@@ -107,9 +107,9 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
         <Field label="Department"><select value={dept} onChange={(e) => setDept(e.target.value)}><option value="">All departments</option>{d.departments.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="City"><select value={city} onChange={(e) => { setCity(e.target.value); setCluster(""); setProp(""); }}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Cluster"><select value={cluster} onChange={(e) => { setCluster(e.target.value); setProp(""); }}><option value="">All clusters</option>{clusters.map((x) => <option key={x}>{x}</option>)}</select></Field>
-        <Field label="Property"><select value={prop} onChange={(e) => setProp(e.target.value)}><option value="">All properties</option>{props.map((p) => <option key={p.id} value={String(p.id)}>{p.property}</option>)}</select></Field>
-        <Field label="Raised to"><select value={owner} onChange={(e) => setOwner(e.target.value)}><option value="">Anyone</option>{owners.map((x) => <option key={x}>{x}</option>)}</select></Field>
-        <Field label="Raised by"><select value={by} onChange={(e) => setBy(e.target.value)}><option value="">Anyone</option>{raisers.map((x) => <option key={x}>{x}</option>)}</select></Field>
+        <Field label="Property"><SearchPick value={prop} onChange={setProp} allLabel="All properties" placeholder="Type a property name" options={props.map((p) => ({ v: String(p.id), label: p.property, sub: `${p.cluster}, ${p.city}` }))} /></Field>
+        <Field label="Raised to"><SearchPick value={owner} onChange={setOwner} allLabel="Anyone" placeholder="Type a name" options={owners.map((v) => ({ v }))} /></Field>
+        <Field label="Raised by"><SearchPick value={by} onChange={setBy} allLabel="Anyone" placeholder="Type a name" options={raisers.map((v) => ({ v }))} /></Field>
       </>} />
   );
   const cur = open !== null ? d.rows.find((r) => r.id === open) ?? null : null;
@@ -436,10 +436,8 @@ function RaiseForm({ d, close, onDone }: { d: EscData; close: () => void; onDone
           <div className="f span2">Property
             <span className="row2">
               {propertyIds.map((id) => <span key={id} className="cmp-chip">{props.find((p) => p.id === id)?.property}<button type="button" aria-label="Remove" onClick={() => setPropertyIds(propertyIds.filter((x) => x !== id))}>×</button></span>)}
-              <select value="" onChange={(x) => x.target.value && setPropertyIds([...propertyIds, Number(x.target.value)])} aria-label="Add property">
-                <option value="">{propertyIds.length ? "+ Add another" : "Pick a property"}</option>
-                {props.filter((p) => !propertyIds.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.property} · {p.cluster}</option>)}
-              </select>
+              <span style={{ flex: "1 1 220px" }}><SearchPick multi onChange={(v) => setPropertyIds([...propertyIds, Number(v)])} placeholder={propertyIds.length ? "+ Add another property" : "Type a property name"}
+                options={props.filter((p) => !propertyIds.includes(p.id)).map((p) => ({ v: String(p.id), label: p.property, sub: p.cluster }))} /></span>
             </span></div>
           <label className="f span2">What is the issue
             <input type="text" value={title} onChange={(x) => setTitle(x.target.value)} placeholder="e.g. Washing machine repair - Zolo Arcadia" /></label>

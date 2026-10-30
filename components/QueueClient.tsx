@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getHistory, reassignReviewer, remindTasks, ViewFilters } from "@/app/actions";
-import { ActiveChip, DateRow, Field, FilterBar, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
+import { ActiveChip, DateRow, Field, FilterBar, SearchPick, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
 
 export type QItem = {
   id: number; t: string; p: string; cluster: string; city: string; a: string; r: string; s: string; h: number; sla: number; att: string;
@@ -29,7 +29,7 @@ const nice = (s: string) => new Date(s + "T00:00").toLocaleDateString("en-GB", {
 const fmtH = (h: number) => (h >= 48 ? Math.round(h / 24) + " days" : h + "h");
 const over = (t: QItem) => t.sla > 0 && t.h > t.sla;
 const bucket = (t: QItem) => (t.h > 72 ? "r" : t.h >= 24 ? "a" : "g");
-const empty: ViewFilters = { city: [], cluster: [], prop: [], role: [], asg: [], mine: false };
+const empty: ViewFilters = { city: [], cluster: [], prop: [], role: [], asg: [], cbm: [], rv: [], mine: false };
 
 export default function QueueClient({ items, geo, views, reviewers, me, canReview, today, initial }: {
   items: QItem[]; geo: Geo[]; views: SavedView[]; reviewers: { id: number; name: string }[]; me: string; canReview: boolean; today: string;
@@ -79,12 +79,18 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     const cl = clusterList(x).map((c) => c.v); const c2 = { ...x, cluster: x.cluster.filter((v) => cl.includes(v)) };
     const pl = propList(c2).map((p) => p.v); return { ...c2, prop: c2.prop.filter((v) => pl.includes(v)) };
   }
-  const people = useMemo(() => [...new Set(items.map((i) => i.a))].sort(), [items]);
+  const uniq = (l: string[]) => [...new Set(l.filter(Boolean))].sort();
+  const people = useMemo(() => uniq(items.map((i) => i.a)), [items]);
+  const cbmList = useMemo(() => uniq(items.map((i) => i.cbm)), [items]);
+  // Reviewers and auditors: the central team.
+  const central = useMemo(() => uniq(items.flatMap((i) => [i.rv, i.au])), [items]);
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
 
   const inScope = (t: QItem) =>
     (!f.city.length || f.city.includes(t.city)) && (!f.cluster.length || f.cluster.includes(t.cluster)) && (!f.prop.length || f.prop.includes(t.p)) &&
     (!f.role.length || f.role.includes(t.r)) && (!f.asg.length || f.asg.includes(t.a)) && (!f.mine || t.mine) &&
-    (!q || t.t.toLowerCase().includes(q.toLowerCase()) || t.p.toLowerCase().includes(q.toLowerCase()));
+    (!f.cbm?.length || f.cbm.includes(t.cbm)) && (!f.rv?.length || f.rv.includes(t.rv) || f.rv.includes(t.au)) &&
+    words.every((w) => `${t.t} ${t.p} ${t.cluster} ${t.city} ${t.a} ${t.cbm} ${t.rv} ${t.au} ${t.next}`.toLowerCase().includes(w));
   const inDates = (t: QItem) => t.date >= from && t.date <= to;
   const tasksFor = (k: string) => items.filter((t) => t.s === k && inScope(t) && inDates(t));
 
@@ -132,6 +138,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     ...f.city.map((v) => ["city", v, "City"] as [keyof ViewFilters, string, string]), ...f.cluster.map((v) => ["cluster", v, "Cluster"] as [keyof ViewFilters, string, string]),
     ...f.prop.map((v) => ["prop", v, "Property"] as [keyof ViewFilters, string, string]), ...f.role.map((v) => ["role", v, "Role", RNAME[v]] as [keyof ViewFilters, string, string, string]),
     ...f.asg.map((v) => ["asg", v, "Assignee"] as [keyof ViewFilters, string, string]),
+    ...(f.cbm ?? []).map((v) => ["cbm", v, "CBM"] as [keyof ViewFilters, string, string]),
+    ...(f.rv ?? []).map((v) => ["rv", v, "Reviewer"] as [keyof ViewFilters, string, string]),
   ];
   const chipList: ActiveChip[] = [
     ...chips.map(([k, v, l, d]) => ({ key: k + v, label: <>{l}: <b>{d ?? v}</b></>, clear: () => change({ [k]: (f[k] as string[]).filter((x) => x !== v) }) })),
@@ -183,7 +191,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
             { key: "props", label: "Properties", value: new Set(all.map((t) => t.p)).size },
           ]} />
 
-          <FilterBar search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search task or property" chips={chipList}
+          <FilterBar search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search task, property or person" chips={chipList}
             onClearAll={() => change(empty)}
             dates={<DateRow value={date} from={from} to={to} max={today} onPick={(k) => { setDate(k); setPage(0); }} onCustom={(a, b) => { setDateMode("custom"); setFrom(a); setTo(b); setPage(0); }} />}
             saved={{ page: "queue", views, current: f, apply: (v) => { setF({ ...empty, ...(v as Partial<ViewFilters>) }); setDate("today"); setSel(new Set()); setPage(0); },
@@ -191,7 +199,9 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
             panel={<>
               <Field label="Location" wide><LocPicker f={f} cities={cities} clusters={clusterList()} props={propList()} change={change} /></Field>
               <Field label="Role"><div className="checks">{ROLES.map((r) => <label key={r} title={RNAME[r]}><input type="checkbox" checked={f.role.includes(r)} onChange={(e) => change({ role: e.target.checked ? [...f.role, r] : f.role.filter((x) => x !== r) })} />{r}</label>)}</div></Field>
-              <Field label="Assignee"><select value="" onChange={(e) => e.target.value && change({ asg: [...f.asg, e.target.value] })}><option value="">{f.asg.length ? `${f.asg.length} picked · add another` : "Anyone"}</option>{people.filter((p) => !f.asg.includes(p)).map((p) => <option key={p}>{p}</option>)}</select></Field>
+              <Field label="Assignee"><SearchPick multi onChange={(v) => change({ asg: [...f.asg, v] })} placeholder={f.asg.length ? `${f.asg.length} picked · add another` : "Type a name"} options={people.filter((p) => !f.asg.includes(p)).map((v) => ({ v }))} /></Field>
+              <Field label="CBM"><SearchPick multi onChange={(v) => change({ cbm: [...(f.cbm ?? []), v] })} placeholder={f.cbm?.length ? `${f.cbm.length} picked · add another` : "Type a CBM name"} options={cbmList.filter((p) => !f.cbm?.includes(p)).map((v) => ({ v }))} /></Field>
+              <Field label="Reviewer or auditor"><SearchPick multi onChange={(v) => change({ rv: [...(f.rv ?? []), v] })} placeholder={f.rv?.length ? `${f.rv.length} picked · add another` : "Type a name"} options={central.filter((p) => !f.rv?.includes(p)).map((v) => ({ v }))} /></Field>
               <Field label="Next step"><label className="switch"><input type="checkbox" checked={f.mine} onChange={(e) => change({ mine: e.target.checked })} /> Waiting on me</label></Field>
             </>} />
 

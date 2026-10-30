@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ActiveChip, DateRow, Field, FilterBar, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
+import { ActiveChip, DateRow, Field, FilterBar, SearchPick, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
 
 export type MyTask = { id: number; task: string; crit: boolean; property: string; category: string; win: string; date: string; dateLabel: string;
   status: string; label: string; pill: string; due: string; dueAt: number; warn: boolean; cta: string | null };
@@ -62,7 +62,7 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
           onCustom={(f, t) => { setPage(0); go(tab, `&range=custom&from=${f}&to=${t}`); }} />}
         saved={{ page: "tasks", views, current, apply, notify: setToast, name: [prop, cat, crit ? "Critical" : ""].filter(Boolean).join(" · ") || "My filters", note: "Dates are not saved. My Tasks always opens on today." }}
         panel={<>
-          {props.length > 1 && <Field label="Property"><select value={prop} onChange={(e) => { setProp(e.target.value); setPage(0); }}><option value="">All properties</option>{props.map((p) => <option key={p}>{p}</option>)}</select></Field>}
+          {props.length > 1 && <Field label="Property"><SearchPick value={prop} onChange={(v) => { setProp(v); setPage(0); }} allLabel="All properties" placeholder="Type a property name" options={props.map((v) => ({ v }))} /></Field>}
           <Field label="Task type"><select value={cat} onChange={(e) => { setCat(e.target.value); setPage(0); }}><option value="">All types</option>{cats.map((c) => <option key={c}>{c}</option>)}</select></Field>
           <Field label="Priority"><label className="switch"><input type="checkbox" checked={crit} onChange={(e) => { setCrit(e.target.checked); setPage(0); }} />Critical only</label></Field>
         </>} />

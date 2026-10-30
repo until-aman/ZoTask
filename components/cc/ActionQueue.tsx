@@ -6,7 +6,7 @@ import type { Issue, T } from "@/lib/command";
 import { acknowledgeIssues, remindTasks } from "@/app/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/statuses";
 import { InfoTip, dur, useDrill, CopyModal } from "./parts";
-import { ActiveChip, Field, FilterBar, Pager, SortState, clampPage, usePageSize, Stats, nextSort, sortRows } from "@/components/ui/Filters";
+import { ActiveChip, Field, FilterBar, SearchPick, Pager, SortState, clampPage, usePageSize, Stats, nextSort, sortRows } from "@/components/ui/Filters";
 
 const CATS: [Issue["cat"] | "all", string][] = [["all", "All"], ["critical", "Critical"], ["ground", "Ground team overdue"], ["review", "Review SLA breaches"], ["repeat", "Repeated rejections"], ["exception", "Exceptions"]];
 const SEVC: Record<string, string> = { Critical: "r", High: "r", Medium: "a", Low: "" };
@@ -37,7 +37,7 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
   const pg = clampPage(page, sorted.length, size);
   const view = sorted.slice(pg * size, pg * size + size);
   const chips: ActiveChip[] = [
-    ...(owner ? [{ key: "owner", label: <>Owner: <b>{owner}</b></>, clear: () => setOwner("") }] : []),
+    ...(owner ? [{ key: "owner", label: <>Responsible: <b>{owner}</b></>, clear: () => setOwner("") }] : []),
     ...(sev ? [{ key: "sev", label: <>Severity: <b>{sev}</b></>, clear: () => setSev("") }] : []),
     ...(hideAck ? [{ key: "ack", label: <>Hiding acknowledged</>, clear: () => setHideAck(false) }] : []),
   ];
@@ -79,7 +79,7 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
       <FilterBar search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search task, property, person" chips={chips}
         onClearAll={() => { setOwner(""); setSev(""); setHideAck(false); }}
         panel={<>
-          <Field label="Owner"><select value={owner} onChange={(e) => { setOwner(e.target.value); setPage(0); }}><option value="">All owners</option>{owners.includes(me) && <option value={me}>Me ({me})</option>}{owners.filter((o) => o !== me).map((o) => <option key={o}>{o}</option>)}</select></Field>
+          <Field label="Responsible"><SearchPick value={owner} onChange={(v) => { setOwner(v); setPage(0); }} allLabel="Anyone" placeholder="Type a name" options={[...(owners.includes(me) ? [{ v: me, label: `Me (${me})` }] : []), ...owners.filter((o) => o !== me).map((v) => ({ v }))]} /></Field>
           <Field label="Severity"><select value={sev} onChange={(e) => { setSev(e.target.value); setPage(0); }}><option value="">All severities</option>{["Critical", "High", "Medium", "Low"].map((x) => <option key={x}>{x}</option>)}</select></Field>
           <Field label="Acknowledged"><label className="switch"><input type="checkbox" checked={hideAck} onChange={(e) => { setHideAck(e.target.checked); setPage(0); }} />Hide acknowledged</label></Field>
         </>} />

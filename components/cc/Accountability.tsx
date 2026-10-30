@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { CC, Issue } from "@/lib/command";
 import { InfoTip, N, Sec, Spark, Table, dur, fmtP, rag } from "./parts";
-import { Field, FilterBar } from "@/components/ui/Filters";
+import { Field, FilterBar, SearchPick } from "@/components/ui/Filters";
 
 type Prop = CC["properties"][number];
 const W0 = { late: 30, missed: 25, repeat: 15, sla: 15, critical: 15 };
@@ -30,7 +30,7 @@ export function Properties({ d, cbm, setCbm, issues }: { d: CC; cbm: string; set
             onClearAll={() => { setLvl(""); setCbm(""); }}
             panel={<>
               <Field label="Risk level"><select value={lvl} onChange={(e) => setLvl(e.target.value)}><option value="">All risk levels</option><option>High</option><option>Medium</option><option>Low</option></select></Field>
-              <Field label="CBM"><select value={cbm} onChange={(e) => setCbm(e.target.value)}><option value="">All CBMs</option>{[...new Set(d.properties.map((p) => p.cbm).filter(Boolean))].sort().map((c) => <option key={c}>{c}</option>)}</select></Field>
+              <Field label="CBM"><SearchPick value={cbm} onChange={setCbm} allLabel="All CBMs" placeholder="Type a CBM name" options={[...new Set(d.properties.map((p) => p.cbm).filter(Boolean))].sort().map((v) => ({ v }))} /></Field>
             </>} />
           <span className="pickwrap">
             <button type="button" className="btn sm" onClick={() => setEditW(!editW)} aria-expanded={editW}>Risk weights</button>

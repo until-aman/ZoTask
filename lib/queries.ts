@@ -33,9 +33,9 @@ export async function rows(where: string, ...params: unknown[]): Promise<Row[]> 
 }
 
 export async function geo() {
-  return await all<{ city: string; cluster: string; property: string; id: number }>(
-    `SELECT c.name city, cl.name cluster, p.name property, p.id FROM properties p
-     JOIN clusters cl ON cl.id=p.cluster_id JOIN cities c ON c.id=cl.city_id ORDER BY c.name, cl.name, p.name`);
+  return await all<{ city: string; cluster: string; property: string; id: number; cbmId: number | null; cbm: string }>(
+    `SELECT c.name city, cl.name cluster, p.name property, p.id, p.cbm_id cbmId, COALESCE(u.name, '') cbm FROM properties p
+     JOIN clusters cl ON cl.id=p.cluster_id JOIN cities c ON c.id=cl.city_id LEFT JOIN users u ON u.id=p.cbm_id ORDER BY c.name, cl.name, p.name`);
 }
 
 export async function eventsFor(instanceId: number) {
