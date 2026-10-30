@@ -119,13 +119,18 @@ function SavedViews({ page, views, current, apply, name = "", note, notify }: Sa
           )}
         </span>
       )}
-      {saving && <SaveModal page={page} current={current} name={name} note={note} close={() => setSaving(false)} done={(m) => { setSaving(false); say(m); router.refresh(); }} />}
+      {saving && <SaveModal page={page} current={current} name={name} note={note} taken={views.map((v) => v.name)} close={() => setSaving(false)} done={(m) => { setSaving(false); say(m); router.refresh(); }} />}
     </div>
   );
 }
 
-function SaveModal({ page, current, name: suggested, note, close, done }: { page: string; current: object; name: string; note?: string; close: () => void; done: (msg: string) => void }) {
-  const [name, setName] = useState(suggested);
+function SaveModal({ page, current, name: suggested, note, taken, close, done }: { page: string; current: object; name: string; note?: string; taken: string[]; close: () => void; done: (msg: string) => void }) {
+  const key = (n: string) => n.trim().replace(/\s+/g, " ").toLowerCase();
+  const used = new Set(taken.map(key));
+  // Suggest a free name: "Bangalore", then "Bangalore 2", "Bangalore 3"...
+  const free = (n: string) => { if (!used.has(key(n))) return n; let i = 2; while (used.has(key(`${n} ${i}`))) i++; return `${n} ${i}`; };
+  const [name, setName] = useState(() => free(suggested || "My filters"));
+  const dup = used.has(key(name));
   const [def, setDef] = useState(false);
   const [err, setErr] = useState("");
   return (
@@ -133,11 +138,12 @@ function SaveModal({ page, current, name: suggested, note, close, done }: { page
       <div className="mcard" role="dialog" aria-label="Save filters">
         <h2>Save these filters</h2>
         {note && <div className="info" style={{ background: "var(--bg)", borderRadius: 8, padding: "8px 10px" }}>{note}</div>}
-        <label className="f">Name<input type="text" value={name} onChange={(e) => setName(e.target.value)} autoFocus maxLength={60} /></label>
+        <label className="f">Name<input type="text" value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} autoFocus maxLength={60} aria-invalid={dup} /></label>
+        {dup && <p className="err">You already have saved filters with this name. Pick another name.</p>}
         <label className="row2" style={{ fontWeight: 600 }}><input type="checkbox" checked={def} onChange={(e) => setDef(e.target.checked)} /> Open this page with these filters</label>
         {err && <p className="err">{err}</p>}
         <div className="row2"><span className="spacer" /><button type="button" className="btn" onClick={close}>Cancel</button>
-          <button type="button" className="btn primary" disabled={!name.trim()} onClick={async () => { const r = await saveView(page, name.trim(), current, def); if (r.ok) done(r.msg ?? "Saved"); else setErr(r.error); }}>Save</button></div>
+          <button type="button" className="btn primary" disabled={!name.trim() || dup} onClick={async () => { const r = await saveView(page, name.trim().replace(/\s+/g, " "), current, def); if (r.ok) done(r.msg ?? "Saved"); else setErr(r.error); }}>Save</button></div>
       </div>
     </div>
   );

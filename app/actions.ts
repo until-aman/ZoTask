@@ -109,8 +109,12 @@ export type ViewFilters = { city: string[]; cluster: string[]; prop: string[]; r
 export async function saveView(page: string, name: string, filters: object, isDefault: boolean): Promise<Result & { id?: number }> {
   const u = await requireUser();
   let id = 0;
+  name = name.trim() || "My filters";
   const r = await guard(async () => {
     await tx(async () => {
+      // Names are unique per person and page, ignoring case and extra spaces.
+      if (await one("SELECT id FROM saved_views WHERE user_id=? AND page=? AND lower(trim(name))=lower(?)", u.id, page, name))
+        throw new Error(`You already have saved filters called “${name}”. Pick another name.`);
       if (isDefault) await run("UPDATE saved_views SET is_default=0 WHERE user_id=? AND page=?", u.id, page);
       id = (await run("INSERT INTO saved_views (user_id, page, name, filters, is_default) VALUES (?,?,?,?,?)", u.id, page, name || "My filters", JSON.stringify(filters), isDefault ? 1 : 0)).lastInsertRowid;
     });
