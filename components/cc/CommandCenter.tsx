@@ -14,7 +14,7 @@ import { Cbms, Housekeeping, Properties, Reviewers } from "./Accountability";
 const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from) : `${nice(r.from)} – ${nice(r.to)}`);
 
-function Health({ d }: { d: CC }) {
+function Health({ d, part }: { d: CC; part: "top" | "rest" }) {
   const g = d.ground, v = d.review, o = d.outcome;
   const { open } = useDrill();
   const parts: [string, typeof o.done, string, string][] = [["Approved and closed", o.done, "var(--green)", "Approved, and audit done or not needed"],
@@ -26,7 +26,7 @@ function Health({ d }: { d: CC }) {
   const count = (k: typeof g.missed) => ({ ...k, prev: undefined });
   return (
     <div className="grid hbands">
-      <section className="card score sumband">
+      {part === "top" ? <section className="card score sumband">
         <h3>Task completion</h3>
         <div className="kpis k4">
           <Tile label="Total tasks" rate={false} k={g.assigned} unitNote="Scheduled in the period" target="In the period"
@@ -38,7 +38,7 @@ function Health({ d }: { d: CC }) {
           <Tile label="Missed" rate={false} goodUp={false} k={count(g.missed)} unitNote="Never submitted" target={g.missed.rate !== null && g.missed.rate !== undefined ? `${g.missed.rate}% of ${g.due.n} past deadline` : undefined}
             def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} />
         </div>
-      </section>
+      </section> : <>
       <section className="card score">
         <h3>Ground team</h3>
         <div className="kpis k3">
@@ -85,6 +85,7 @@ function Health({ d }: { d: CC }) {
             <DefTip label={l} def={{ means: m, calc: `${l} ÷ tasks past deadline` }} k={k} rate /></span>
         ))}</div>
       </section>
+      </>}
     </div>
   );
 }
@@ -128,9 +129,10 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
           <span className="spacer" />
           {d.issues.length > 0 && <a href="#actions" className={`alertpill ${crit ? "r" : "a"}`}>{crit ? `${crit} critical · ` : ""}{d.issues.length} need action</a>}
         </div>
-        <Health d={d} />
+        <Health d={d} part="top" />
         <DashFilters geo={d.geo} cats={d.cats} init={{ range: d.preset, ...d.filters }} range={d.R} mine={d.role === "reviewer" ? d.mine : undefined} reviewers={d.reviewerOpts}
           views={views} bare={bare} notify={setToast} />
+        <Health d={d} part="rest" />
 
         <h2 className="band">Action required</h2>
         <ActionQueue issues={d.issues} now={d.now} me={d.userName} canEscalate={d.canEscalate} toast={setToast}

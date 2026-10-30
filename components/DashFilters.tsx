@@ -63,7 +63,7 @@ export default function DashFilters({ geo, init, range, cats = [], mine, reviewe
   const summary = [init.prop || init.cluster || init.city || "All properties", init.cat, cbmName, rvName].filter(Boolean).join(" · ");
 
   return (
-    <FilterBar chips={chips} onClearAll={() => go(Object.fromEntries(Object.entries(applied).filter(([x]) => ["range", "from", "to"].includes(x))))}
+    <FilterBar datesRight chips={chips} onClearAll={() => go(Object.fromEntries(Object.entries(applied).filter(([x]) => ["range", "from", "to"].includes(x))))}
       saved={{ page: "dashboard", views, current: applied, apply: (f) => go(f as P), name: summary, notify,
         note: init.range === "custom" ? "Custom dates are saved as they are. Other date ranges move with today." : "The date range moves with today." }}
       foot={(close) => <button type="button" className="btn primary sm" onClick={() => { apply(); close(); }}>Apply filters</button>}
