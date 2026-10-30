@@ -163,18 +163,16 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
           </div>
           <nav className="qtabs" aria-label="Queue navigation">
             {GROUPS.map((gr) => (
-              <div key={gr.n} className="qgrp" role="group" aria-label={gr.n}>
-                <span className="qgrp-l">{gr.n}</span>
-                <div className="qgrp-b">{gr.tabs.map(([k, label]) => {
+              <div key={gr.n} className="qgrp" role="group" aria-label={gr.n} title={gr.n}>
+                {gr.tabs.map(([k, label]) => {
                   const l = tasksFor(k); const hot = l.filter(over).length;
                   return (
-                    <button key={k} type="button" className="si" aria-current={tab === k} onClick={() => { setTab(k); setBk("all"); setSel(new Set()); setPage(0); }}>
-                      <span className="dot" style={{ background: gr.c }} />{label}
-                      <span className="cnt">{l.length}</span>
-                      {hot ? <span className="hot" title="Over SLA">{hot}</span> : null}
+                    <button key={k} type="button" className="qt" aria-current={tab === k} onClick={() => { setTab(k); setBk("all"); setSel(new Set()); setPage(0); }}
+                      title={hot ? `${gr.n} · ${hot} over SLA` : gr.n}>
+                      {label}<span className={`qn${hot ? " hot" : ""}`}>{l.length}</span>
                     </button>
                   );
-                })}</div>
+                })}
               </div>
             ))}
           </nav>
