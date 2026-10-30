@@ -116,7 +116,6 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
   const issueOf = (id: number) => d.issues.find((i) => i.id === id);
   const scope = [d.filters.prop || d.filters.cluster || d.filters.city || "All properties", d.filters.cat, d.filters.rv ? `reviewer ${d.reviewerOpts.find((r) => String(r.id) === d.filters.rv)?.name ?? ""}` : "", d.mine ? "my portfolio" : ""].filter(Boolean).join(" · ");
   const pickCbm = (name: string) => { setCbm(name); document.getElementById("properties")?.scrollIntoView({ behavior: "smooth" }); };
-  const crit = d.issues.filter((i) => i.sev === "Critical").length;
 
   return (
     <DrillCtx.Provider value={ctx}>
@@ -126,8 +125,6 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
             <h1>Operations command center</h1>
             <p className="muted" style={{ margin: "2px 0 0" }}>{span(d.R)} vs {span(d.P)} · {d.propCount} properties{d.mine ? " · my portfolio" : ""}{d.filters.rv ? ` · reviewer: ${d.reviewerOpts.find((r) => String(r.id) === d.filters.rv)?.name ?? ""}` : ""} · data as of {new Date(d.now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</p>
           </div>
-          <span className="spacer" />
-          {d.issues.length > 0 && <a href="#actions" className={`alertpill ${crit ? "r" : "a"}`}>{crit ? `${crit} critical · ` : ""}{d.issues.length} need action</a>}
         </div>
         <DashFilters geo={d.geo} cats={d.cats} init={{ range: d.preset, ...d.filters }} range={d.R} mine={d.role === "reviewer" ? d.mine : undefined} reviewers={d.reviewerOpts}
           views={views} bare={bare} notify={setToast} />
