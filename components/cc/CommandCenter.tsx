@@ -129,9 +129,9 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
           <span className="spacer" />
           {d.issues.length > 0 && <a href="#actions" className={`alertpill ${crit ? "r" : "a"}`}>{crit ? `${crit} critical · ` : ""}{d.issues.length} need action</a>}
         </div>
-        <Health d={d} part="top" />
         <DashFilters geo={d.geo} cats={d.cats} init={{ range: d.preset, ...d.filters }} range={d.R} mine={d.role === "reviewer" ? d.mine : undefined} reviewers={d.reviewerOpts}
           views={views} bare={bare} notify={setToast} />
+        <Health d={d} part="top" />
         <Health d={d} part="rest" />
 
         <h2 className="band">Action required</h2>
