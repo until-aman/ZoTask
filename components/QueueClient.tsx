@@ -15,9 +15,9 @@ type Geo = { city: string; cluster: string; property: string; id: number };
 type Ev = { id: number; at: number; type: string; detail: string; actor: string | null };
 
 const GROUPS = [
-  { n: "Waiting on reviewer or auditor", tabs: [["review", "To Review"], ["resub", "Resubmitted"], ["audit", "To Audit"], ["flagans", "Flag Answers"]], open: true, c: "var(--blue)" },
-  { n: "Waiting on ground team or CBM", tabs: [["changes", "Changes Required"], ["notsub", "Not Submitted"], ["auditflag", "Audit Flags"]], open: true, ground: true, c: "var(--amber)" },
-  { n: "Closed", tabs: [["done", "Done"], ["missed", "Missed"], ["notrect", "Not rectified"], ["waived", "Waived"]], open: false, c: "var(--faint)" },
+  { n: "Waiting on reviewer or auditor", short: "With reviewers", tabs: [["review", "To Review"], ["resub", "Resubmitted"], ["audit", "To Audit"], ["flagans", "Flag Answers"]], open: true, c: "var(--blue)" },
+  { n: "Waiting on ground team or CBM", short: "With ground team", tabs: [["changes", "Changes Required"], ["notsub", "Not Submitted"], ["auditflag", "Audit Flags"]], open: true, ground: true, c: "var(--amber)" },
+  { n: "Closed", short: "Closed", tabs: [["done", "Done"], ["missed", "Missed"], ["notrect", "Not rectified"], ["waived", "Waived"]], open: false, c: "var(--faint)" },
 ] as const;
 const grpOf = (k: string) => GROUPS.find((g) => g.tabs.some((t) => t[0] === k))!;
 const tabName = (k: string) => grpOf(k).tabs.find((t) => t[0] === k)![1];
@@ -163,16 +163,17 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
           </div>
           <nav className="qtabs" aria-label="Queue navigation">
             {GROUPS.map((gr) => (
-              <div key={gr.n} className="qgrp" role="group" aria-label={gr.n} title={gr.n}>
-                {gr.tabs.map(([k, label]) => {
+              <div key={gr.n} className="qgrp" role="group" aria-label={gr.n} style={{ "--gc": gr.c } as React.CSSProperties}>
+                <span className="qgrp-l" title={gr.n}>{gr.short}</span>
+                <div className="qgrp-b">{gr.tabs.map(([k, label]) => {
                   const l = tasksFor(k); const hot = l.filter(over).length;
                   return (
-                    <button key={k} type="button" className="qt" aria-current={tab === k} onClick={() => { setTab(k); setBk("all"); setSel(new Set()); setPage(0); }}
-                      title={hot ? `${gr.n} · ${hot} over SLA` : gr.n}>
-                      {label}<span className={`qn${hot ? " hot" : ""}`}>{l.length}</span>
+                    <button key={k} type="button" className={`qpill${hot ? " hot" : ""}`} aria-current={tab === k} onClick={() => { setTab(k); setBk("all"); setSel(new Set()); setPage(0); }}
+                      title={hot ? `${hot} over SLA` : undefined}>
+                      {label}<span className="qn">{l.length}</span>
                     </button>
                   );
-                })}
+                })}</div>
               </div>
             ))}
           </nav>
