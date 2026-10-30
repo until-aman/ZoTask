@@ -35,10 +35,12 @@ export type Saved = {
   name?: string; note?: string; notify?: (msg: string) => void;
 };
 
-export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [], panel, foot, onClearAll, saved, right, dates }: {
+export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [], panel, foot, onClearAll, saved, right, dates, datesRight }: {
   search?: string; setSearch?: (q: string) => void; searchLabel?: string; chips?: ActiveChip[];
   /** Date quick filters, shown on their own row under the search. */
   dates?: ReactNode;
+  /** Put the dates at the right end of the search row, with a wide search box. */
+  datesRight?: boolean;
   /** The filters, shown when the Filters button is pressed. */
   panel: ReactNode;
   /** Footer of the filters panel; defaults to a Done button. Gets close() to call after applying. */
@@ -51,7 +53,7 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
   return (
     <section className="fbar2" aria-label="Search and filters">
       <div className="fbrow">
-        {setSearch && <input type="search" className="search" placeholder={searchLabel} value={search ?? ""} onChange={(e) => setSearch(e.target.value)} aria-label={searchLabel} />}
+        {setSearch && <input type="search" className={`search${datesRight ? " grow" : ""}`} placeholder={searchLabel} value={search ?? ""} onChange={(e) => setSearch(e.target.value)} aria-label={searchLabel} />}
         <span className="fwrap" ref={ref}>
           <button type="button" className={`filtbtn${chips.length ? " set" : ""}`} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12M4.5 8h7M7 12.5h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" /></svg>
@@ -69,8 +71,9 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
         </span>
         {saved && <SavedViews {...saved} />}
         {right && <><span className="spacer" />{right}</>}
+        {datesRight && dates && <span className="fdates">{dates}</span>}
       </div>
-      {dates}
+      {!datesRight && dates}
       {chips.length > 0 && (
         <div className="chips">
           {chips.map((c) => <span key={c.key} className="chip">{c.label}<button type="button" aria-label="Remove filter" onClick={c.clear}>×</button></span>)}
@@ -142,9 +145,9 @@ function SaveModal({ page, current, name: suggested, note, close, done }: { page
 
 /** Headline counts above a list. A card with onClick works as a quick filter. */
 export type Stat = { key: string; label: string; value: ReactNode; sub?: ReactNode; tone?: "r" | "a" | "g"; active?: boolean; onClick?: () => void; tip?: ReactNode };
-export function Stats({ items }: { items: Stat[] }) {
+export function Stats({ items, compact }: { items: Stat[]; compact?: boolean }) {
   return (
-    <div className="stats">
+    <div className={`stats${compact ? " sm" : ""}`}>
       {items.map((s) => {
         const body = <><span className="stat-h"><b className={s.tone ? `t-${s.tone}` : ""}>{s.value}</b><span className="stat-l">{s.label}{s.tip}</span></span>{s.sub !== undefined && <span className="stat-s">{s.sub}</span>}</>;
         return s.onClick

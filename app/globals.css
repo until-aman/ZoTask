@@ -506,3 +506,14 @@ select{max-width:100%}
 .spick-l li.hi{background:var(--bg)}
 .spick-l li.on{color:var(--blue);font-weight:600}
 .spick-l li.none{color:var(--muted);cursor:default}
+
+/* ---------- Wide search with dates on the right; compact stats ---------- */
+.fbrow>.search.grow{flex:1 1 360px;max-width:none}
+.fdates{margin-left:auto;min-width:0;max-width:100%}
+.fdates .daterow .ff-l{display:none}
+.stats.sm{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.stats.sm .stat{padding:7px 12px;border-radius:10px;gap:0}
+.stats.sm .stat-h>b{font-size:17px}
+.stats.sm .stat-h>.stat-l{font-size:12.5px}
+.stats.sm .stat-s{font-size:11.5px}
+@media (max-width:760px){.fdates{margin-left:0;flex:1 1 100%}}

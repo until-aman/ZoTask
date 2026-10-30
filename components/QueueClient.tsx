@@ -178,19 +178,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
             ))}
           </nav>
 
-          <Stats items={g.open ? [
-            { key: "all", label: "Tasks", value: cnt.all, sub: oldest ? `oldest waiting ${fmtH(oldest)}` : "none waiting", active: bk === "all", onClick: () => { setBk("all"); setPage(0); } },
-            { key: "over", label: "Over SLA", value: cnt.over, tone: cnt.over ? "r" : undefined, sub: "past the time limit", active: bk === "over", onClick: () => { setBk("over"); setPage(0); } },
-            { key: "r", label: "Waiting 3+ days", value: cnt.r, tone: cnt.r ? "r" : undefined, active: bk === "r", onClick: () => { setBk("r"); setPage(0); } },
-            { key: "a", label: "Waiting 1–3 days", value: cnt.a, tone: cnt.a ? "a" : undefined, active: bk === "a", onClick: () => { setBk("a"); setPage(0); } },
-            { key: "g", label: "Under 1 day", value: cnt.g, active: bk === "g", onClick: () => { setBk("g"); setPage(0); } },
-          ] : [
-            { key: "all", label: "Tasks", value: cnt.all, sub: from === to ? nice(from) : `${nice(from)} – ${nice(to)}` },
-            { key: "crit", label: "Critical", value: all.filter((t) => t.crit).length, tone: all.some((t) => t.crit) ? "r" : undefined },
-            { key: "props", label: "Properties", value: new Set(all.map((t) => t.p)).size },
-          ]} />
-
-          <FilterBar search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search task, property or person" chips={chipList}
+          <FilterBar datesRight search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search task, property or person" chips={chipList}
             onClearAll={() => change(empty)}
             dates={<DateRow value={date} from={from} to={to} max={today} onPick={(k) => { setDate(k); setPage(0); }} onCustom={(a, b) => { setDateMode("custom"); setFrom(a); setTo(b); setPage(0); }} />}
             saved={{ page: "queue", views, current: f, apply: (v) => { setF({ ...empty, ...(v as Partial<ViewFilters>) }); setDate("today"); setSel(new Set()); setPage(0); },
@@ -203,6 +191,18 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               <Field label="Reviewer or auditor"><SearchPick multi onChange={(v) => change({ rv: [...(f.rv ?? []), v] })} placeholder={f.rv?.length ? `${f.rv.length} picked · add another` : "Type a name"} options={central.filter((p) => !f.rv?.includes(p)).map((v) => ({ v }))} /></Field>
               <Field label="Next step"><label className="switch"><input type="checkbox" checked={f.mine} onChange={(e) => change({ mine: e.target.checked })} /> Waiting on me</label></Field>
             </>} />
+
+          <Stats compact items={g.open ? [
+            { key: "all", label: "Tasks", value: cnt.all, sub: oldest ? `oldest waiting ${fmtH(oldest)}` : "none waiting", active: bk === "all", onClick: () => { setBk("all"); setPage(0); } },
+            { key: "over", label: "Over SLA", value: cnt.over, tone: cnt.over ? "r" : undefined, sub: "past the time limit", active: bk === "over", onClick: () => { setBk("over"); setPage(0); } },
+            { key: "r", label: "Waiting 3+ days", value: cnt.r, tone: cnt.r ? "r" : undefined, active: bk === "r", onClick: () => { setBk("r"); setPage(0); } },
+            { key: "a", label: "Waiting 1–3 days", value: cnt.a, tone: cnt.a ? "a" : undefined, active: bk === "a", onClick: () => { setBk("a"); setPage(0); } },
+            { key: "g", label: "Under 1 day", value: cnt.g, active: bk === "g", onClick: () => { setBk("g"); setPage(0); } },
+          ] : [
+            { key: "all", label: "Tasks", value: cnt.all, sub: from === to ? nice(from) : `${nice(from)} – ${nice(to)}` },
+            { key: "crit", label: "Critical", value: all.filter((t) => t.crit).length, tone: all.some((t) => t.crit) ? "r" : undefined },
+            { key: "props", label: "Properties", value: new Set(all.map((t) => t.p)).size },
+          ]} />
 
           <section className="listcard" aria-label="Tasks">
             {sel.size > 0 && (
