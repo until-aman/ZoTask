@@ -109,7 +109,10 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
 
   const scope = await scopeProps(u);
   const G = (await geo()).filter((g) => scope.includes(g.id));
-  const props = G.filter((g) => (!sp.city || g.city === sp.city) && (!sp.cluster || g.cluster === sp.cluster) && (!sp.prop || g.property === sp.prop) && (!sp.cbm || String(g.cbmId) === sp.cbm)).map((g) => g.id);
+  // Search matches properties by name, cluster, city or CBM; every word has to match.
+  const words = (sp.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  const hit = (g: (typeof G)[number]) => words.every((w) => [g.property, g.cluster, g.city, g.cbm ?? ""].some((x) => x.toLowerCase().includes(w)));
+  const props = G.filter((g) => (!sp.city || g.city === sp.city) && (!sp.cluster || g.cluster === sp.cluster) && (!sp.prop || g.property === sp.prop) && (!sp.cbm || String(g.cbmId) === sp.cbm) && hit(g)).map((g) => g.id);
   const keep = (r: { category: string; reviewer_id?: number | null; i_reviewer?: number | null }) =>
     (!sp.cat || r.category === sp.cat) && (rvId === null || (r.reviewer_id ?? r.i_reviewer) === rvId);
   const inProps = `IN (${props.join(",") || 0})`;
@@ -416,7 +419,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
 
   return {
     now, today, preset, R, P, mine, role: u.access_role, userName: u.name, canEscalate: ["admin", "reviewer", "auditor"].includes(u.access_role),
-    geo: G, cats, filters: { city: sp.city, cluster: sp.cluster, prop: sp.prop, cat: sp.cat, rv: sp.rv, cbm: sp.cbm }, reviewerOpts, propCount: props.length,
+    geo: G, cats, filters: { city: sp.city, cluster: sp.cluster, prop: sp.prop, cat: sp.cat, rv: sp.rv, cbm: sp.cbm, q: sp.q }, reviewerOpts, propCount: props.length,
     tasks: Object.fromEntries(tasks), ground: groundK, review: reviewK, outcome, issues, properties, cities: compare("city"), clusters: compare("cluster"),
     reviewers, cbms, lifecycle, reasons, reasonsTotal: uniq(fC.map((f) => f.instance_id)), reasonsPrevTotal: uniq(fP.map((f) => f.instance_id)).length,
     reviewedTotal: vC.reviewed.length, trend, recurring: varied.slice(0, 8), prevHasData: prev.length > 0 && P.from >= (span.length ? span.reduce((m, r) => (r.task_date < m ? r.task_date : m), span[0].task_date) : P.from), closedToday, tomorrow, staff,

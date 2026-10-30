@@ -10,7 +10,7 @@ const PRESETS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], 
 type P = Record<string, string>;
 
 export default function DashFilters({ geo, init, range, cats = [], mine, reviewers = [], views, bare, notify }: {
-  geo: Geo[]; init: { range: string; city?: string; cluster?: string; prop?: string; cat?: string; rv?: string; cbm?: string }; range: { from: string; to: string }; cats?: string[]; mine?: boolean;
+  geo: Geo[]; init: { range: string; q?: string; city?: string; cluster?: string; prop?: string; cat?: string; rv?: string; cbm?: string }; range: { from: string; to: string }; cats?: string[]; mine?: boolean;
   reviewers?: { id: number; name: string }[]; views: SavedView[]; bare: boolean; notify: (m: string) => void;
 }) {
   const router = useRouter();
@@ -21,22 +21,30 @@ export default function DashFilters({ geo, init, range, cats = [], mine, reviewe
   const [rv, setRv] = useState(init.rv ?? "");
   const [cbm, setCbm] = useState(init.cbm ?? "");
   const [my, setMy] = useState(mine ?? false);
+  const [q, setQ] = useState(init.q ?? "");
   // Keep the panel in step with the link (saved filters, chips and the back button all change it).
   useEffect(() => {
     setCity(init.city ?? ""); setCluster(init.cluster ?? ""); setProp(init.prop ?? ""); setCat(init.cat ?? ""); setRv(init.rv ?? ""); setCbm(init.cbm ?? ""); setMy(mine ?? false);
   }, [init.city, init.cluster, init.prop, init.cat, init.rv, init.cbm, mine]);
+  useEffect(() => { setQ(init.q ?? ""); }, [init.q]);
 
   // What is applied now, as URL parameters. Custom dates are kept; presets roll forward with today.
   const applied: P = Object.fromEntries(Object.entries({
     range: init.range === "7d" ? "" : init.range, ...(init.range === "custom" ? { from: range.from, to: range.to } : {}),
-    city: init.city, cluster: init.cluster, prop: init.prop, cat: init.cat, rv: init.rv, cbm: init.cbm, mine: mine === false ? "0" : "",
+    q: init.q, city: init.city, cluster: init.cluster, prop: init.prop, cat: init.cat, rv: init.rv, cbm: init.cbm, mine: mine === false ? "0" : "",
   }).filter(([, v]) => v)) as P;
   const go = (v: P) => router.push(`/dashboard?${new URLSearchParams(Object.entries(v).filter(([, x]) => x))}`);
   const dates = (k: string, from?: string, to?: string) => go({ ...Object.fromEntries(Object.entries(applied).filter(([x]) => !["range", "from", "to"].includes(x))),
     range: k === "7d" ? "" : k, ...(k === "custom" ? { from: from!, to: to! } : {}) });
   const apply = () => go({
-    ...Object.fromEntries(Object.entries(applied).filter(([x]) => ["range", "from", "to"].includes(x))), city, cluster, prop, cat, rv, cbm, mine: mine === undefined || my ? "" : "0",
+    ...Object.fromEntries(Object.entries(applied).filter(([x]) => ["range", "from", "to", "q"].includes(x))), city, cluster, prop, cat, rv, cbm, mine: mine === undefined || my ? "" : "0",
   });
+  // Search applies a moment after typing stops, so the page doesn't reload on every key.
+  useEffect(() => {
+    if (q.trim() === (init.q ?? "")) return;
+    const t = setTimeout(() => go({ ...applied, q: q.trim() }), 400);
+    return () => clearTimeout(t);
+  }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
   const drop = (keys: string[]) => go(Object.fromEntries(Object.entries(applied).filter(([k]) => !keys.includes(k))));
 
   // Opening the dashboard with no filters in the link uses the default saved filters, if any.
@@ -60,10 +68,11 @@ export default function DashFilters({ geo, init, range, cats = [], mine, reviewe
     ...(init.rv ? [{ key: "rv", label: <>Reviewer: <b>{rvName}</b></>, clear: () => drop(["rv"]) }] : []),
     ...(mine === false ? [{ key: "mine", label: <>All reviewers&apos; properties</>, clear: () => drop(["mine"]) }] : []),
   ];
-  const summary = [init.prop || init.cluster || init.city || "All properties", init.cat, cbmName, rvName].filter(Boolean).join(" · ");
+  const summary = [init.prop || init.cluster || init.city || (init.q ? "" : "All properties"), init.q && `"${init.q}"`, init.cat, cbmName, rvName].filter(Boolean).join(" · ");
 
   return (
-    <FilterBar datesRight chips={chips} onClearAll={() => go(Object.fromEntries(Object.entries(applied).filter(([x]) => ["range", "from", "to"].includes(x))))}
+    <FilterBar datesRight search={q} setSearch={setQ} searchLabel="Search property, cluster, city or CBM" chips={chips}
+      onClearAll={() => go(Object.fromEntries(Object.entries(applied).filter(([x]) => ["range", "from", "to", "q"].includes(x))))}
       saved={{ page: "dashboard", views, current: applied, apply: (f) => go(f as P), name: summary, notify,
         note: init.range === "custom" ? "Custom dates are saved as they are. Other date ranges move with today." : "The date range moves with today." }}
       foot={(close) => <button type="button" className="btn primary sm" onClick={() => { apply(); close(); }}>Apply filters</button>}
