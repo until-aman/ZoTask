@@ -23,7 +23,7 @@ function Health({ d }: { d: CC }) {
     ["Not rectified", o.notrect, "var(--purple)", "All attempts used without a pass"]];
   const due = g.due.n;
   return (
-    <div className="grid g2h">
+    <div className="grid hbands">
       <section className="card score">
         <h3>Ground team</h3>
         <div className="kpis k3">

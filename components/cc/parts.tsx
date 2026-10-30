@@ -59,8 +59,7 @@ export function Tile({ label, def, k, rate = true, goodUp = true, band, target, 
     <div className={`kpi ${k.ids.length ? "click" : ""}`} role="button" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.key === "Enter") act(); }} aria-label={`${label}: show tasks`}>
       {band && <span className={`rag ${r}`} title={RAG_LABEL[r]} />}
       <div className="kpi-h"><div className="v">{rate ? fmtP(v) : k.n}</div><div className="lab">{label}<DefTip label={label} def={def} k={k} rate={rate} target={target} /></div></div>
-      {rate && k.of !== undefined && <div className="sub mono">{k.n} of {k.of}</div>}
-      <div className="foot">{k.prev !== undefined ? <Delta cur={v} prev={k.prev} goodUp={goodUp} unit={rate ? "pts" : ""} /> : <span />}{target && <span className="tgt">{target}</span>}</div>
+      <div className="foot"><span className="kpi-m">{rate && k.of !== undefined && <span className="sub mono">{k.n} of {k.of}</span>}{k.prev !== undefined && <Delta cur={v} prev={k.prev} goodUp={goodUp} unit={rate ? "pts" : ""} />}</span>{target && <span className="tgt">{target}</span>}</div>
     </div>
   );
 }
