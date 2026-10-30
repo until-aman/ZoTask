@@ -54,7 +54,7 @@ export function ground(list: Row[], sentBack: Map<number, number>, passed: Set<n
   const ids = (xs: Row[]) => xs.map((r) => r.id);
   const decided = act.filter((r) => r.first_decision);
   const sets = {
-    assigned: ids(act), due: ids(due),
+    assigned: ids(act), due: ids(due), completed: ids(act.filter((r) => r.first_submitted_at)),
     onTime: ids(due.filter((r) => r.first_submitted_at && r.first_submitted_at <= r.window_end_at)),
     late: ids(due.filter((r) => r.first_submitted_at && r.first_submitted_at > r.window_end_at)),
     overdue: ids(due.filter((r) => r.status === "notsub")),
@@ -152,7 +152,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
   const reviewMissed = (list: Row[]) => list.filter((r) => REVIEW_ST.includes(r.status) && now - r.status_since > r.review_sla_h * HOUR).map((r) => r.id);
   const submittedIn = cur.filter((r) => r.first_submitted_at).map((r) => r.id);
   const groundK = {
-    assigned: k(gC.assigned, undefined, gP.assigned), due: k(gC.due, undefined, gP.due),
+    assigned: k(gC.assigned, undefined, gP.assigned), due: k(gC.due, undefined, gP.due), completed: k(gC.completed, gC.assigned, gP.completed, gP.assigned),
     onTime: k(gC.onTime, gC.due, gP.onTime, gP.due), late: k(gC.late, gC.due, gP.late, gP.due),
     overdue: k(gC.overdue, gC.due), missed: k(gC.missed, gC.due, gP.missed, gP.due),
     fta: k(gC.fta, gC.decided, gP.fta, gP.decided), returned: k(gC.returned, gC.decided, gP.returned, gP.decided),

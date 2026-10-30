@@ -22,8 +22,23 @@ function Health({ d }: { d: CC }) {
     ["Not submitted yet", o.notsub, "var(--amber)", "Past the deadline, grace period still running"], ["Missed", o.missed, "var(--red)", "Grace period ended with nothing submitted"],
     ["Not rectified", o.notrect, "var(--purple)", "All attempts used without a pass"]];
   const due = g.due.n;
+  // Counts only: the change arrow on these compares rates, so leave it off here.
+  const count = (k: typeof g.missed) => ({ ...k, prev: undefined });
   return (
     <div className="grid hbands">
+      <section className="card score sumband">
+        <h3>Task completion</h3>
+        <div className="kpis k4">
+          <Tile label="Total tasks" rate={false} k={g.assigned} unitNote="Scheduled in the period" target="In the period"
+            def={{ means: "All tasks scheduled in the period", note: "Cancelled tasks are left out." }} />
+          <Tile label="Completed" rate={false} k={count(g.completed)} unitNote="Submitted at least once" target={g.completed.rate !== null && g.completed.rate !== undefined ? `${g.completed.rate}% of total` : undefined}
+            def={{ means: "Tasks submitted at least once, on time or late", calc: "Submitted tasks ÷ total tasks", note: "Includes tasks still in review." }} />
+          <Tile label="Completed on time" rate={false} k={count(g.onTime)} unitNote="Submitted by the deadline" target={g.onTime.rate !== null && g.onTime.rate !== undefined ? `${g.onTime.rate}% of ${g.due.n} past deadline` : undefined}
+            def={{ means: "Tasks submitted by their deadline", calc: "On time ÷ tasks past deadline" }} />
+          <Tile label="Missed" rate={false} goodUp={false} k={count(g.missed)} unitNote="Never submitted" target={g.missed.rate !== null && g.missed.rate !== undefined ? `${g.missed.rate}% of ${g.due.n} past deadline` : undefined}
+            def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} />
+        </div>
+      </section>
       <section className="card score">
         <h3>Ground team</h3>
         <div className="kpis k3">

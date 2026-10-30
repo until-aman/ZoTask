@@ -534,3 +534,6 @@ select{max-width:100%}
 .hbands .mini>span:not(.tip){min-width:0;line-height:1.25}
 @media (min-width:1300px){.hbands .minis{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media (max-width:640px){.hbands .score .kpis.k3{grid-template-columns:minmax(0,1fr)}.hbands .minis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hbands .kpis.k4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.sumband .kpi .v{font-size:24px}
+@media (max-width:900px){.hbands .kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}}
