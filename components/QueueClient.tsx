@@ -147,32 +147,29 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
 
   return (
     <div className="page" style={{ paddingTop: 16 }}>
-      <div className="shell">
-        <aside className="side" aria-label="Queue navigation">
-          <div className="box">
-            {GROUPS.map((gr) => (
-              <div key={gr.n}>
-                <h3>{gr.n}</h3>
-                {gr.tabs.map(([k, label]) => {
-                  const l = tasksFor(k); const hot = l.filter(over).length;
-                  return (
-                    <button key={k} type="button" className="si" aria-current={tab === k} onClick={() => { setTab(k); setBk("all"); setSel(new Set()); }}>
-                      <span className="dot" style={{ background: gr.c }} />{label}
-                      {hot ? <span className="cnt"><span className="hot" title="Over SLA">{hot}</span></span> : null}
-                      <span className="cnt" style={hot ? { marginLeft: 4 } : undefined}>{l.length}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </aside>
-
+      <div>
         <main className="q">
           <div>
             <h1>{tabName(tab)}</h1>
             <p className="muted" style={{ margin: "2px 0 0" }}>{locText} · {from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}</p>
           </div>
+          <nav className="qtabs" aria-label="Queue navigation">
+            {GROUPS.map((gr) => (
+              <div key={gr.n} className="qgrp" role="group" aria-label={gr.n}>
+                <span className="qgrp-l">{gr.n}</span>
+                <div className="qgrp-b">{gr.tabs.map(([k, label]) => {
+                  const l = tasksFor(k); const hot = l.filter(over).length;
+                  return (
+                    <button key={k} type="button" className="si" aria-current={tab === k} onClick={() => { setTab(k); setBk("all"); setSel(new Set()); setPage(0); }}>
+                      <span className="dot" style={{ background: gr.c }} />{label}
+                      <span className="cnt">{l.length}</span>
+                      {hot ? <span className="hot" title="Over SLA">{hot}</span> : null}
+                    </button>
+                  );
+                })}</div>
+              </div>
+            ))}
+          </nav>
 
           <Stats items={g.open ? [
             { key: "all", label: "Tasks", value: cnt.all, sub: oldest ? `oldest waiting ${fmtH(oldest)}` : "none waiting", active: bk === "all", onClick: () => { setBk("all"); setPage(0); } },
