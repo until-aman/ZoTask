@@ -101,7 +101,17 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
           { key: "props", label: "Properties", value: props.length, sub: `${cities.length} cities` },
           { key: "people", label: "People", value: total, sub: people.map((p) => `${p.n} ${ROLE_NAME[p.access_role]?.toLowerCase() ?? p.access_role}`).join(" · ") },
         ]} />
-        <div className="row2 bulkbar">
+        {copying && <div className="card grid">
+          <div className="row2"><b>Add {sel.length} task{sel.length > 1 ? "s" : ""} to these properties</b><span className="spacer" />
+            <button type="button" className="link small" onClick={() => setCopying(props.map((p) => p.id))}>All</button><button type="button" className="link small" onClick={() => setCopying([])}>None</button></div>
+          <div className="grid g3" style={{ gap: 4 }}>
+            {cities2.map((c) => <div key={c}><b className="small">{c}</b>{props.filter((p) => p.city === c).map((p) => (
+              <label key={p.id} className="opt"><input type="checkbox" checked={copying.includes(p.id)} onChange={(e) => setCopying(e.target.checked ? [...copying, p.id] : copying.filter((x) => x !== p.id))} />{p.name}</label>))}</div>)}
+          </div>
+          <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={() => setCopying(null)}>Cancel</button>
+            <button type="button" className="btn primary sm" disabled={!copying.length} onClick={async () => { if (await bulk(copyTasksTo(sel, copying))) setCopying(null); }}>Add to {copying.length} propert{copying.length === 1 ? "y" : "ies"}</button></div>
+        </div>}
+        <Table name="Task setup" rows={tpl} cols={cols} rowKey={(t) => t.id} query={q} empty="No task types match these filters." toolbar={<span className="bulkbar">
           {sel.length ? <>
             <b>{sel.length} selected</b>
             <button type="button" className="btn sm" onClick={() => bulk(setTasksActive(sel, false))}>Pause</button>
@@ -113,20 +123,8 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
               : <button type="button" className="btn sm" style={{ color: "var(--red)" }} onClick={() => setDelAsk(true)}>Delete</button>}
             <button type="button" className="link small" onClick={() => setSel([])}>Clear</button>
           </> : <span className="small muted">Tick tasks to pause, resume, add them to more properties, or delete them.</span>}
-          <span className="spacer" />
           <button type="button" className="link small" onClick={() => setSel(tpl.map((t) => t.id))}>Select all {tpl.length}</button>
-        </div>
-        {copying && <div className="card grid">
-          <div className="row2"><b>Add {sel.length} task{sel.length > 1 ? "s" : ""} to these properties</b><span className="spacer" />
-            <button type="button" className="link small" onClick={() => setCopying(props.map((p) => p.id))}>All</button><button type="button" className="link small" onClick={() => setCopying([])}>None</button></div>
-          <div className="grid g3" style={{ gap: 4 }}>
-            {cities2.map((c) => <div key={c}><b className="small">{c}</b>{props.filter((p) => p.city === c).map((p) => (
-              <label key={p.id} className="opt"><input type="checkbox" checked={copying.includes(p.id)} onChange={(e) => setCopying(e.target.checked ? [...copying, p.id] : copying.filter((x) => x !== p.id))} />{p.name}</label>))}</div>)}
-          </div>
-          <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={() => setCopying(null)}>Cancel</button>
-            <button type="button" className="btn primary sm" disabled={!copying.length} onClick={async () => { if (await bulk(copyTasksTo(sel, copying))) setCopying(null); }}>Add to {copying.length} propert{copying.length === 1 ? "y" : "ies"}</button></div>
-        </div>}
-        <Table name="Task setup" rows={tpl} cols={cols} rowKey={(t) => t.id} query={q} empty="No task types match these filters." />
+        </span>} />
         {children}
       </>}
       {tab === "checklists" && <Checklists rows={lib.checklists} notify={setToast} />}

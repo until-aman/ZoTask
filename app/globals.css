@@ -595,7 +595,7 @@ select{max-width:100%}
 .admtabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
 .admtabs button{border:0;background:none;padding:8px 12px;font:inherit;font-weight:600;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer}
 .admtabs button.on{color:var(--fg);border-bottom-color:var(--blue)}
-.bulkbar{min-height:36px;padding:4px 0}
+.bulkbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
 .lib-list{display:grid;gap:0;padding:4px 14px}
 .lib-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line2)}
 .lib-row:last-child{border-bottom:0}
@@ -607,3 +607,7 @@ input.cnt{width:72px;text-align:right}
 .iconbtn.del:hover{color:var(--red);border-color:var(--red)}
 .btn.danger{background:var(--red);border-color:var(--red);color:#fff}
 .te-ask{padding:10px 12px;border-radius:10px;background:var(--blue-soft)}
+/* Table toolbar: search and buttons share one height and line. */
+.ttool{min-height:36px}
+.ttool .search,.ttool>.pickwrap>.btn,.ttool>.btn,.bulkbar .btn{height:36px;box-sizing:border-box}
+.ttool>.pickwrap>.btn,.ttool>.btn{padding:0 12px;font-size:13px}

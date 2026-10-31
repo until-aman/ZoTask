@@ -154,9 +154,9 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, 
           {expand && <th style={{ width: 28 }} />}
           {shown.map((c) => (
             <th key={c.key} className={c.num ? "n" : ""} aria-sort={sort?.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}>
-              <button type="button" className="sortbtn" onClick={() => { setSort(nextSort(sort, c.key)); setPage(0); }}>
+{c.label ?               <button type="button" className="sortbtn" onClick={() => { setSort(nextSort(sort, c.key)); setPage(0); }}>
                 {c.label}<span className="sorti">{sort?.key === c.key ? (sort.dir === 1 ? "▲" : "▼") : "↕"}</span>
-              </button>{c.tip}
+              </button> : null}{c.tip}
             </th>
           ))}
         </tr></thead>
