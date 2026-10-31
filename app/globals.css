@@ -508,7 +508,7 @@ select{max-width:100%}
 .spick-l li.none{color:var(--muted);cursor:default}
 
 /* ---------- Wide search with dates on the right; compact stats ---------- */
-.fbrow>.search.grow{flex:1 1 360px;max-width:none}
+.fbrow>.search.grow{flex:1 1 220px;max-width:none}
 .fdates{margin-left:auto;min-width:0;max-width:100%}
 .fdates .daterow .ff-l{display:none}
 .stats.sm{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}

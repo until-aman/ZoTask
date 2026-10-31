@@ -35,11 +35,11 @@ export type Saved = {
   name?: string; note?: string; notify?: (msg: string) => void;
 };
 
-export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [], panel, foot, onClearAll, saved, right, dates, datesRight }: {
+export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [], panel, foot, onClearAll, saved, right, dates }: {
   search?: string; setSearch?: (q: string) => void; searchLabel?: string; chips?: ActiveChip[];
-  /** Date quick filters, shown on their own row under the search. */
+  /** Date quick filters, at the right end of the search row. */
   dates?: ReactNode;
-  /** Put the dates at the right end of the search row, with a wide search box. */
+  /** Kept for older callers; the dates always sit at the right end now. */
   datesRight?: boolean;
   /** The filters, shown when the Filters button is pressed. */
   panel: ReactNode;
@@ -53,7 +53,7 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
   return (
     <section className="fbar2" aria-label="Search and filters">
       <div className="fbrow">
-        {setSearch && <input type="search" className={`search${datesRight ? " grow" : ""}`} placeholder={searchLabel} value={search ?? ""} onChange={(e) => setSearch(e.target.value)} aria-label={searchLabel} />}
+        {setSearch && <input type="search" className="search grow" placeholder={searchLabel} value={search ?? ""} onChange={(e) => setSearch(e.target.value)} aria-label={searchLabel} />}
         <span className="fwrap" ref={ref}>
           <button type="button" className={`filtbtn${chips.length ? " set" : ""}`} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h12M4.5 8h7M7 12.5h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" /></svg>
@@ -71,9 +71,8 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
         </span>
         {saved && <SavedViews {...saved} />}
         {right && <><span className="spacer" />{right}</>}
-        {datesRight && dates && <span className="fdates">{dates}</span>}
+        {dates && <span className="fdates">{dates}</span>}
       </div>
-      {!datesRight && dates}
       {chips.length > 0 && (
         <div className="chips">
           {chips.map((c) => <span key={c.key} className="chip">{c.label}<button type="button" aria-label="Remove filter" onClick={c.clear}>×</button></span>)}

@@ -50,12 +50,6 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
         <h1>My Tasks</h1>
         <p className="muted" style={{ margin: "2px 0 0" }}>{late ? <b style={{ color: "var(--red)" }}>{lists.overdue.length} overdue · {lists.changes.length} to fix{lists.flags.length ? ` · ${lists.flags.length} audit flags to answer` : ""}</b> : "Nothing overdue. Nice."}</p>
       </div>
-      <Stats items={TABS.map(([k, l]) => {
-        const n = lists[k].filter(keep).length;
-        return { key: k, label: l, value: n, active: tab === k, onClick: () => { setPage(0); go(k); },
-          tone: (k === "overdue" || k === "changes" || k === "flags") && n ? (k === "overdue" ? "r" as const : "a" as const) : undefined,
-          sub: k === "now" || k === "done" ? span : undefined };
-      })} />
       <FilterBar search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search tasks" chips={chips}
         onClearAll={() => apply({})}
         dates={<DateRow value={range} from={from} to={to} onPick={(k) => { setPage(0); go(tab, k === "today" ? "" : `&range=${k}`); }}
@@ -66,6 +60,12 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
           <Field label="Task type"><select value={cat} onChange={(e) => { setCat(e.target.value); setPage(0); }}><option value="">All types</option>{cats.map((c) => <option key={c}>{c}</option>)}</select></Field>
           <Field label="Priority"><label className="switch"><input type="checkbox" checked={crit} onChange={(e) => { setCrit(e.target.checked); setPage(0); }} />Critical only</label></Field>
         </>} />
+      <Stats compact items={TABS.map(([k, l]) => {
+        const n = lists[k].filter(keep).length;
+        return { key: k, label: l, value: n, active: tab === k, onClick: () => { setPage(0); go(k); },
+          tone: (k === "overdue" || k === "changes" || k === "flags") && n ? (k === "overdue" ? "r" as const : "a" as const) : undefined,
+          sub: k === "now" || k === "done" ? span : undefined };
+      })} />
       <section className="listcard" aria-label="Tasks">
         <div className="mthead">{sortHead("task", "Task")}{sortHead("prop", "Property")}{sortHead("due", "Due")}{sortHead("status", "Status")}</div>
         {!shown.length ? <div className="empty"><b>Nothing here</b>{chips.length || q ? "No tasks match these filters." : tab === "now" ? `No open tasks for ${span}.` : "You're all caught up."}</div>

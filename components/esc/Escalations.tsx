@@ -149,11 +149,11 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
       </div>
 
       {tab === "tracker" ? <>
-        <Stats items={([["open", "Open", "yet to start or in progress"], ["overdue", "Past expected closure", "still open"], ["soon", "Due in 2 days", "open, not late yet"], ["closed", "Closed or dropped", ""], ["all", "All", "every escalation"]] as [Quick, string, string][]).map(([k, l, sub]) => ({
+        {bar(false)}
+        <Stats compact items={([["open", "Open", "yet to start or in progress"], ["overdue", "Past expected closure", "still open"], ["soon", "Due in 2 days", "open, not late yet"], ["closed", "Closed or dropped", ""], ["all", "All", "every escalation"]] as [Quick, string, string][]).map(([k, l, sub]) => ({
           key: k, label: l, value: counts[k], sub: sub || undefined, tone: k === "overdue" && counts[k] ? "r" as const : k === "soon" && counts[k] ? "a" as const : undefined,
           active: !focus && quick === k, onClick: () => { setQuick(k); setFocus(null); },
         }))} />
-        {bar(false)}
         <Table name="Escalations" rows={list} cols={cols} rowKey={(r) => r.id} query={q} initialSort={{ key: quick === "closed" ? "updated" : "due", dir: quick === "closed" ? -1 : 1 }}
           search={(r) => `${r.ref} ${r.title} ${r.detail} ${r.owner} ${r.raisedBy} ${r.department} ${r.props.map((p) => `${p.name} ${p.cluster} ${p.city}`).join(" ")} ${r.mailSubject}`}
           empty={d.rows.length ? "No escalations match these filters." : "No escalations yet. Raise the first one."} />
@@ -218,6 +218,7 @@ function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; peri
 
   return (
     <>
+      {bar}
       <Stats items={[
         { key: "open", label: "Open now", value: <C l={openRows} label="Open now" />, sub: `${openRows.filter((r) => r.status === "open").length} not started yet` },
         { key: "over", label: "Past expected closure", value: <C l={overdue} label="Past expected closure" />, sub: `${pct(overdue.length, openRows.length)} of open`, tone: overdue.length ? "r" : undefined },
@@ -225,7 +226,6 @@ function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; peri
         { key: "closed", label: `Closed · ${pLabel}`, value: <C l={closed} label={`Closed in ${pLabel}`} />, sub: `${pct(onTime.length, closed.length)} by expected date` },
         { key: "med", label: "Usual time to close", value: fmtDays(closeDays(closed)), sub: "median", tip: <InfoTip title="Usual time to close" rows={[["Means", "Median time from raising to closing, for escalations closed in the period"]]} /> },
       ]} />
-      {bar}
 
       <div className="grid g2h">
         <Sec title="How long open ones have waited" tip={<InfoTip title="How long open ones have waited" rows={[["Counts", "Open escalations by days since they were raised"]]} />}>

@@ -61,12 +61,6 @@ export default function AdminClient({ templates, props, people, views, children 
   return (
     <div className="page">
       <div className="row2"><h1>Admin</h1><span className="spacer" /><Link className="btn primary" href="/admin/templates/new">+ New task</Link></div>
-      <Stats items={[
-        { key: "tasks", label: "Task types", value: templates.length, sub: `${templates.filter((t) => t.active).length} active · ${templates.filter((t) => !t.active).length} paused` },
-        { key: "crit", label: "Critical task types", value: templates.filter((t) => t.criticality === "high").length, active: state === "critical", onClick: () => setState(state === "critical" ? "" : "critical") },
-        { key: "props", label: "Properties", value: props.length, sub: `${cities.length} cities` },
-        { key: "people", label: "People", value: total, sub: people.map((p) => `${p.n} ${ROLE_NAME[p.access_role]?.toLowerCase() ?? p.access_role}`).join(" · ") },
-      ]} />
       <FilterBar search={q} setSearch={setQ} searchLabel="Search tasks, properties, people" chips={chips} onClearAll={() => apply({})}
         saved={{ page: "admin", views, current, apply, notify: setToast, name: [cat, role, city].filter(Boolean).join(" · ") || "Admin view" }}
         panel={<>
@@ -76,6 +70,12 @@ export default function AdminClient({ templates, props, people, views, children 
           <Field label="Show"><select value={state} onChange={(e) => setState(e.target.value)}><option value="">All task types</option><option value="active">Active only</option><option value="paused">Paused only</option><option value="critical">Critical only</option></select></Field>
           <Field label="Properties in"><select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>
         </>} />
+      <Stats compact items={[
+        { key: "tasks", label: "Task types", value: templates.length, sub: `${templates.filter((t) => t.active).length} active · ${templates.filter((t) => !t.active).length} paused` },
+        { key: "crit", label: "Critical task types", value: templates.filter((t) => t.criticality === "high").length, active: state === "critical", onClick: () => setState(state === "critical" ? "" : "critical") },
+        { key: "props", label: "Properties", value: props.length, sub: `${cities.length} cities` },
+        { key: "people", label: "People", value: total, sub: people.map((p) => `${p.n} ${ROLE_NAME[p.access_role]?.toLowerCase() ?? p.access_role}`).join(" · ") },
+      ]} />
       <section className="grid" style={{ gap: 8 }}>
         <h2 style={{ margin: 0 }}>Task setup</h2>
         <Table name="Task setup" rows={tpl} cols={cols} rowKey={(t) => t.id} query={q} empty="No task types match these filters." />

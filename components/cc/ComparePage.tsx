@@ -147,14 +147,6 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
           {ready && <button type="button" className="btn primary" onClick={() => setReport(buildReport())}>Generate report</button>}
         </div>
 
-        {ready && <Stats items={ranking.map((r) => ({
-          key: r.o.id, label: r.o.label,
-          value: `#${place.get(r.i)}`,
-          sub: <>avg position {r.avgPos === null ? "—" : <b>{r.avgPos.toFixed(1)}</b>} · best on <b className="t-g">{r.bestOn}</b>, worst on <b className={r.worstOn ? "t-r" : ""}>{r.worstOn}</b> of {r.scored}{r.tasks < MIN_TASKS ? <span className="t-a"> · few tasks</span> : null}</>,
-          tone: place.get(r.i) === 1 ? "g" as const : place.get(r.i) === ranking.length ? "r" as const : undefined,
-          tip: <InfoTip title="Overall ranking" rows={[["Rank", "Place by average position across the scored metrics"], ["Avg position", "1.0 means best on every metric"], ["Best on / worst on", "Metrics where it is first or last in this group"], ["Tasks", `${r.tasks} ${d.kind === "reviewer" ? "reviewed" : "due"} in the period`]]} />,
-        }))} />}
-
         <FilterBar
           chips={[
             ...P.map((o, i): ActiveChip => ({ key: o.id, label: <><span className="cmp-dot" style={{ background: COLORS[i] }} aria-hidden="true" />{o.label}</>, clear: () => go({ ids: ids.filter((x) => x !== o.id) }) })),
@@ -183,6 +175,14 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
               </div>
             </Field>
           </>} />
+
+        {ready && <Stats items={ranking.map((r) => ({
+          key: r.o.id, label: r.o.label,
+          value: `#${place.get(r.i)}`,
+          sub: <>avg position {r.avgPos === null ? "—" : <b>{r.avgPos.toFixed(1)}</b>} · best on <b className="t-g">{r.bestOn}</b>, worst on <b className={r.worstOn ? "t-r" : ""}>{r.worstOn}</b> of {r.scored}{r.tasks < MIN_TASKS ? <span className="t-a"> · few tasks</span> : null}</>,
+          tone: place.get(r.i) === 1 ? "g" as const : place.get(r.i) === ranking.length ? "r" as const : undefined,
+          tip: <InfoTip title="Overall ranking" rows={[["Rank", "Place by average position across the scored metrics"], ["Avg position", "1.0 means best on every metric"], ["Best on / worst on", "Metrics where it is first or last in this group"], ["Tasks", `${r.tasks} ${d.kind === "reviewer" ? "reviewed" : "due"} in the period`]]} />,
+        }))} />}
 
         {!ready ? <div className="card empty"><b>Pick at least two</b>{d.options.length < 2 ? `You need at least two ${lc(kindLabel)} you can see.` : `Add ${lc(kindLabel)} above to compare them.`}</div> : <>
           <Sec title="Side by side" tip={<InfoTip title="Side by side" rows={[["Counted", "Per task. A task counts once however many checks or reviews it had"], ["Green / red", "Best and worst in this group. Not scored means there is no right direction"], ["Spread", "Gap between the best and the worst"], ["Click", "Any number to see its tasks"]]} />}>
