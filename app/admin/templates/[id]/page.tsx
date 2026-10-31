@@ -5,7 +5,7 @@ import { can } from "@/lib/auth";
 import { all, one } from "@/lib/db";
 import { Template, itemsFor } from "@/lib/engine";
 import { geo } from "@/lib/queries";
-import TemplateEditor from "@/components/TemplateEditor";
+import TemplateEditor, { ChecklistPreset, SchedulePreset } from "@/components/TemplateEditor";
 
 export default async function EditTemplate({ params }: { params: Promise<{ id: string }> }) {
   const u = await boot();
@@ -16,13 +16,19 @@ export default async function EditTemplate({ params }: { params: Promise<{ id: s
   if (id && !t) redirect("/admin");
   const items = id ? (await itemsFor(id)).filter((i) => i.pos < 1000) : [];
   const selected = id ? (await all<{ property_id: number }>("SELECT property_id FROM template_properties WHERE template_id=?", id)).map((x) => x.property_id) : [];
-  const users = await all<{ id: number; name: string; access_role: string }>("SELECT id, name, access_role FROM users WHERE access_role IN ('reviewer','auditor') ORDER BY name");
+  const people = await all<{ id: number; name: string; access_role: string; op_role: string | null; props: string | null }>(
+    `SELECT u.id, u.name, u.access_role, u.op_role,
+      (SELECT group_concat(p.name, ', ') FROM user_properties up JOIN properties p ON p.id=up.property_id WHERE up.user_id=u.id) props
+     FROM users u ORDER BY u.name`);
+  const categories = (await all<{ name: string }>("SELECT name FROM task_categories WHERE archived=0 ORDER BY pos, id")).map((c) => c.name);
   return (
-    <div className="page narrow">
+    <div className="page">
       <Link href="/admin" className="small">‹ Admin</Link>
       <h1>{t ? `Edit “${t.name}”` : "New task"}</h1>
-      <TemplateEditor id={id} initial={t ?? null} initialItems={items} selected={selected} geo={await geo()}
-        reviewers={users.filter((x) => x.access_role === "reviewer")} auditors={users.filter((x) => x.access_role === "auditor")} />
+      <TemplateEditor id={id} initial={t ?? null} initialItems={items} selected={selected} geo={await geo()} people={people} categories={categories}
+        checklists={await all<ChecklistPreset>("SELECT * FROM checklist_presets ORDER BY title")}
+        schedules={await all<SchedulePreset>("SELECT * FROM schedule_presets ORDER BY name")}
+        reviewers={people.filter((x) => x.access_role === "reviewer")} auditors={people.filter((x) => x.access_role === "auditor")} />
     </div>
   );
 }

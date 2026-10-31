@@ -10,8 +10,14 @@ export type Template = {
   frequency: string; weekday: number | null; window_start: string; window_end: string;
   review_sla_h: number; audit_sla_h: number; attempts_allowed: number; late_window_days: number;
   criticality: string; audit_rate: number; geofence: number; reviewer_id: number | null; auditor_id: number | null; active: number;
+  description: string | null; events: string; days: string; once_date: string | null; start_stop: number; geofence_m: number;
+  ideal_minutes: number | null; review_required: number; assignees: string;
 };
-export type Item = { id: number; template_id: number; pos: number; label: string; kind: string; photo_required: number; note_required: number };
+export type Item = {
+  id: number; template_id: number; pos: number; label: string; kind: string; photo_required: number; note_required: number;
+  photo_allowed: number; note_allowed: number; count_of: string | null;
+};
+export const list = <T = number>(s: string | null | undefined): T[] => { try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
 export type Instance = {
   id: number; template_id: number; property_id: number; task_date: string; window_start_at: number; window_end_at: number;
   late_until_at: number; assignee_id: number | null; reviewer_id: number | null; auditor_id: number | null; status: string;
@@ -34,6 +40,11 @@ function hash(n: number) {
 }
 
 async function pickAssignee(t: Template, propertyId: number): Promise<number | null> {
+  const named = list(t.assignees);
+  if (named.length) {
+    const u = await one<{ user_id: number }>(`SELECT user_id FROM user_properties WHERE property_id=? AND user_id IN (${named.map(() => "?").join(",")}) ORDER BY user_id LIMIT 1`, propertyId, ...named);
+    if (u) return u.user_id;
+  }
   if (t.op_role === "CBM") return (await one<{ cbm_id: number }>("SELECT cbm_id FROM properties WHERE id=?", propertyId))?.cbm_id ?? null;
   const u = await one<{ id: number }>(
     `SELECT u.id FROM users u JOIN user_properties up ON up.user_id=u.id
@@ -44,9 +55,17 @@ async function pickAssignee(t: Template, propertyId: number): Promise<number | n
 function appliesOn(t: Template, date: string) {
   if (t.trigger !== "scheduled") return false;
   if (t.frequency === "daily") return true;
-  if (t.frequency === "weekly") return weekday(date) === (t.weekday ?? 1);
-  if (t.frequency === "monthly") return date.endsWith("-01");
+  if (t.frequency === "once") return date === t.once_date;
+  const days = list(t.days);
+  if (t.frequency === "weekly") return days.length ? days.includes(weekday(date)) : weekday(date) === (t.weekday ?? 1);
+  if (t.frequency === "monthly") return (days.length ? days : [1]).includes(Number(date.slice(8, 10)));
   return false;
+}
+
+/** A cluster's reviewer and auditor take tasks that don't name their own. */
+async function clusterDefault(propertyId: number) {
+  return (await one<{ reviewer_id: number | null; auditor_id: number | null }>(
+    "SELECT c.reviewer_id, c.auditor_id FROM properties p JOIN clusters c ON c.id=p.cluster_id WHERE p.id=?", propertyId)) ?? { reviewer_id: null, auditor_id: null };
 }
 
 export async function createInstance(t: Template, propertyId: number, date: string, source: string, now: number, assignee?: number | null): Promise<number | null> {
@@ -59,11 +78,13 @@ export async function createInstance(t: Template, propertyId: number, date: stri
     end = now + len;
   }
   const lateUntil = t.late_window_days === 0 ? atTime(isoDate(end), "23:59") : end + t.late_window_days * DAY;
+  const def = t.reviewer_id && t.auditor_id ? null : await clusterDefault(propertyId);
   const res = await run(
     `INSERT OR IGNORE INTO instances (template_id, property_id, task_date, window_start_at, window_end_at, late_until_at,
       assignee_id, reviewer_id, auditor_id, status, status_since, source)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-    t.id, propertyId, date, start, end, lateUntil, assignee !== undefined ? assignee : await pickAssignee(t, propertyId), t.reviewer_id, t.auditor_id,
+    t.id, propertyId, date, start, end, lateUntil, assignee !== undefined ? assignee : await pickAssignee(t, propertyId),
+    t.reviewer_id ?? def?.reviewer_id ?? null, t.auditor_id ?? def?.auditor_id ?? null,
     now >= start ? "current" : "upcoming", Math.min(now, start), source);
   if (!res.changes) return null;
   const id = Number(res.lastInsertRowid);
@@ -89,14 +110,18 @@ export async function generateInstances(from: string, to: string, now: number) {
   const cbm = new Map((await all<{ id: number; cbm_id: number | null }>("SELECT id, cbm_id FROM properties")).map((p) => [p.id, p.cbm_id]));
   const staff = await all<{ id: number; property_id: number; op_role: string }>(
     "SELECT u.id, up.property_id, u.op_role FROM users u JOIN user_properties up ON up.user_id=u.id ORDER BY u.id");
-  const who = (t: Template, p: number) => t.op_role === "CBM" ? cbm.get(p) ?? null : staff.find((s) => s.property_id === p && s.op_role === t.op_role)?.id ?? null;
+  const who = (t: Template, p: number) => {
+    const named = list(t.assignees);
+    const n = named.length ? staff.find((s) => s.property_id === p && named.includes(s.id)) : undefined;
+    return n ? n.id : t.op_role === "CBM" ? cbm.get(p) ?? null : staff.find((s) => s.property_id === p && s.op_role === t.op_role)?.id ?? null;
+  };
   await tx(async () => { for (const [t, p, d] of todo) await createInstance(t, p, d, "schedule", now, who(t, p)); });
 }
 
 export async function triggerEvent(templateId: number, propertyId: number, actorId: number, now: number) {
   const t = (await one<Template>("SELECT * FROM templates WHERE id=?", templateId))!;
   const id = await createInstance(t, propertyId, isoDate(now), `${t.trigger}:${now}`, now);
-  if (id) await logEvent(id, now, actorId, "triggered", t.event_name || "On demand");
+  if (id) await logEvent(id, now, actorId, "triggered", list<string>(t.events).join(", ") || t.event_name || "On demand");
   return id;
 }
 
@@ -156,8 +181,10 @@ export async function submit(instanceId: number, userId: number, answers: Answer
       await logEvent(instanceId, at, userId, "resubmitted", `Attempt ${attempt} of ${t.attempts_allowed}`);
     } else {
       const late = at > i.window_end_at;
-      await setStatus(instanceId, "review", at, ", attempt=?, first_submitted_at=?, last_submitted_at=?", attempt, at, at);
-      await logEvent(instanceId, at, userId, "submitted", late ? "Submitted late" : "Submitted on time");
+      // Tasks without review are done once submitted.
+      const next = t.review_required === 0 ? "done" : "review";
+      await setStatus(instanceId, next, at, `, attempt=?, first_submitted_at=?, last_submitted_at=?${next === "done" ? ", closed_at=?" : ""}`, attempt, at, at, ...(next === "done" ? [at] : []));
+      await logEvent(instanceId, at, userId, "submitted", (late ? "Submitted late" : "Submitted on time") + (next === "done" ? " · no review needed" : ""));
     }
     if (t.geofence && loc.ok === false) await logEvent(instanceId, at, userId, "location_warning", `Submitted ${loc.distance ?? "?"} m from property`);
     return sid;

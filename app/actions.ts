@@ -32,6 +32,17 @@ export async function submitTask(instanceId: number, answers: E.AnswerInput[], l
   });
 }
 
+export async function startTask(instanceId: number): Promise<Result> {
+  const u = await requireUser();
+  return guard(async () => {
+    const i = await one<{ assignee_id: number | null; status: string; cbm_id: number | null }>(
+      "SELECT i.assignee_id, i.status, p.cbm_id FROM instances i JOIN properties p ON p.id=i.property_id WHERE i.id=?", instanceId);
+    if (!i || (i.assignee_id !== u.id && i.cbm_id !== u.id)) throw new Error("Only the person doing this task can start it.");
+    if (!["current", "notsub"].includes(i.status)) throw new Error("This task can't be started right now.");
+    if (!(await one("SELECT 1 FROM events WHERE instance_id=? AND type='started'", instanceId))) await E.logEvent(instanceId, Date.now(), u.id, "started", "Started the task");
+  });
+}
+
 export async function reviewTask(instanceId: number, decision: "pass" | "changes", flags: E.FlagInput[], comment: string, openedAt: number): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
@@ -149,28 +160,36 @@ export async function triggerTask(templateId: number, propertyId: number): Promi
   });
 }
 
-export type TemplateInput = Omit<E.Template, "id"> & { items: { label: string; kind: string; photo_required: boolean; note_required: boolean }[]; properties: number[] };
+export type TemplateItemInput = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null };
+export type TemplateInput = Omit<E.Template, "id"> & { items: TemplateItemInput[]; properties: number[] };
 export async function saveTemplate(id: number | null, t: TemplateInput): Promise<Result> {
   const u = await requireUser();
   if (!can.admin(u)) return { ok: false, error: "Only admins can edit task setup." };
   let newId = id;
   const r = await guard(async () => {
     if (!t.name.trim()) throw new Error("Give the task a name.");
+    if (!id && !t.description?.trim()) throw new Error("Add a short description so the team knows what this task is for.");
     if (!t.items.length) throw new Error("Add at least one checklist item.");
+    if (t.trigger === "event" && !E.list<string>(t.events).length) throw new Error("Pick at least one event that creates this task.");
+    if (t.trigger === "scheduled" && (t.frequency === "weekly" || t.frequency === "monthly") && !E.list(t.days).length) throw new Error("Pick at least one day it repeats on.");
+    if (t.trigger === "scheduled" && t.frequency === "once" && !t.once_date) throw new Error("Pick the date it runs on.");
+    if (t.window_end <= t.window_start) throw new Error("End time must be after start time.");
+    if (t.geofence && (t.geofence_m < 10 || t.geofence_m > 1000)) throw new Error("Maximum distance must be 10 to 1000 metres.");
+    if (!t.properties.length) throw new Error("Pick at least one property.");
     if (t.reviewer_id && t.reviewer_id === t.auditor_id) throw new Error("The auditor must be a different person from the reviewer.");
     await tx(async () => {
       const cols = ["name", "category", "op_role", "trigger", "event_name", "frequency", "weekday", "window_start", "window_end", "review_sla_h",
-        "audit_sla_h", "attempts_allowed", "late_window_days", "criticality", "audit_rate", "geofence", "reviewer_id", "auditor_id", "active"] as const;
+        "audit_sla_h", "attempts_allowed", "late_window_days", "criticality", "audit_rate", "geofence", "reviewer_id", "auditor_id", "active",
+        "description", "events", "days", "once_date", "start_stop", "geofence_m", "ideal_minutes", "review_required", "assignees"] as const;
       const vals = cols.map((c) => (t as Record<string, unknown>)[c] ?? null);
       if (id) await run(`UPDATE templates SET ${cols.map((c) => `${c}=?`).join(", ")} WHERE id=?`, ...vals, id);
       else newId = Number((await run(`INSERT INTO templates (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`, ...vals)).lastInsertRowid);
       // Items already answered are kept (renamed in place) so history stays readable; extra ones are appended.
       const existing = await all<{ id: number }>("SELECT id FROM template_items WHERE template_id=? ORDER BY pos", newId);
       for (const [pos, it] of t.items.entries()) {
-        if (existing[pos]) await run("UPDATE template_items SET label=?, kind=?, photo_required=?, note_required=?, pos=? WHERE id=?",
-          it.label, it.kind, it.photo_required ? 1 : 0, it.note_required ? 1 : 0, pos, existing[pos].id);
-        else await run("INSERT INTO template_items (template_id, pos, label, kind, photo_required, note_required) VALUES (?,?,?,?,?,?)",
-          newId, pos, it.label, it.kind, it.photo_required ? 1 : 0, it.note_required ? 1 : 0);
+        const rules = [it.label, it.kind, it.photo_required, it.note_required, it.photo_allowed || it.photo_required, it.note_allowed || it.note_required, it.kind === "count" ? it.count_of ?? "HK" : null];
+        if (existing[pos]) await run("UPDATE template_items SET label=?, kind=?, photo_required=?, note_required=?, photo_allowed=?, note_allowed=?, count_of=?, pos=? WHERE id=?", ...rules, pos, existing[pos].id);
+        else await run("INSERT INTO template_items (label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, template_id, pos) VALUES (?,?,?,?,?,?,?,?,?)", ...rules, newId, pos);
       }
       for (const ex of existing.slice(t.items.length)) {
         const used = await one("SELECT 1 FROM answers WHERE item_id=? LIMIT 1", ex.id);

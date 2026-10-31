@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS cities (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
-CREATE TABLE IF NOT EXISTS clusters (id INTEGER PRIMARY KEY, city_id INTEGER NOT NULL REFERENCES cities(id), name TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS clusters (id INTEGER PRIMARY KEY, city_id INTEGER NOT NULL REFERENCES cities(id), name TEXT NOT NULL,
+  reviewer_id INTEGER REFERENCES users(id), auditor_id INTEGER REFERENCES users(id), archived INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS properties (
   id INTEGER PRIMARY KEY, cluster_id INTEGER NOT NULL REFERENCES clusters(id), name TEXT NOT NULL,
   lat REAL, lng REAL, cbm_id INTEGER REFERENCES users(id)
@@ -24,12 +25,23 @@ CREATE TABLE IF NOT EXISTS templates (
   audit_rate REAL NOT NULL DEFAULT 0.2,
   geofence INTEGER NOT NULL DEFAULT 1,
   reviewer_id INTEGER REFERENCES users(id), auditor_id INTEGER REFERENCES users(id),
-  active INTEGER NOT NULL DEFAULT 1
+  active INTEGER NOT NULL DEFAULT 1,
+  description TEXT,
+  events TEXT NOT NULL DEFAULT '[]',              -- trigger=event: every event that creates the task (JSON list)
+  days TEXT NOT NULL DEFAULT '[]',                -- weekly: weekdays 0-6; monthly: days 1-31 (JSON list)
+  once_date TEXT,                                 -- frequency=once
+  start_stop INTEGER NOT NULL DEFAULT 1,          -- assignee taps Start and Stop to track time
+  geofence_m INTEGER NOT NULL DEFAULT 200,        -- maximum distance from the property when location is checked
+  ideal_minutes INTEGER,                          -- shown to the assignee as "Ideal: 30 min"
+  review_required INTEGER NOT NULL DEFAULT 1,     -- off: a submission counts as done straight away
+  assignees TEXT NOT NULL DEFAULT '[]'            -- named people (JSON list of user ids); empty means anyone with the role
 );
 CREATE TABLE IF NOT EXISTS template_items (
   id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL REFERENCES templates(id), pos INTEGER NOT NULL,
   label TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'check',   -- check | number | text
-  photo_required INTEGER NOT NULL DEFAULT 0, note_required INTEGER NOT NULL DEFAULT 0
+  photo_required INTEGER NOT NULL DEFAULT 0, note_required INTEGER NOT NULL DEFAULT 0,
+  photo_allowed INTEGER NOT NULL DEFAULT 1, note_allowed INTEGER NOT NULL DEFAULT 1,  -- allowed = shown; required = compulsory
+  count_of TEXT                                   -- kind=count: HK or SHK, checked against the property's ideal count
 );
 CREATE TABLE IF NOT EXISTS template_properties (template_id INTEGER NOT NULL, property_id INTEGER NOT NULL, PRIMARY KEY (template_id, property_id));
 
@@ -106,3 +118,10 @@ CREATE TABLE IF NOT EXISTS escalation_updates (
   by_id INTEGER REFERENCES users(id), note TEXT, status TEXT, due_date TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_escu ON escalation_updates(escalation_id, at);
+-- Admin libraries.
+CREATE TABLE IF NOT EXISTS task_categories (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, pos INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS checklist_presets (id INTEGER PRIMARY KEY, title TEXT NOT NULL, items TEXT NOT NULL DEFAULT '[]');
+CREATE TABLE IF NOT EXISTS schedule_presets (
+  id INTEGER PRIMARY KEY, name TEXT NOT NULL, frequency TEXT NOT NULL DEFAULT 'daily', days TEXT NOT NULL DEFAULT '[]', once_date TEXT,
+  window_start TEXT NOT NULL DEFAULT '09:00', window_end TEXT NOT NULL DEFAULT '10:00'
+);

@@ -2,6 +2,7 @@
 import schema from "../lib/schema.sql";
 import { seed } from "../lib/seed";
 import { seedEscalations } from "../lib/escalations";
+import { seedLibraries } from "../lib/libraries";
 
 type Stmt = { bind(p: unknown[]): void; step(): boolean; getAsObject(): Record<string, unknown>; reset(): void };
 type SqlDb = { prepare(sql: string): Stmt; exec(sql: string): { values: unknown[][] }[]; run(sql: string): void; getRowsModified(): number };
@@ -44,6 +45,7 @@ export async function init(initSqlJs: (o?: unknown) => Promise<{ Database: new (
   raw.exec(schema);
   await seed();
   await seedEscalations();
+  await seedLibraries();
   raw.run("INSERT INTO meta (k, v) VALUES ('seeded', '1')");
 }
 export async function all<T = any>(sql: string, ...params: unknown[]): Promise<T[]> { return prepare(sql).all(...params) as T[]; }

@@ -1,7 +1,7 @@
 import { fmtDateTime, fmtDur } from "@/lib/time";
 
 const LABEL: Record<string, [string, string]> = {
-  created: ["Task created", ""], triggered: ["Triggered", "b"], window_closed: ["Window closed", "a"], missed: ["Missed", "r"],
+  created: ["Task created", ""], started: ["Started", "b"], triggered: ["Triggered", "b"], window_closed: ["Window closed", "a"], missed: ["Missed", "r"],
   submitted: ["Submitted", "b"], resubmitted: ["Resubmitted", "b"], changes_requested: ["Changes requested", "r"], passed: ["Passed", "g"],
   audit_passed: ["Audit passed", "g"], audit_failed: ["Audit failed", "r"], flags_answered: ["Audit flags answered", "b"],
   flags_closed: ["Audit flags closed", "g"], flags_reopened: ["Flag answers sent back", "r"], reopened: ["Reopened", "a"],

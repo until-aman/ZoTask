@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { boot } from "@/lib/boot";
-import { all } from "@/lib/db";
+import { all, one } from "@/lib/db";
 import { itemsFor, missingEvidence } from "@/lib/engine";
 import { rows, eventsFor, STATUS_LABEL, STATUS_PILL } from "@/lib/queries";
 import { fmtDate, fmtDateTime, fmtDur } from "@/lib/time";
@@ -24,6 +24,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
     "SELECT f.* FROM review_flags f JOIN reviews r ON r.id=f.review_id WHERE r.instance_id=?", id);
   const latest = subs[subs.length - 1];
   const missing = latest ? (await missingEvidence(latest.id, r.template_id)).map((m) => m.id) : [];
+  const staff = await one<{ ideal_hk: number; ideal_shk: number }>("SELECT ideal_hk, ideal_shk FROM staffing WHERE property_id=?", r.property_id);
 
   const mode =
     ["review", "resub"].includes(r.status) && ["reviewer", "admin"].includes(u.access_role) ? "review" :
@@ -61,7 +62,8 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
       {latest && (
         <ReviewForm instanceId={id} mode={mode} items={items} latest={pack(latest.id)} previous={subs.length > 1 ? pack(subs[subs.length - 2].id) : null}
           prevFlags={flags.filter((f) => reviews.find((x) => x.id === f.review_id)?.submission_id === subs[subs.length - 2]?.id)}
-          auditFlags={lastAudit ? flags.filter((f) => f.review_id === lastAudit.id) : []} missing={missing} />
+          auditFlags={lastAudit ? flags.filter((f) => f.review_id === lastAudit.id) : []} missing={missing}
+          ideal={staff ? { HK: staff.ideal_hk, SHK: staff.ideal_shk } : undefined} />
       )}
       {mode === "waive" && <ReviewForm instanceId={id} mode="waive" items={[]} latest={{}} previous={null} prevFlags={[]} auditFlags={[]} missing={[]} />}
       <div className="card">

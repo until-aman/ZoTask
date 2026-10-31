@@ -20,7 +20,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const lastReview = await one<{ id: number; decision: string; kind: string }>("SELECT id, decision, kind FROM reviews WHERE instance_id=? ORDER BY decided_at DESC LIMIT 1", id);
   const flags = lastReview ? await all<{ id: number; item_id: number; reason: string; comment: string | null; answer: string | null }>("SELECT * FROM review_flags WHERE review_id=?", lastReview.id) : [];
   const prop = (await one<{ lat: number; lng: number }>("SELECT lat, lng FROM properties WHERE id=?", r.property_id))!;
-  const tpl = (await one<{ geofence: number }>("SELECT geofence FROM templates WHERE id=?", r.template_id))!;
+  const tpl = (await one<{ geofence: number; geofence_m: number; start_stop: number; ideal_minutes: number | null; description: string | null }>(
+    "SELECT geofence, geofence_m, start_stop, ideal_minutes, description FROM templates WHERE id=?", r.template_id))!;
+  const started = await one<{ at: number }>("SELECT at FROM events WHERE instance_id=? AND type='started' ORDER BY at DESC LIMIT 1", id);
   const canSubmit = ["current", "notsub", "changes"].includes(r.status) && (r.assignee_id === u.id || r.cbm_id === u.id);
   const canAnswer = r.status === "auditflag" && (r.cbm_id === u.id || u.access_role === "admin");
 
@@ -35,11 +37,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <span className="spacer" />
         <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
       </div>
+      {tpl.description && <p className="card" style={{ margin: 0 }}>{tpl.description}</p>}
       {r.status === "upcoming" && <div className="card">This task opens at {r.window_start}. You can fill it in once the window opens.</div>}
       {canSubmit && (
         <TaskForm instanceId={id} items={items} status={r.status} attempt={r.attempt} attemptsAllowed={r.attempts_allowed}
           prev={r.status === "changes" ? prev : []} flags={r.status === "changes" ? flags : []}
-          property={{ lat: prop.lat, lng: prop.lng, geofence: !!tpl.geofence }} />
+          property={{ lat: prop.lat, lng: prop.lng, geofence: !!tpl.geofence, geofenceM: tpl.geofence_m }}
+          timer={{ startStop: !!tpl.start_stop, startedAt: started?.at ?? null, idealMinutes: tpl.ideal_minutes }} />
       )}
       {canAnswer && <FlagAnswerForm instanceId={id} items={items} flags={flags} />}
       {!canSubmit && !canAnswer && sub && (

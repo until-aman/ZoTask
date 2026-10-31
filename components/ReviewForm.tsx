@@ -5,13 +5,16 @@ import { auditTask, closeFlags, reopenTask, reviewTask, waiveTask } from "@/app/
 import Photo from "./Photo";
 
 const REASONS = ["Photo missing", "Photo unclear", "Wrong location", "Count mismatch", "Item not done", "Other"];
-type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number };
+type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; count_of?: string | null };
 type Ans = { checked: number; value: string | null; note: string | null; photos: string[]; reply: string | null };
 type Flag = { id: number; item_id: number; reason: string; comment: string | null; answer: string | null };
 
-function Shown({ it, a }: { it: Item; a?: Ans }) {
+function Shown({ it, a, ideal }: { it: Item; a?: Ans; ideal?: Record<string, number> }) {
   if (!a) return <span className="warn">Not recorded</span>;
-  const main = it.kind === "check" ? (a.checked ? "Done" : <span className="warn">Not done</span>) : a.value ? a.value : <span className="warn">Not recorded</span>;
+  const want = it.kind === "count" ? ideal?.[it.count_of ?? "HK"] : undefined;
+  const main = it.kind === "check" ? (a.checked ? "Done" : <span className="warn">Not done</span>) : a.value
+    ? <>{a.value}{want !== undefined && <> · <span className={Number(a.value) < want ? "warn" : "muted"}>ideal {want}{Number(a.value) < want ? `, ${want - Number(a.value)} short` : ""}</span></>}</>
+    : <span className="warn">Not recorded</span>;
   return (
     <div className="grid" style={{ gap: 6 }}>
       <div>{main}{it.photo_required && !a.photos.length ? <> · <span className="warn">Photo not recorded</span></> : null}</div>
@@ -22,9 +25,9 @@ function Shown({ it, a }: { it: Item; a?: Ans }) {
   );
 }
 
-export default function ReviewForm({ instanceId, mode, items, latest, previous, prevFlags, auditFlags, missing }: {
+export default function ReviewForm({ instanceId, mode, items, latest, previous, prevFlags, auditFlags, missing, ideal }: {
   instanceId: number; mode: string; items: Item[]; latest: Record<number, Ans>; previous: Record<number, Ans> | null;
-  prevFlags: Flag[]; auditFlags: Flag[]; missing: number[];
+  prevFlags: Flag[]; auditFlags: Flag[]; missing: number[]; ideal?: Record<string, number>;
 }) {
   const router = useRouter();
   const [opened] = useState(() => Date.now());
@@ -81,10 +84,10 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
             </div>
             {previous && pf ? (
               <div className="cmp">
-                <div><div className="small muted">Previous attempt · flagged “{pf.reason}”</div><Shown it={it} a={previous[it.id]} /></div>
-                <div><div className="small muted">This attempt</div><Shown it={it} a={latest[it.id]} /></div>
+                <div><div className="small muted">Previous attempt · flagged “{pf.reason}”</div><Shown it={it} a={previous[it.id]} ideal={ideal} /></div>
+                <div><div className="small muted">This attempt</div><Shown it={it} a={latest[it.id]} ideal={ideal} /></div>
               </div>
-            ) : <Shown it={it} a={latest[it.id]} />}
+            ) : <Shown it={it} a={latest[it.id]} ideal={ideal} />}
             {af && <div className="small"><span className="warn">Audit flag: {af.reason}{af.comment ? ` · “${af.comment}”` : ""}</span>{af.answer && <><br />CBM answer: {af.answer}</>}</div>}
             {f && (
               <div className="row2">

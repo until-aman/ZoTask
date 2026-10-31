@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
+import { seedLibraries } from "./libraries";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -32,13 +33,25 @@ async function init(): Promise<Client> {
   if (!REMOTE) await c.execute("PRAGMA journal_mode = WAL");
   await c.executeMultiple(schema());
   // Columns added after a database was first created.
-  const cols = (await c.execute("PRAGMA table_info(saved_views)")).rows.map((r) => String(r.name));
-  if (!cols.includes("page")) await c.execute("ALTER TABLE saved_views ADD COLUMN page TEXT NOT NULL DEFAULT 'queue'");
+  const added: [string, string, string][] = [
+    ["saved_views", "page", "TEXT NOT NULL DEFAULT 'queue'"],
+    ["templates", "description", "TEXT"], ["templates", "events", "TEXT NOT NULL DEFAULT '[]'"], ["templates", "days", "TEXT NOT NULL DEFAULT '[]'"],
+    ["templates", "once_date", "TEXT"], ["templates", "start_stop", "INTEGER NOT NULL DEFAULT 1"], ["templates", "geofence_m", "INTEGER NOT NULL DEFAULT 200"],
+    ["templates", "ideal_minutes", "INTEGER"], ["templates", "review_required", "INTEGER NOT NULL DEFAULT 1"], ["templates", "assignees", "TEXT NOT NULL DEFAULT '[]'"],
+    ["template_items", "photo_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "note_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "count_of", "TEXT"],
+    ["clusters", "reviewer_id", "INTEGER"], ["clusters", "auditor_id", "INTEGER"], ["clusters", "archived", "INTEGER NOT NULL DEFAULT 0"],
+  ];
+  const have = new Map<string, string[]>();
+  for (const [table, col, type] of added) {
+    if (!have.has(table)) have.set(table, (await c.execute(`PRAGMA table_info(${table})`)).rows.map((r) => String(r.name)));
+    if (!have.get(table)!.includes(col)) await c.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+  }
   if (!(await c.execute("SELECT v FROM meta WHERE k='seeded'")).rows.length) await seedInto(c);
   // Databases created before headcounts or escalations existed get sample rows too.
   await scope.run(c, async () => {
     if (!(await one<{ n: number }>("SELECT count(*) n FROM staffing"))!.n) await seedStaffing();
     if (!(await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n) await seedEscalations();
+    if (!(await one<{ n: number }>("SELECT count(*) n FROM task_categories"))!.n) await seedLibraries();
   });
   return c;
 }
@@ -63,7 +76,7 @@ function memory() {
 async function seedInto(target: Client) {
   const { d, conn } = memory();
   d.exec(schema());
-  await scope.run(conn, async () => { await seed(); await seedEscalations(); });
+  await scope.run(conn, async () => { await seed(); await seedEscalations(); await seedLibraries(); });
   const tables = (d.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name<>'meta'").all() as { name: string }[]).map((r) => r.name);
   const stmts: InStatement[] = [];
   for (const t of tables) {
