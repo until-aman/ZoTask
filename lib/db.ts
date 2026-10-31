@@ -9,7 +9,10 @@ import { seedEscalations } from "./escalations";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
-export const REMOTE = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || "";
+// Turso's Vercel integration can add a custom prefix to its variable names, so also take any libsql:// URL and *_AUTH_TOKEN.
+const env = Object.entries(process.env);
+export const REMOTE = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL || env.find(([, v]) => v?.startsWith("libsql://"))?.[1] || "";
+const TOKEN = process.env.TURSO_AUTH_TOKEN || env.find(([k]) => k.endsWith("_AUTH_TOKEN") && !k.startsWith("BLOB"))?.[1];
 
 type Conn = Pick<Client, "execute">;
 type G = { __zotaskDb?: Promise<Client> };
@@ -19,7 +22,7 @@ const scope = new AsyncLocalStorage<Conn>();
 const schema = () => fs.readFileSync(path.join(process.cwd(), "lib", "schema.sql"), "utf8");
 
 function open(): Client {
-  if (REMOTE) return createClient({ url: REMOTE, authToken: process.env.TURSO_AUTH_TOKEN });
+  if (REMOTE) return createClient({ url: REMOTE, authToken: TOKEN });
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
   return createClient({ url: `file:${path.join(DATA_DIR, "zotask.db")}` });
 }
