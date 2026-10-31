@@ -5,7 +5,7 @@ import { init } from "./db";
 import { RouterCtx } from "./router";
 import { Redirect, NotFound } from "./shims/navigation";
 import { currentUser, can, User } from "../lib/auth";
-import Nav from "../components/Nav";
+import Shell from "../components/Shell";
 import Link from "./shims/link";
 import Home from "../app/page";
 import Login from "../app/login/page";
@@ -33,7 +33,6 @@ const ROUTES: [RegExp, PageFn, string[]][] = [
   [/^\/admin$/, Admin as PageFn, []],
   [/^\/admin\/templates\/(\w+)$/, EditTemplate as PageFn, ["id"]],
 ];
-const ROLE_LABEL: Record<string, string> = { admin: "Admin", reviewer: "Reviewer", auditor: "Auditor", cbm: "CBM", ground: "Ground team" };
 
 // Photo uploads become data URLs kept with the answer.
 const realFetch = window.fetch.bind(window);
@@ -104,15 +103,7 @@ function App() {
   return (
     <RouterCtx.Provider value={router}>
       <div className="proto">Prototype on sample data. Everything runs in your browser and resets when you reload. Use “Switch user” to see each role.</div>
-      <header className="top">
-        <div className="top-in">
-          <Link href="/" className="logo" aria-label="ZoTask home">Ω</Link>
-          <Link href="/" className="brand">ZoTask</Link>
-          <Nav links={links} />
-          {user && <span className="me"><b>{user.name}</b> · {ROLE_LABEL[user.access_role]}{user.access_role === "ground" && user.op_role ? ` (${user.op_role})` : ""} · <Link href="/login">Switch user</Link></span>}
-        </div>
-      </header>
-      <Catch go={go} k={url + tick}>{view}</Catch>
+      <Shell user={user} links={links}><Catch go={go} k={url + tick}>{view}</Catch></Shell>
     </RouterCtx.Provider>
   );
 }

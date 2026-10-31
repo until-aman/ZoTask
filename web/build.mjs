@@ -24,7 +24,7 @@ const esc = (s) => s.replace(/<\/script/gi, "<\\/script");
 const app = out.outputFiles[0].text;
 const sql = fs.readFileSync(path.join(root, "node_modules/sql.js/dist/sql-asm.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "app/globals.css"), "utf8")
-  .replace(".top{position:sticky;top:0;", ".top{position:sticky;top:env(safe-area-inset-top,0px);");
+  .replace(".side{position:sticky;top:0;", ".side{position:sticky;top:env(safe-area-inset-top,0px);");
 const html = `<title>ZoTask Prototype</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
@@ -33,6 +33,7 @@ ${css}
 :root{color-scheme:light}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:41;background:var(--card)}
 .proto{background:var(--fg);color:#fff;font-size:12.5px;font-weight:600;text-align:center;padding:6px 16px}
+@media(min-width:901px){.proto+.shell .side{height:calc(100vh - 30px)}}
 .boot{min-height:60vh;display:grid;place-items:center;color:var(--muted);font-weight:700}
 </style>
 <div id="root"><div class="boot">Setting up ZoTask with 14 days of sample data…</div></div>

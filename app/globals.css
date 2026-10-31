@@ -23,17 +23,33 @@ h1{margin:0;font-size:24px;font-weight:800}
 h2{margin:0 0 8px;font-size:17px;font-weight:800}
 h3{margin:0 0 6px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 
-/* header */
-.top{position:sticky;top:0;z-index:40;background:var(--card);border-bottom:1px solid var(--line)}
-.top-in{max-width:1440px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
+/* app frame: menu on the left */
+.shell{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh;--toph:0px}
+.shell.bare{grid-template-columns:minmax(0,1fr)}
+.shell.bare .side{display:none}
+.main{min-width:0}
+.side{position:sticky;top:0;height:100vh;z-index:40;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px;padding:14px 12px;box-sizing:border-box}
+.side-brand{display:flex;align-items:center;gap:10px;padding:0 6px 6px}
 .logo{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
 .brand{font-weight:800;font-size:18px;color:var(--fg)}
-.nav{display:flex;gap:6px;margin-left:auto;overflow-x:auto;align-items:center}
-.nav a{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 12px;font-weight:600;white-space:nowrap;color:var(--fg)}
-.nav a.on{background:var(--blue);border-color:var(--blue);color:#fff}
-.nav a:hover{text-decoration:none;border-color:var(--blue)}
-.me{font-size:12.5px;color:var(--muted);white-space:nowrap;margin-left:8px}
-.me b{color:var(--fg)}
+.nav{display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nav a{display:flex;align-items:center;gap:10px;border-radius:8px;padding:9px 10px;font-weight:600;white-space:nowrap;color:var(--fg)}
+.nav a svg{color:var(--muted);flex:none}
+.nav a:hover{text-decoration:none;background:var(--line2)}
+.nav a.on{background:var(--blue-soft);color:var(--blue-d)}
+.nav a.on svg{color:var(--blue)}
+.me{margin-top:auto;display:grid;gap:2px;font-size:12.5px;color:var(--muted);padding:12px 6px 2px;border-top:1px solid var(--line2)}
+.me b{color:var(--fg);font-size:13.5px}
+@media (max-width:900px){
+  .shell{display:block;--toph:var(--sideh,104px)}
+  .side{height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 12px;border-right:0;border-bottom:1px solid var(--line);padding:8px 16px}
+  .side-brand{padding:0}
+  .me{margin:0 0 0 auto;padding:0;border:0;display:flex;gap:6px;align-items:center;white-space:nowrap}
+  .me span{display:none}
+  .nav{order:3;flex-direction:row;flex:1 1 100%;overflow-x:auto;scrollbar-width:none}
+  .nav a{padding:7px 10px;border:1px solid var(--line)}
+  .nav a.on{border-color:var(--blue)}
+}
 
 .page{max-width:1440px;margin:0 auto;padding:16px 16px 48px;display:grid;gap:14px}
 .narrow{max-width:900px}
@@ -76,10 +92,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 tr:last-child td{border-bottom:0}
 
 /* queue (mirrors the Review Queue mockup) */
-.shell{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;align-items:start}
-@media (max-width:960px){.shell{grid-template-columns:minmax(0,1fr)}}
-.side{position:sticky;top:70px;display:grid;gap:12px}
-@media (max-width:960px){.side{position:static}}
 .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
 .box h3{margin:4px 8px 6px;font-size:11px}
 .si{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;border-radius:8px;padding:8px;text-align:left;font-weight:600}
@@ -395,8 +407,6 @@ select{max-width:100%}
 .esc-upd .ell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .seg button{white-space:nowrap}
 @media (max-width:760px){
-  .top-in{flex-wrap:wrap;row-gap:8px}
-  .top-in .me{margin-left:auto}
   .nav{order:3;flex:1 1 100%;margin-left:0;padding-bottom:2px}
 }
 @media (max-width:560px){
@@ -494,7 +504,6 @@ select{max-width:100%}
 .daterow .ff-l{margin-right:2px}
 .daterow .seg{max-width:100%;min-width:0;overflow-x:auto;scrollbar-width:none}
 .daterow .dates{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
-@media (max-width:760px){:root{--toph:104px}}
 @media (max-width:560px){.pager{bottom:6px;width:100%;justify-content:space-between}.pgnum{display:none}}
 @media (max-width:560px){.score .kpis.k3{grid-template-columns:minmax(0,1fr)}.kpis.k3>:nth-child(3){grid-column:auto}}
 

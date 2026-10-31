@@ -1,12 +1,9 @@
 import "./globals.css";
-import Link from "next/link";
 import { currentUser, can } from "@/lib/auth";
-import Nav from "@/components/Nav";
+import Shell from "@/components/Shell";
 
 export const metadata = { title: "ZoTask", description: "Recurring operations tasks for Zolo properties" };
 export const dynamic = "force-dynamic";
-
-const ROLE_LABEL: Record<string, string> = { admin: "Admin", reviewer: "Reviewer", auditor: "Auditor", cbm: "CBM", ground: "Ground team" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const u = await currentUser();
@@ -25,19 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" />
       </head>
       <body>
-        <header className="top">
-          <div className="top-in">
-            <Link href="/" className="logo" aria-label="ZoTask home">Ω</Link>
-            <Link href="/" className="brand">ZoTask</Link>
-            <Nav links={links} />
-            {u && (
-              <span className="me">
-                <b>{u.name}</b> · {ROLE_LABEL[u.access_role]}{u.op_role && u.access_role === "ground" ? ` (${u.op_role})` : ""} · <Link href="/login">Switch user</Link>
-              </span>
-            )}
-          </div>
-        </header>
-        {children}
+        <Shell user={u} links={links}>{children}</Shell>
       </body>
     </html>
   );
