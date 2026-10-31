@@ -97,17 +97,17 @@ export function Categories({ rows, notify }: { rows: Category[]; notify: (m: str
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="New category name" aria-label="New category name" style={{ flex: "1 1 220px" }} />
         <button className="btn primary sm">Add category</button>
       </form>
-      <div className="card lib-list">
-        {live.map((c, i) => (
-          <div key={c.id} className="lib-row">
-            <span className="te-n">{i + 1}</span><b>{c.name}</b><span className="small muted">{c.used} task{c.used === 1 ? "" : "s"}</span><span className="spacer" />
-            <button type="button" className="link" aria-label="Move up" disabled={i === 0} onClick={() => run(moveCategory(c.id, -1))}>↑</button>
-            <button type="button" className="link" aria-label="Move down" disabled={i === live.length - 1} onClick={() => run(moveCategory(c.id, 1))}>↓</button>
-            <button type="button" className="link" onClick={() => run(archiveCategory(c.id, true))}>Archive</button>
-          </div>
-        ))}
-        {!live.length && <div className="muted small">No categories yet, so every task is Uncategorised.</div>}
-      </div>
+      <Table<Category & { n: number }> name="Categories" rows={live.map((c, i) => ({ ...c, n: i + 1 }))} rowKey={(c) => c.id} search={(c) => c.name}
+        empty="No categories yet, so every task is Uncategorised." cols={[
+          { key: "n", label: "#", value: (c) => c.n },
+          { key: "name", label: "Category", value: (c) => c.name, render: (c) => <b>{c.name}</b>, sticky: true },
+          { key: "used", label: "Tasks", num: true, value: (c) => c.used },
+          { key: "act", label: "", value: () => null, csv: () => "", render: (c) => <span className="rowact">
+            <button type="button" className="iconbtn" aria-label={`Move ${c.name} up`} title="Move up" disabled={c.n === 1} onClick={() => run(moveCategory(c.id, -1))}>↑</button>
+            <button type="button" className="iconbtn" aria-label={`Move ${c.name} down`} title="Move down" disabled={c.n === live.length} onClick={() => run(moveCategory(c.id, 1))}>↓</button>
+            <button type="button" className="btn sm" onClick={() => run(archiveCategory(c.id, true))}>Archive</button>
+          </span> },
+        ]} />
       {old.length > 0 && <details><summary className="small">Archived ({old.length})</summary>
         <div className="card lib-list" style={{ marginTop: 8 }}>{old.map((c) => <div key={c.id} className="lib-row"><span>{c.name}</span><span className="spacer" /><button type="button" className="link" onClick={() => run(archiveCategory(c.id, false))}>Restore</button></div>)}</div>
       </details>}

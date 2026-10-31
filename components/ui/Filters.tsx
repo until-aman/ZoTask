@@ -190,13 +190,13 @@ export function Pager({ page, total, size = PAGE, setPage, setSize }: { page: nu
   const pages = Math.max(1, Math.ceil(total / size));
   const p = clampPage(page, total, size);
   const go = (n: number) => setPage(Math.max(0, Math.min(pages - 1, n)));
-  const sizes = !!setSize && total > PAGE_SIZES[0];
+  const sizes = !!setSize;
   return (
     <div className={`pager${sizes || pages > 1 ? "" : " plain"}`} role="navigation" aria-label="Pages">
       {sizes && <label className="pgsize">Rows<select value={size} onChange={(e) => { const n = Number(e.target.value); setSize(n); setPage(Math.floor((p * size) / n)); }} aria-label="Rows per page">
         {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}</select></label>}
       <span className="pgcount">{total <= size ? `${total} ${total === 1 ? "row" : "rows"}` : `${p * size + 1}–${Math.min(total, (p + 1) * size)} of ${total}`}</span>
-      {pages > 1 && <span className="pgbtns">
+      {(sizes || pages > 1) && <span className="pgbtns">
         <button type="button" className="btn sm" disabled={p === 0} onClick={() => go(0)} aria-label="First page" title="First page">«</button>
         <button type="button" className="btn sm" disabled={p === 0} onClick={() => go(p - 1)} aria-label="Previous page" title="Previous page">‹</button>
         <span className="pgnum">Page {p + 1} of {pages}</span>

@@ -386,6 +386,7 @@ select:not([multiple]):disabled{cursor:not-allowed;opacity:.6}
 .page>*,.grid>*,.cmp-ctl>*{min-width:0}
 table.tt td,.tbl>table:not(.aq) td{white-space:nowrap}
 table.tt td .link,table.tt td button.link{text-align:left}
+table.tt td{vertical-align:middle;padding-block:6px}
 th,td{padding:8px 10px}
 .ttable{gap:6px}
 .dashf{flex-wrap:wrap}
@@ -611,8 +612,9 @@ select{max-width:100%}
 .lib-row .link:disabled{opacity:.3}
 input.cnt{width:72px;text-align:right}
 .rowact{display:inline-flex;gap:4px;align-items:center;justify-content:flex-end;white-space:nowrap}
-.iconbtn{display:inline-grid;place-items:center;width:30px;height:30px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer}
-.iconbtn:hover{color:var(--blue);border-color:var(--blue)}
+.iconbtn{display:inline-grid;place-items:center;width:28px;height:28px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer}
+.iconbtn:hover:not(:disabled){color:var(--blue);border-color:var(--blue)}
+.iconbtn:disabled{opacity:.35;cursor:default}
 .iconbtn.del:hover{color:var(--red);border-color:var(--red)}
 .btn.danger{background:var(--red);border-color:var(--red);color:#fff}
 .te-ask{padding:10px 12px;border-radius:10px;background:var(--blue-soft)}

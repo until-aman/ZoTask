@@ -66,7 +66,7 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
     { key: "sla", label: "Review / audit SLA", num: true, value: (t) => t.review_sla_h, render: (t) => t.review_required ? `${t.review_sla_h}h / ${t.audit_sla_h}h` : "No review" },
     { key: "att", label: "Attempts", num: true, value: (t) => t.attempts_allowed },
     { key: "audit", label: "Audit sample", num: true, value: (t) => t.audit_rate, render: (t) => `${Math.round(t.audit_rate * 100)}%` },
-    { key: "rv", label: "Reviewer / auditor", value: (t) => t.reviewer, render: (t) => <span className="small"><div>{t.reviewer ?? "Cluster reviewer"}</div><div className="muted">{t.auditor ?? "Any auditor"}</div></span>, csv: (t) => `${t.reviewer ?? ""} / ${t.auditor ?? ""}` },
+    { key: "rv", label: "Reviewer / auditor", value: (t) => t.reviewer, render: (t) => <span className="small">{t.reviewer ?? "Cluster reviewer"} <span className="muted">/ {t.auditor ?? "Any auditor"}</span></span>, csv: (t) => `${t.reviewer ?? ""} / ${t.auditor ?? ""}` },
     { key: "props", label: "Properties", num: true, value: (t) => t.props },
     { key: "edit", label: "", value: () => null, csv: () => "", render: (t) => <RowActions name={t.name} onEdit={() => router.push(`/admin/templates/${t.id}`)} onDelete={() => bulk(deleteTasks([t.id]))} /> },
   ];
