@@ -1,3 +1,5 @@
+import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
 import "./globals.css";
 import { currentUser, can } from "@/lib/auth";
 import Shell from "@/components/Shell";
@@ -14,6 +16,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     if (can.dashboard(u)) links.push(["/dashboard", "Review Dashboard"]);
     if (can.dashboard(u)) links.push(["/compare", "Compare"]);
     if (can.dashboard(u)) links.push(["/escalations", "Escalations"]);
+    if (can.dashboard(u)) links.push(["/map", "Map"]);
     if (can.admin(u)) links.push(["/admin", "Admin"]);
   }
   return (

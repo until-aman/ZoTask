@@ -23,7 +23,8 @@ const out = await esbuild.build({
 const esc = (s) => s.replace(/<\/script/gi, "<\\/script");
 const app = out.outputFiles[0].text;
 const sql = fs.readFileSync(path.join(root, "node_modules/sql.js/dist/sql-asm.js"), "utf8");
-const css = fs.readFileSync(path.join(root, "app/globals.css"), "utf8")
+const css = ["node_modules/leaflet/dist/leaflet.css", "node_modules/leaflet.markercluster/dist/MarkerCluster.css", "app/globals.css"]
+  .map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n")
   .replace(".side{position:sticky;top:0;", ".side{position:sticky;top:env(safe-area-inset-top,0px);");
 const html = `<title>ZoTask Prototype</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap">

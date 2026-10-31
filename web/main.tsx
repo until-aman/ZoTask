@@ -16,6 +16,7 @@ import ReviewSheet from "../app/review/[id]/page";
 import Dashboard from "../app/dashboard/page";
 import Compare from "../app/compare/page";
 import EscalationsPage from "../app/escalations/page";
+import MapPage from "../app/map/page";
 import Admin from "../app/admin/page";
 import EditTemplate from "../app/admin/templates/[id]/page";
 
@@ -30,6 +31,7 @@ const ROUTES: [RegExp, PageFn, string[]][] = [
   [/^\/dashboard$/, Dashboard as PageFn, []],
   [/^\/compare$/, Compare as PageFn, []],
   [/^\/escalations$/, EscalationsPage as PageFn, []],
+  [/^\/map$/, MapPage as PageFn, []],
   [/^\/admin$/, Admin as PageFn, []],
   [/^\/admin\/templates\/(\w+)$/, EditTemplate as PageFn, ["id"]],
 ];
@@ -98,6 +100,7 @@ function App() {
     if (can.dashboard(user)) links.push(["/dashboard", "Review Dashboard"]);
     if (can.dashboard(user)) links.push(["/compare", "Compare"]);
     if (can.dashboard(user)) links.push(["/escalations", "Escalations"]);
+    if (can.dashboard(user)) links.push(["/map", "Map"]);
     if (can.admin(user)) links.push(["/admin", "Admin"]);
   }
   return (

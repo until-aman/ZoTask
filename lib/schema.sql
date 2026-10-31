@@ -125,3 +125,9 @@ CREATE TABLE IF NOT EXISTS schedule_presets (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, frequency TEXT NOT NULL DEFAULT 'daily', days TEXT NOT NULL DEFAULT '[]', once_date TEXT,
   window_start TEXT NOT NULL DEFAULT '09:00', window_end TEXT NOT NULL DEFAULT '10:00'
 );
+
+-- Every Zolo property for the Map tab, from the uploaded sheet. property_id links a row to a ZoTask property.
+CREATE TABLE IF NOT EXISTS map_sites (
+  id INTEGER PRIMARY KEY, code TEXT, name TEXT NOT NULL, city TEXT, state TEXT, lat REAL NOT NULL, lng REAL NOT NULL,
+  address TEXT, status TEXT NOT NULL DEFAULT 'Live', beds INTEGER, property_id INTEGER, updated_at INTEGER
+);
