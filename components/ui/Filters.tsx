@@ -69,10 +69,10 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
             </div>
           )}
         </span>
-        {saved && <SavedViews {...saved} />}
         {right && <><span className="spacer" />{right}</>}
         {dates && <span className="fdates">{dates}</span>}
       </div>
+      {saved && <div className="fbsaved"><SavedViews {...saved} /></div>}
       {chips.length > 0 && (
         <div className="chips">
           {chips.map((c) => <span key={c.key} className="chip">{c.label}<button type="button" aria-label="Remove filter" onClick={c.clear}>×</button></span>)}
@@ -83,7 +83,7 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
   );
 }
 
-/** Saved filters sit next to the Filters button, one click each. The star marks the one the page opens with. */
+/** Saved filters sit on their own row under the search, one click each. The star marks the one the page opens with. */
 function SavedViews({ page, views, current, apply, name = "", note, notify }: Saved) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);

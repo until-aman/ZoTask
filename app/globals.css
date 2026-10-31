@@ -429,6 +429,8 @@ select{max-width:100%}
 .ff .checks label{display:inline-flex;gap:6px;align-items:center;font-weight:500}
 .saved{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
 .saved-l{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-left:4px}
+.fbsaved{display:flex;min-width:0}
+.fbsaved .saved-l{margin-left:0}
 .svchip{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:4px 12px;font-weight:600;font-size:13px;display:inline-flex;gap:5px;align-items:center;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .svchip:hover{border-color:var(--blue)}
 .svchip[aria-pressed="true"]{background:var(--green-soft);border-color:var(--green);color:var(--green)}
