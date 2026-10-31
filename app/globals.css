@@ -539,3 +539,20 @@ select{max-width:100%}
 .hbands .kpis.k4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .sumband .kpi .v{font-size:24px}
 @media (max-width:900px){.hbands .kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Sign in */
+.lg-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lg-top .search{flex:1 1 260px}
+.lg-office{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:640px){.lg-office{grid-template-columns:minmax(0,1fr)}}
+.lg-props{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:10px}
+.lg-card{padding:14px 16px}
+.lg-card h2,.lg-card h3{margin:0;font-size:15px;font-weight:700;text-transform:none;letter-spacing:0;color:var(--fg)}
+.lg-card p{margin:2px 0 10px}
+.lg-names{display:flex;flex-wrap:wrap;gap:6px}
+.lg-names.col{flex-direction:column}
+.lg-names form{display:contents}
+.lg-pick{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;font:inherit;font-weight:600;font-size:13.5px;text-align:left;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit;cursor:pointer}
+.lg-names:not(.col) .lg-pick{width:auto}
+.lg-pick:hover{border-color:var(--blue);background:var(--blue-soft)}
+.lg-pick small{font-weight:500;color:var(--muted);font-size:12px}
+.lg .seg{overflow-x:auto;max-width:100%}
