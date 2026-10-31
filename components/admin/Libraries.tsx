@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { addCategory, archiveCategory, archiveCluster, deleteChecklistPreset, deleteSchedulePreset, moveCategory, PresetItem, saveChecklistPreset, saveCluster, saveCounts, saveSchedulePreset } from "@/app/admin-actions";
 import { DAYS, describeWhen } from "@/components/TemplateEditor";
 import { Table } from "@/components/cc/parts";
+import { RowActions } from "@/components/ui/RowActions";
 
 type R = { ok: true; msg?: string } | { ok: false; error: string };
 const parse = <X,>(s: string, d: X): X => { try { return JSON.parse(s); } catch { return d; } };
@@ -44,9 +45,8 @@ export function Checklists({ rows, notify }: { rows: Checklist[]; notify: (m: st
         { key: "title", label: "Checklist", value: (c) => c.title, sticky: true, render: (c) => <b>{c.title}</b> },
         { key: "n", label: "Items", num: true, value: (c) => parse<unknown[]>(c.items, []).length },
         { key: "ph", label: "Photo compulsory", num: true, value: (c) => parse<PresetItem[]>(c.items, []).filter((i) => i.photo_required).length },
-        { key: "act", label: "", value: () => null, csv: () => "", render: (c) => <span className="row2" style={{ gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" className="link" onClick={() => setEdit({ id: c.id, title: c.title, items: parse<PresetItem[]>(c.items, []).map((i) => ({ ...blank, ...i })) })}>Edit</button>
-          <button type="button" className="link" style={{ color: "var(--red)" }} onClick={() => confirm(`Delete "${c.title}"?`) && run(deleteChecklistPreset(c.id))}>Delete</button></span> },
+        { key: "act", label: "", value: () => null, csv: () => "", render: (c) => <RowActions name={c.title}
+          onEdit={() => setEdit({ id: c.id, title: c.title, items: parse<PresetItem[]>(c.items, []).map((i) => ({ ...blank, ...i })) })} onDelete={() => run(deleteChecklistPreset(c.id))} /> },
       ]} />
     </section>
   );
@@ -78,9 +78,8 @@ export function Schedules({ rows, notify }: { rows: Schedule[]; notify: (m: stri
       <Table<Schedule> name="Predefined schedules" rows={rows} rowKey={(s) => s.id} cols={[
         { key: "name", label: "Schedule", value: (s) => s.name, sticky: true, render: (s) => <b>{s.name}</b> },
         { key: "when", label: "Runs", value: (s) => describeWhen({ ...s, trigger: "scheduled", events: "[]", event_name: null }) },
-        { key: "act", label: "", value: () => null, csv: () => "", render: (s) => <span className="row2" style={{ gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" className="link" onClick={() => setEdit({ ...s, days: parse<number[]>(s.days, []) })}>Edit</button>
-          <button type="button" className="link" style={{ color: "var(--red)" }} onClick={() => confirm(`Delete "${s.name}"?`) && run(deleteSchedulePreset(s.id))}>Delete</button></span> },
+        { key: "act", label: "", value: () => null, csv: () => "", render: (s) => <RowActions name={s.name}
+          onEdit={() => setEdit({ ...s, days: parse<number[]>(s.days, []) })} onDelete={() => run(deleteSchedulePreset(s.id))} /> },
       ]} />
     </section>
   );

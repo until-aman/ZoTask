@@ -71,10 +71,13 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
   const timed = t.trigger !== "scheduled";
   const hours = Math.max(1, Math.round((Number(t.window_end.slice(0, 2)) * 60 + Number(t.window_end.slice(3)) - Number(t.window_start.slice(0, 2)) * 60 - Number(t.window_start.slice(3))) / 60));
 
-  function loadChecklist(pid: string) {
+  const [pending, setPending] = useState<ChecklistPreset | null>(null);
+  const [presetName, setPresetName] = useState<string | null>(null);
+  function loadChecklist(pid: string, force = false) {
     const p = checklists.find((c) => String(c.id) === pid);
     if (!p) return;
-    if (items.some((i) => i.label.trim()) && !confirm(`Replace the current items with "${p.title}"?`)) return;
+    if (!force && items.some((i) => i.label.trim())) return setPending(p);
+    setPending(null);
     setItems(parse<Partial<It>[]>(p.items, []).map((i) => ({ ...blank(), ...i, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required })));
   }
   function loadSchedule(sid: string) {
@@ -88,12 +91,10 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     setMsg(r.ok ? { ok: true, text: r.msg ?? "Saved" } : { ok: false, text: r.error });
     router.refresh();
   }
-  async function savePreset() {
-    const title = prompt("Name for this predefined checklist", t.name);
-    if (!title) return;
+  async function savePreset(title: string) {
     const r = await saveChecklistPreset(null, title, items);
     setMsg(r.ok ? { ok: true, text: r.msg ?? "Saved" } : { ok: false, text: r.error });
-    router.refresh();
+    if (r.ok) { setPresetName(null); router.refresh(); }
   }
   const toggle = (k: "events" | "days" | "assignees", v: string | number) => {
     const cur = parse<(string | number)[]>(t[k], []);
@@ -167,8 +168,14 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
             <div className="te-row">
               {checklists.length > 0 && <label className="f">Start from a predefined checklist<select value="" onChange={(e) => loadChecklist(e.target.value)}><option value="">Pick one</option>{checklists.map((c) => <option key={c.id} value={c.id}>{c.title} ({parse<unknown[]>(c.items, []).length})</option>)}</select></label>}
               <span className="spacer" />
-              <button type="button" className="btn sm" onClick={savePreset}>Save as predefined checklist</button>
+              {presetName === null && <button type="button" className="btn sm" onClick={() => setPresetName(t.name)}>Save as predefined checklist</button>}
             </div>
+            {presetName !== null && <form className="row2 te-ask" onSubmit={(e) => { e.preventDefault(); void savePreset(presetName); }}>
+              <input type="text" value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Checklist name" aria-label="Checklist name" style={{ flex: "1 1 220px" }} autoFocus />
+              <button className="btn primary sm">Save checklist</button><button type="button" className="btn sm" onClick={() => setPresetName(null)}>Cancel</button>
+            </form>}
+            {pending && <div className="row2 te-ask"><span className="small">Replace the {items.filter((i) => i.label.trim()).length} items below with <b>{pending.title}</b>?</span><span className="spacer" />
+              <button type="button" className="btn primary sm" onClick={() => loadChecklist(String(pending.id), true)}>Replace</button><button type="button" className="btn sm" onClick={() => setPending(null)}>Cancel</button></div>}
             <div className="te-items">
               {items.map((it, ix) => (
                 <div key={ix} className="te-item">

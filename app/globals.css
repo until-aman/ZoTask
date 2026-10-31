@@ -601,3 +601,9 @@ select{max-width:100%}
 .lib-row:last-child{border-bottom:0}
 .lib-row .link:disabled{opacity:.3}
 input.cnt{width:72px;text-align:right}
+.rowact{display:inline-flex;gap:4px;align-items:center;justify-content:flex-end;white-space:nowrap}
+.iconbtn{display:inline-grid;place-items:center;width:30px;height:30px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer}
+.iconbtn:hover{color:var(--blue);border-color:var(--blue)}
+.iconbtn.del:hover{color:var(--red);border-color:var(--red)}
+.btn.danger{background:var(--red);border-color:var(--red);color:#fff}
+.te-ask{padding:10px 12px;border-radius:10px;background:var(--blue-soft)}

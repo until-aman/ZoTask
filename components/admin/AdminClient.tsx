@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { copyTasksTo, deleteTasks, setTasksActive } from "@/app/admin-actions";
 import { describeWhen } from "@/components/TemplateEditor";
+import { RowActions } from "@/components/ui/RowActions";
 import { Categories, Category, Checklist, Checklists, Cluster, Clusters, Count, Counts, Schedule, Schedules } from "./Libraries";
 import { Table, type Col } from "@/components/cc/parts";
 import { ActiveChip, Field, FilterBar, SavedView, Stats, sameFilters } from "@/components/ui/Filters";
@@ -28,6 +29,7 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
   const setTab = (k: string) => { setTabState(k); router.replace(k === "tasks" ? "/admin" : `/admin?tab=${k}`); };
   const [sel, setSel] = useState<number[]>([]);
   const [copying, setCopying] = useState<number[] | null>(null);
+  const [delAsk, setDelAsk] = useState(false);
   const bulk = async (p: Promise<{ ok: true; msg?: string } | { ok: false; error: string }>) => { const r = await p; setToast(r.ok ? r.msg ?? "Done" : r.error); if (r.ok) { setSel([]); router.refresh(); } return r.ok; };
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
@@ -66,7 +68,7 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
     { key: "audit", label: "Audit sample", num: true, value: (t) => t.audit_rate, render: (t) => `${Math.round(t.audit_rate * 100)}%` },
     { key: "rv", label: "Reviewer / auditor", value: (t) => t.reviewer, render: (t) => <span className="small"><div>{t.reviewer ?? "Cluster reviewer"}</div><div className="muted">{t.auditor ?? "Any auditor"}</div></span>, csv: (t) => `${t.reviewer ?? ""} / ${t.auditor ?? ""}` },
     { key: "props", label: "Properties", num: true, value: (t) => t.props },
-    { key: "edit", label: "", value: () => null, render: (t) => <Link href={`/admin/templates/${t.id}`}>Edit</Link>, csv: () => "" },
+    { key: "edit", label: "", value: () => null, csv: () => "", render: (t) => <RowActions name={t.name} onEdit={() => router.push(`/admin/templates/${t.id}`)} onDelete={() => bulk(deleteTasks([t.id]))} /> },
   ];
   const pcols: Col<Prop>[] = [
     { key: "name", label: "Property", value: (p) => p.name, sticky: true },
@@ -105,7 +107,10 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
             <button type="button" className="btn sm" onClick={() => bulk(setTasksActive(sel, false))}>Pause</button>
             <button type="button" className="btn sm" onClick={() => bulk(setTasksActive(sel, true))}>Resume</button>
             <button type="button" className="btn sm" onClick={() => setCopying([])}>Add to properties</button>
-            <button type="button" className="btn sm" style={{ color: "var(--red)" }} onClick={() => confirm(`Delete ${sel.length} task${sel.length > 1 ? "s" : ""}? Tasks that already ran are paused instead, so reports keep their history.`) && bulk(deleteTasks(sel))}>Delete</button>
+            {delAsk ? <span className="row2 small" style={{ gap: 6 }}>Delete {sel.length}? Tasks that already ran are paused instead.
+              <button type="button" className="btn sm danger" onClick={() => { setDelAsk(false); void bulk(deleteTasks(sel)); }}>Yes, delete</button>
+              <button type="button" className="btn sm" onClick={() => setDelAsk(false)}>No</button></span>
+              : <button type="button" className="btn sm" style={{ color: "var(--red)" }} onClick={() => setDelAsk(true)}>Delete</button>}
             <button type="button" className="link small" onClick={() => setSel([])}>Clear</button>
           </> : <span className="small muted">Tick tasks to pause, resume, add them to more properties, or delete them.</span>}
           <span className="spacer" />
