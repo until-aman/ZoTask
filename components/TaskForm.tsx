@@ -1,7 +1,7 @@
 "use client";
 import { fmtTime } from "@/lib/time";
-import { uploadPhoto } from "./upload";
-import { useState } from "react";
+import { tryUpload } from "./upload";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { startTask, submitTask, type Where } from "@/app/actions";
 import Photo from "./Photo";
@@ -41,14 +41,46 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
   }
   const set = (id: number, patch: Partial<Ans>) => setAns((s) => ({ ...s, [id]: { ...s[id], ...patch } }));
 
+  // Unsent answers are kept on this phone, so a refresh, a call or a dropped connection doesn't lose them.
+  const KEY = `zotask.draft.${instanceId}.${attempt}`;
+  const [restored, setRestored] = useState(false);
+  const loaded = useRef(false);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) ?? "null") as Record<number, Ans> | null;
+      if (saved && items.some((it) => JSON.stringify(saved[it.id]) !== JSON.stringify(ans[it.id]))) {
+        setAns((s) => Object.fromEntries(items.map((it) => [it.id, saved[it.id] ? { ...s[it.id], ...saved[it.id] } : s[it.id]])));
+        setRestored(true);
+      }
+    } catch { /* storage blocked */ }
+    loaded.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [KEY]);
+  useEffect(() => {
+    if (!loaded.current) return;
+    const t = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(ans)); } catch { /* storage full or blocked */ } }, 400);
+    return () => clearTimeout(t);
+  }, [ans, KEY]);
+  function discardDraft() {
+    try { localStorage.removeItem(KEY); } catch { /* storage blocked */ }
+    window.location.reload();
+  }
+
+  // Photos being uploaded and the ones that failed, per item.
+  const [uploading, setUploading] = useState<Record<number, number>>({});
+  const [failed, setFailed] = useState<Record<number, string>>({});
+  const pending = Object.values(uploading).reduce((a, b) => a + b, 0);
   async function upload(id: number, files: FileList | null) {
-    if (!files) return;
-    const names: string[] = [];
-    for (const f of Array.from(files).slice(0, 10 - ans[id].photos.length)) {
-      const n = await uploadPhoto(f);
-      if (n) names.push(n);
-    }
-    set(id, { photos: [...ans[id].photos, ...names] });
+    if (!files?.length) return;
+    const list = Array.from(files).slice(0, 10 - ans[id].photos.length);
+    setFailed((f) => ({ ...f, [id]: "" }));
+    setUploading((u) => ({ ...u, [id]: (u[id] ?? 0) + list.length }));
+    await Promise.all(list.map(async (f) => {
+      const r = await tryUpload(f);
+      if ("name" in r) setAns((s) => ({ ...s, [id]: { ...s[id], photos: [...s[id].photos, r.name].slice(0, 10) } }));
+      else setFailed((x) => ({ ...x, [id]: `${f.name}: ${r.error}` }));
+      setUploading((u) => ({ ...u, [id]: (u[id] ?? 1) - 1 }));
+    }));
   }
 
   function checkLocation() {
@@ -70,6 +102,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
 
   async function onSubmit() {
     setErr("");
+    if (pending) return setErr("Wait for the photos to finish uploading.");
     if (property.geofence && !loc.where && !locWarned) {
       setLocWarned(true);
       return setErr("Location hasn't been checked. Validate it, or press Submit again to send without it. The reviewer will see that.");
@@ -78,6 +111,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
     const r = await submitTask(instanceId, items.map((it) => ({ itemId: it.id, ...ans[it.id] })), loc.where);
     setBusy(false);
     if (!r.ok) return setErr(r.error);
+    try { localStorage.removeItem(KEY); } catch { /* storage blocked */ }
     router.push("/tasks");
     router.refresh();
   }
@@ -90,6 +124,9 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
             : <><button type="button" className="btn primary" onClick={start}>Start task</button><span className="small muted">Tap Start when you begin, so time spent is tracked.</span></>}
           {timer.idealMinutes ? <><span className="spacer" /><span className="pill">Ideal: {timer.idealMinutes} min</span></> : null}
         </div>
+      )}
+      {restored && (
+        <div className="info row2" role="status"><i>i</i><span>Restored the answers you hadn&apos;t sent yet.</span><span className="spacer" /><button type="button" className="link small" onClick={discardDraft}>Start over</button></div>
       )}
       {status === "changes" && (
         <div className="err" style={{ fontWeight: 600 }}>The reviewer sent this back. Fix the flagged items and reply to each flag. This will be attempt {attempt + 1} of {attemptsAllowed}{attempt + 1 === attemptsAllowed ? ", your last one" : ""}.</div>
@@ -123,13 +160,15 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
                     onClick={() => set(it.id, { photos: a.photos.filter((_, j) => j !== ix) })}>×</button>
                 </span>
               ))}
-              {a.photos.length < 10 && (
+              {Array.from({ length: uploading[it.id] ?? 0 }, (_, k) => <span key={`up${k}`} className="ph" role="status" aria-label="Uploading photo">Uploading…</span>)}
+              {a.photos.length + (uploading[it.id] ?? 0) < 10 && (
                 <label className="ph" style={{ cursor: "pointer", borderStyle: "dashed" }}>
                   + Photo
-                  <input type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => upload(it.id, e.target.files)} />
+                  <input type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { upload(it.id, e.target.files); e.target.value = ""; }} />
                 </label>
               )}
             </div>}
+            {failed[it.id] && <div className="small warn" role="alert">{failed[it.id]}</div>}
             {!!(it.note_allowed || it.note_required) && <input type="text" placeholder={it.note_required ? "Note (required)" : "Note (optional)"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />}
             {flag && <input type="text" placeholder="Reply to the reviewer" value={a.reply} onChange={(e) => set(it.id, { reply: e.target.value })} />}
           </div>
@@ -145,7 +184,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
       {problems.length > 0 && <div className="info"><i>!</i>{problems.length} item{problems.length > 1 ? "s are" : " is"} incomplete. The reviewer can't pass a task with missing evidence.</div>}
       {err && <div className="err">{err}</div>}
       <div className="row2">
-        <button type="button" className="btn primary" disabled={busy} onClick={onSubmit}>{busy ? "Submitting…" : status === "changes" ? "Resubmit" : "Submit"}</button>
+        <button type="button" className="btn primary" disabled={busy || pending > 0} onClick={onSubmit}>{busy ? "Submitting…" : pending ? `Uploading ${pending} photo${pending > 1 ? "s" : ""}…` : status === "changes" ? "Resubmit" : "Submit"}</button>
       </div>
     </div>
   );
