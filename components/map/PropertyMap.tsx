@@ -6,12 +6,12 @@ import type * as Leaflet from "leaflet";
 import type { MapData, Pin } from "@/lib/map";
 import { readWorkbook, resolveMapLinks, saveMapSites } from "@/app/map-actions";
 import { parseCsv, readSheet, type SiteInput } from "@/lib/sheet";
+import { templateCsv, templateXlsx } from "@/lib/template";
 import PropertyCard, { genderLabel } from "./PropertyCard";
 import { ActiveChip, Field, FilterBar, Stats } from "@/components/ui/Filters";
 
 type By = "status" | "health";
 const STATUSES = ["Live", "Upcoming", "Closed"];
-const COLS = ["Zolo Code", "Property Name", "City", "State", "Latitude", "Longitude", "Address", "Status", "Beds"];
 
 /** Pin colour class. Health: red under 70% on time or anything overdue, amber under 85%, green otherwise. */
 function tone(p: Pin, by: By) {
@@ -29,7 +29,6 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
   const [sel, setSel] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   const [sheet, setSheet] = useState<(ReturnType<typeof readSheet> & { file: string }) | null>(null);
-  const [replace, setReplace] = useState(true);
   const [busy, setBusy] = useState(false);
   const [look, setLook] = useState<{ done: number; total: number } | null>(null);
   const [noTiles, setNoTiles] = useState(false);
@@ -136,20 +135,18 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
   async function save() {
     if (!sheet) return;
     setBusy(true);
-    // In batches, so a big sheet with long write-ups stays well under the upload size limit.
-    let saved = 0, linked = 0, err = "";
-    for (let i = 0; i < sheet.ok.length && !err; i += 50) {
-      const r = await saveMapSites(sheet.ok.slice(i, i + 50), replace && i === 0).catch((e: Error) => ({ ok: false as const, error: e.message }));
-      if (r.ok) { saved += r.saved; linked += r.linked; } else err = r.error;
-    }
+    // One save: the new sheet replaces the whole list, or nothing changes if it fails.
+    const r = await saveMapSites(sheet.ok).catch((e: Error) => ({ ok: false as const, error: e.message }));
     setBusy(false);
-    setToast(err ? `${saved ? `Saved ${saved}, then stopped: ` : ""}${err}` : `Saved ${saved} propert${saved === 1 ? "y" : "ies"}${linked ? `, ${linked} matched to ZoTask` : ""}.`);
-    if (!err) setSheet(null);
-    router.refresh();
+    setToast(r.ok ? r.msg : r.error);
+    if (r.ok) { setSheet(null); router.refresh(); }
   }
-  function template() {
-    const csv = [COLS.join(","), "ZO0001,Zolo Euphoria for Men,Bangalore,Karnataka,12.9352,77.6245,\"80 Feet Road, Koramangala\",Live,120"].join("\n");
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "zolo-property-locations.csv"; a.click();
+  function template(kind: "xlsx" | "csv") {
+    const blob = kind === "xlsx"
+      ? new Blob([templateXlsx() as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
+      : new Blob([templateCsv()], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `zolo-properties-template.${kind}`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
   const chips: ActiveChip[] = [
@@ -180,9 +177,10 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
 
       {sheet && <section className="card grid mupload" aria-label="Upload locations">
         <div className="row2"><b>Upload property locations</b><span className="spacer" /><button type="button" className="link small" onClick={() => setSheet(null)}>Close</button></div>
-        <p className="small muted" style={{ margin: 0 }}>One row per property, as Excel (.xlsx) or CSV. Columns: <b>{COLS.join(", ")}</b>. Property Name and a location are needed; the rest is optional. The location can be Latitude and Longitude, a &ldquo;Coordinates&rdquo; column with &ldquo;12.93, 77.62&rdquo;, or a Google Maps link (short share links are looked up for you). Status is Live, Upcoming or Closed. The full property sheet works as it is: gender, address, write-ups, amenities, demand centres, transit, staff contacts and compliance all go on the property&apos;s card. Rows are matched to ZoTask properties by Zolo Code, then by name.</p>
+        <p className="small muted" style={{ margin: 0 }}>Upload the complete property sheet as Excel (.xlsx) or CSV, one row per property. Download the template for every column, with an example row (it is skipped if left in). Only <b>Property Name</b> and a location are needed: Latitude and Longitude, a &ldquo;Coordinates&rdquo; column like &ldquo;12.93, 77.62&rdquo;, or a Google Maps link (short share links are looked up for you). Everything else (gender, address, write-ups, amenities, demand centres, transit, staff contacts, compliance) goes on the property&apos;s card. Each upload replaces the whole list.</p>
         <div className="row2">
-          <button type="button" className="btn sm" onClick={template}>Download template</button>
+          <button type="button" className="btn sm" onClick={() => template("xlsx")}>Download Excel template</button>
+          <button type="button" className="btn sm" onClick={() => template("csv")}>CSV template</button>
           <label className="btn sm primary" style={{ cursor: "pointer" }}>{busy && !sheet.file ? "Reading…" : sheet.file ? "Choose another file" : "Choose Excel or CSV file"}<input type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} /></label>
           {sheet.file && <span className="small muted">{sheet.file}</span>}
         </div>
@@ -197,8 +195,7 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
           {look && <div className="mlook" role="status"><div className="small">Finding locations from Google Maps links: {look.done} of {look.total}</div><div className="mbar"><i style={{ width: `${(look.done / look.total) * 100}%` }} /></div></div>}
           {sheet.bad.length > 0 && <ul className="small mbad">{sheet.bad.slice(0, 8).map((b) => <li key={b}>{b}</li>)}{sheet.bad.length > 8 && <li>and {sheet.bad.length - 8} more</li>}</ul>}
           <div className="row2">
-            <label className="opt"><input type="radio" checked={replace} onChange={() => setReplace(true)} />Replace the whole list with this sheet</label>
-            <label className="opt"><input type="radio" checked={!replace} onChange={() => setReplace(false)} />Add these and update matching ones</label>
+            <span className="small muted">Saving replaces the whole list: properties and details from earlier uploads are deleted.</span>
             <span className="spacer" />
             <button type="button" className="btn primary sm" disabled={!sheet.ok.length || busy || !!look} onClick={save}>{busy ? "Saving…" : `Save ${sheet.ok.length} location${sheet.ok.length === 1 ? "" : "s"}`}</button>
           </div>

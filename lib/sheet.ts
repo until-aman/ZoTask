@@ -88,6 +88,7 @@ export function readSheet(all: string[][]) {
     const at = (i: number) => (i < 0 ? "" : clean(r[i] ?? ""));
     const name = g("name"), line = `Row ${hi + n + 2}${name ? ` (${name})` : ""}`;
     if (!name) return void bad.push(`${line}: property name missing`);
+    if (/\(delete this row\)/i.test(name)) return; // the template's example row
     const comp = parseFloat(g("compliance")), staff = parseFloat(g("staff"));
     const d: Details = {
       gender: g("gender") || undefined, mapsUrl: /^https?:/i.test(g("maps")) ? g("maps") : undefined,

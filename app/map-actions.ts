@@ -62,8 +62,8 @@ export async function resolveMapLinks(urls: string[]): Promise<({ lat: number; l
 
 const STATUSES = ["Live", "Upcoming", "Closed"];
 
-/** replace: the sheet becomes the full list (pass it on the first batch only). Otherwise rows are added, or update the row with the same code or name. */
-export async function saveMapSites(rows: SiteInput[], replace: boolean): Promise<Result> {
+/** The uploaded sheet becomes the whole list: every earlier row and its details are deleted, in the same transaction. */
+export async function saveMapSites(rows: SiteInput[]): Promise<Result> {
   if (!(await admin())) return { ok: false, error: "Only admins can upload locations." };
   const good = rows.filter((r) => r.name.trim() && Number.isFinite(r.lat) && Number.isFinite(r.lng) && inIndia(r.lat, r.lng));
   if (!good.length) return { ok: false, error: "No rows with a property name and a latitude and longitude in India." };
@@ -72,11 +72,12 @@ export async function saveMapSites(rows: SiteInput[], replace: boolean): Promise
     await tx(async () => {
       const props = await all<{ id: number; name: string }>("SELECT id, name FROM properties");
       const match = (r: SiteInput) => props.find((p) => r.code && zoloCode(p.id) === r.code.toUpperCase()) ?? props.find((p) => p.name.toLowerCase() === r.name.trim().toLowerCase());
-      if (replace) await run("DELETE FROM map_sites");
+      await run("DELETE FROM map_sites");
       const now = Date.now();
       for (const r of good) {
         const p = match(r);
         if (p) { linked++; await run("UPDATE properties SET lat=?, lng=? WHERE id=?", r.lat, r.lng, p.id); }
+        // A property listed twice in the sheet keeps its last row.
         await run("DELETE FROM map_sites WHERE (code IS NOT NULL AND code <> '' AND upper(code)=upper(?)) OR lower(name)=lower(?)", r.code, r.name.trim());
         await run(`INSERT INTO map_sites (code, name, city, state, lat, lng, address, status, beds, property_id, updated_at, gender, details) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           r.code.trim() || null, r.name.trim(), r.city.trim() || null, r.state.trim() || null, r.lat, r.lng, r.address.trim() || null,
