@@ -41,13 +41,12 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
 
   return (
     <div className="page narrow">
-      <Link href="/queue" className="small">‹ Review Queue</Link>
-      <div className="row2">
+      <Link href="/queue" className="crumb">‹ Review Queue</Link>
+      <div className="phead">
         <div>
           <h1>{r.task}</h1>
-          <p className="muted" style={{ margin: "2px 0 0" }}>{r.property} · {r.cluster}, {r.city} · {fmtDate(r.task_date)} · window {r.window_start}–{r.window_end}</p>
+          <p className="phead-sub">{r.property} · {r.cluster}, {r.city} · {fmtDate(r.task_date)} · window {r.window_start}–{r.window_end}</p>
         </div>
-        <span className="spacer" />
         <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
       </div>
       <div className="card">

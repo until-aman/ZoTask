@@ -16,8 +16,8 @@ type Geo = { city: string; cluster: string; property: string; id: number };
 type Ev = { id: number; at: number; type: string; detail: string; actor: string | null };
 
 const GROUPS = [
-  { n: "Waiting on the reviewer", short: "With reviewers", tabs: [["review", "To Review"], ["resub", "Resubmitted"]], open: true, c: "var(--blue)" },
-  { n: "Waiting on the auditor", short: "With auditor", tabs: [["audit", "To Audit"], ["flagans", "Flag Answers"]], open: true, c: "#7c3aed" },
+  { n: "Waiting on the reviewer", short: "With reviewers", tabs: [["review", "To Review"], ["resub", "Resubmitted"]], open: true, c: "var(--accent)" },
+  { n: "Waiting on the auditor", short: "With auditor", tabs: [["audit", "To Audit"], ["flagans", "Flag Answers"]], open: true, c: "var(--navy)" },
   { n: "Waiting on ground team or CBM", short: "With ground team", tabs: [["changes", "Changes Required"], ["notsub", "Not Submitted"], ["auditflag", "Audit Flags"]], open: true, ground: true, c: "var(--amber)" },
   { n: "Closed", short: "Closed", tabs: [["done", "Done"], ["missed", "Missed"], ["notrect", "Not rectified"], ["waived", "Waived"]], open: false, c: "var(--faint)" },
 ] as const;
@@ -158,9 +158,9 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     <div className="page" style={{ paddingTop: 16 }}>
       <div>
         <main className="q">
-          <div>
-            <h1>{tabName(tab)}</h1>
-            <p className="muted" style={{ margin: "2px 0 0" }}>{locText} · {from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}</p>
+          <div className="phead">
+            <div><h1>{tabName(tab)}</h1>
+            <p className="phead-sub">{locText} · {from === to ? nice(from) : `${nice(from)} – ${nice(to)}`}</p></div>
           </div>
           <nav className="qtabs" aria-label="Queue navigation">
             {GROUPS.map((gr) => (

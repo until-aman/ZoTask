@@ -19,9 +19,9 @@ function Health({ d, part }: { d: CC; part: "top" | "rest" }) {
   const g = d.ground, v = d.review, o = d.outcome;
   const { open } = useDrill();
   const parts: [string, typeof o.done, string, string][] = [["Approved and closed", o.done, "var(--green)", "Approved, and audit done or not needed"],
-    ["In review or being fixed", o.inprog, "var(--blue)", "Submitted, still in review, audit or being corrected"],
+    ["In review or being fixed", o.inprog, "var(--accent)", "Submitted, still in review, audit or being corrected"],
     ["Not submitted yet", o.notsub, "var(--amber)", "Past the deadline, grace period still running"], ["Missed", o.missed, "var(--red)", "Grace period ended with nothing submitted"],
-    ["Not rectified", o.notrect, "var(--purple)", "All attempts used without a pass"]];
+    ["Not rectified", o.notrect, "var(--navy)", "All attempts used without a pass"]];
   const due = g.due.n;
   // Counts only: the change arrow on these compares rates, so leave it off here.
   const count = (k: typeof g.missed) => ({ ...k, prev: undefined });
@@ -74,7 +74,7 @@ function Health({ d, part }: { d: CC; part: "top" | "rest" }) {
         </div>
       </section>
       <section className="card outcome">
-        <div className="row2">
+        <div className="row2 sech">
           <h3 style={{ margin: 0, display: "flex", alignItems: "center" }}>Outcome of {due} tasks past deadline</h3>
           <span className="spacer" />
           <span className="small" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>Approved (any attempt) <b>{o.approved.rate ?? "—"}%</b>
@@ -121,10 +121,10 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
   return (
     <DrillCtx.Provider value={ctx}>
       <div className="page cc">
-        <div className="row2">
+        <div className="phead">
           <div>
             <h1>Operations command center</h1>
-            <p className="muted" style={{ margin: "2px 0 0" }}>{span(d.R)} vs {span(d.P)} · {d.propCount} properties{d.mine ? " · my portfolio" : ""}{d.filters.rv ? ` · reviewer: ${d.reviewerOpts.find((r) => String(r.id) === d.filters.rv)?.name ?? ""}` : ""} · data as of {fmtTime(d.now)}</p>
+            <p className="phead-sub">{span(d.R)} vs {span(d.P)} · {d.propCount} properties{d.mine ? " · my portfolio" : ""}{d.filters.rv ? ` · reviewer: ${d.reviewerOpts.find((r) => String(r.id) === d.filters.rv)?.name ?? ""}` : ""} · data as of {fmtTime(d.now)}</p>
           </div>
         </div>
         <DashFilters geo={d.geo} cats={d.cats} init={{ range: d.preset, ...d.filters }} range={d.R} mine={d.role === "reviewer" ? d.mine : undefined} reviewers={d.reviewerOpts}

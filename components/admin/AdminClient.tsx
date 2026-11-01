@@ -81,7 +81,7 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
   const cities2 = [...new Set(props.map((p) => p.city))];
   return (
     <div className="page">
-      <div className="row2"><h1>Admin</h1><span className="spacer" /><Link className="btn primary" href="/admin/templates/new">+ New task</Link></div>
+      <div className="phead"><div><h1>Admin</h1><p className="phead-sub">Tasks, properties, people and the lists they use.</p></div><Link className="btn primary" href="/admin/templates/new">+ New task</Link></div>
       <nav className="admtabs" aria-label="Admin sections">
         {TABS.map(([k, l]) => <button key={k} type="button" aria-current={tab === k ? "page" : undefined} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}
       </nav>

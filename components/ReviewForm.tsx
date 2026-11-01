@@ -20,7 +20,7 @@ function Shown({ it, a, ideal }: { it: Item; a?: Ans; ideal?: Record<string, num
       <div>{main}{it.photo_required && !a.photos.length ? <> · <span className="warn">Photo not recorded</span></> : null}</div>
       {a.photos.length > 0 && <div className="photos">{a.photos.map((p, i) => <Photo key={i} name={p} />)}</div>}
       {a.note && <div className="small muted">Note: {a.note}</div>}
-      {a.reply && <div className="small" style={{ color: "var(--blue-d)" }}>Reply: {a.reply}</div>}
+      {a.reply && <div className="small" style={{ color: "var(--accent-text)" }}>Reply: {a.reply}</div>}
     </div>
   );
 }

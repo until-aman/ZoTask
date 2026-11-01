@@ -71,7 +71,7 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
   return (
     <section className="card sec" id="actions">
       <div className="sech">
-        <h2>Action required<InfoTip title="Action required" rows={[["Order", "Severity first, then how long it is past its limit"], ["Critical", "A critical task not done, or on its last attempt"], ["High", "Twice the time limit, last attempt left, or no reviewer"], ["Owner", "The one person who must act next"], ["Stays", "Until the task moves on. Acknowledging doesn't hide it"]]} note="Each task appears once, under its most serious problem." /></h2>
+        <h2>Open issues<InfoTip title="Open issues" rows={[["Order", "Severity first, then how long it is past its limit"], ["Critical", "A critical task not done, or on its last attempt"], ["High", "Twice the time limit, last attempt left, or no reviewer"], ["Owner", "The one person who must act next"], ["Stays", "Until the task moves on. Acknowledging doesn't hide it"]]} note="Each task appears once, under its most serious problem." /></h2>
         <span className="pill">{issues.length}</span><span className="spacer" />
         <button type="button" className="btn sm" onClick={() => setHo(makeHandover())}>Daily handover</button>
       </div>

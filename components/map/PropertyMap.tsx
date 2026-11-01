@@ -160,7 +160,7 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
 
   return (
     <div className="page">
-      <div className="row2"><h1>Property map</h1><span className="spacer" />
+      <div className="phead"><div><h1>Property map</h1><p className="phead-sub">Every Zolo property, coloured by status or task health.</p></div>
         {admin && <button type="button" className="btn" onClick={() => setSheet(sheet ? null : { ok: [], pending: [], bad: [], total: 0, missingCols: [], file: "" })}>Upload locations</button>}
       </div>
       <FilterBar search={q} setSearch={setQ} searchLabel="Search property, code, city, address or CBM" chips={chips} onClearAll={() => { setCity(""); setStatus(""); setGender(""); setOnly(""); }}

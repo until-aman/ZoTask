@@ -41,9 +41,10 @@ export default function LoginClient({ people }: { people: Person[] }) {
 
   return (
     <div className="page narrow lg">
-      <div>
-        <h1>Sign in to ZoTask</h1>
-        <p className="muted" style={{ margin: "2px 0 0" }}>Sample data. Pick anyone to see ZoTask from their side.</p>
+      <div className="lg-brand"><span className="logo" aria-hidden="true">Ω</span><span className="brand">ZoTask</span></div>
+      <div className="phead">
+        <div><h1>Sign in to ZoTask</h1>
+        <p className="phead-sub">Sample data. Pick anyone to see ZoTask from their side.</p></div>
       </div>
       <div className="lg-top">
         <input type="search" className="search grow" placeholder="Search name, property, city or role" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search people" autoFocus />

@@ -47,9 +47,9 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
 
   return (
     <div className="page narrow">
-      <div>
-        <h1>My Tasks</h1>
-        <p className="muted" style={{ margin: "2px 0 0" }}>{late ? <b style={{ color: "var(--red)" }}>{lists.overdue.length} overdue · {lists.changes.length} to fix{lists.flags.length ? ` · ${lists.flags.length} audit flags to answer` : ""}</b> : "Nothing overdue. Nice."}</p>
+      <div className="phead">
+        <div><h1>My Tasks</h1>
+        <p className="phead-sub">{late ? <b style={{ color: "var(--red)" }}>{lists.overdue.length} overdue · {lists.changes.length} to fix{lists.flags.length ? ` · ${lists.flags.length} audit flags to answer` : ""}</b> : "Nothing overdue. Nice."}</p></div>
       </div>
       <FilterBar search={q} setSearch={(v) => { setQ(v); setPage(0); }} searchLabel="Search tasks" chips={chips}
         onClearAll={() => apply({})}

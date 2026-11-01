@@ -39,17 +39,17 @@ function toText(r: Rep) {
 /** HTML with inline styles, so tables survive a paste into Gmail, Outlook or Google Docs. */
 function toHtml(r: Rep) {
   const e = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
-  const th = "padding:6px 10px;border:1px solid #d9dee8;background:#f3f5f9;text-align:left;font-size:12px", td = "padding:6px 10px;border:1px solid #d9dee8;font-size:13px";
+  const th = "padding:6px 10px;border:1px solid #e3e8ee;background:#f6f8fa;text-align:left;font-size:12px", td = "padding:6px 10px;border:1px solid #e3e8ee;font-size:13px";
   const tone = (t: string) => (t === "best" ? "background:#e7f6ec;color:#166534;font-weight:600" : t === "worst" ? "background:#fdecec;color:#b91c1c" : "");
-  let h = `<div style="font-family:Arial,sans-serif;color:#172033"><h2 style="margin:0 0 4px">${e(r.title)}</h2><div style="color:#5b6577;font-size:13px">${e(r.names.join(" vs "))} · ${e(r.period)} · generated ${e(r.generated)}</div>`;
+  let h = `<div style="font-family:Arial,sans-serif;color:#1a1f36"><h2 style="margin:0 0 4px">${e(r.title)}</h2><div style="color:#687385;font-size:13px">${e(r.names.join(" vs "))} · ${e(r.period)} · generated ${e(r.generated)}</div>`;
   h += `<p style="font-size:14px"><b>Top performer:</b> ${e(r.ranking[0].label)} &nbsp; <b>Needs the most support:</b> ${e(r.ranking[r.ranking.length - 1].label)}</p>`;
   h += `<h3>Ranking</h3><table style="border-collapse:collapse"><tr><th style="${th}">#</th><th style="${th}">${e(r.one)}</th><th style="${th}">Best on</th><th style="${th}">Worst on</th><th style="${th}">Tasks</th></tr>`;
   for (const x of r.ranking) h += `<tr><td style="${td}">${x.place}</td><td style="${td}"><b>${e(x.label)}</b></td><td style="${td}">${x.bestOn}</td><td style="${td}">${x.worstOn}</td><td style="${td}">${x.tasks}${x.few ? " (few)" : ""}</td></tr>`;
   h += `</table><h3>Metrics</h3><table style="border-collapse:collapse"><tr><th style="${th}">Metric</th>${r.names.map((n) => `<th style="${th}">${e(n)}</th>`).join("")}</tr>`;
-  for (const m of r.metrics) h += `<tr><td style="${td}">${e(m.label)}</td>${m.cells.map((c) => `<td style="${td};${tone(c.tone)}">${e(c.v)}${c.of ? `<br><span style="font-size:11px;color:#5b6577">${e(c.of)}</span>` : ""}</td>`).join("")}</tr>`;
+  for (const m of r.metrics) h += `<tr><td style="${td}">${e(m.label)}</td>${m.cells.map((c) => `<td style="${td};${tone(c.tone)}">${e(c.v)}${c.of ? `<br><span style="font-size:11px;color:#687385">${e(c.of)}</span>` : ""}</td>`).join("")}</tr>`;
   h += "</table>";
   for (const p of r.people) {
-    h += `<h3>${p.place}. ${e(p.label)}${p.sub ? ` <span style="font-weight:normal;color:#5b6577">(${e(p.sub)})</span>` : ""}</h3>`;
+    h += `<h3>${p.place}. ${e(p.label)}${p.sub ? ` <span style="font-weight:normal;color:#687385">(${e(p.sub)})</span>` : ""}</h3>`;
     if (p.ahead.length) h += `<p style="margin:4px 0"><b style="color:#166534">Doing well</b></p><ul>${p.ahead.map((x) => `<li>${e(x.metric)}: <b>${e(x.value)}</b> (avg ${e(x.avg)})${x.top ? " · best in group" : ""}</li>`).join("")}</ul>`;
     if (p.behind.length) h += `<p style="margin:4px 0"><b style="color:#b91c1c">Needs improvement</b></p><ul>${p.behind.map((x) => `<li>${e(x.metric)}: <b>${e(x.value)}</b> (avg ${e(x.avg)}, best ${e(x.best)} by ${e(x.leader)})</li>`).join("")}</ul>`;
     if (p.actions.length) h += `<p style="margin:4px 0"><b>Next steps</b></p><ol>${p.actions.map((a) => `<li>${e(a)}</li>`).join("")}</ol>`;
