@@ -6,7 +6,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p ${PORT:-3000}",
-    "reset": "rm -rf data"
+    "reset": "rm -rf data",
+    "test": "node tests/run.mjs"
   },
   "engines": {
     "node": ">=20"

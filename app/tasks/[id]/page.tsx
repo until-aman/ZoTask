@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { boot } from "@/lib/boot";
+import { taskInScope } from "@/lib/auth";
 import { all, one } from "@/lib/db";
 import { itemsFor, latestSubmission } from "@/lib/engine";
 import { rows, eventsFor, STATUS_LABEL, STATUS_PILL } from "@/lib/queries";
@@ -12,6 +13,8 @@ import Timeline from "@/components/Timeline";
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const u = await boot();
   const id = Number((await params).id);
+  // Unknown ids and tasks outside the user's properties look the same: not found.
+  if ((await taskInScope(u, id)) === null) notFound();
   const [r] = await rows("i.id=?", id);
   if (!r) notFound();
   const items = await itemsFor(r.template_id);

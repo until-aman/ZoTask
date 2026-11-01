@@ -1,8 +1,9 @@
 "use client";
+import { fmtTime } from "@/lib/time";
 import { uploadPhoto } from "./upload";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { startTask, submitTask } from "@/app/actions";
+import { startTask, submitTask, type Where } from "@/app/actions";
 import Photo from "./Photo";
 
 type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null };
@@ -28,7 +29,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
     const p = prev.find((x) => x.item_id === it.id);
     return [it.id, { checked: !!p?.checked, value: p?.value ?? "", note: p?.note ?? "", photos: p ? JSON.parse(p.photos) : [], reply: "" }];
   })));
-  const [loc, setLoc] = useState<{ ok: boolean | null; distance: number | null; msg: string }>({ ok: null, distance: null, msg: "" });
+  const [loc, setLoc] = useState<{ ok: boolean | null; distance: number | null; msg: string; where: Where }>({ ok: null, distance: null, msg: "", where: null });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [locWarned, setLocWarned] = useState(false);
@@ -51,14 +52,14 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
   }
 
   function checkLocation() {
-    if (!navigator.geolocation) return setLoc({ ok: null, distance: null, msg: "This browser can't share location." });
+    if (!navigator.geolocation) return setLoc({ ok: null, distance: null, msg: "This browser can't share location.", where: null });
     setLoc({ ...loc, msg: "Checking…" });
     navigator.geolocation.getCurrentPosition(
       (p) => {
         const d = distance({ lat: p.coords.latitude, lng: p.coords.longitude }, property);
-        setLoc({ ok: d <= GEOFENCE_M, distance: d, msg: d <= GEOFENCE_M ? `You're at the property (${d} m away).` : `You're ${d >= 1000 ? (d / 1000).toFixed(1) + " km" : d + " m"} from the property. The reviewer will see a location warning.` });
+        setLoc({ where: { lat: p.coords.latitude, lng: p.coords.longitude }, ok: d <= GEOFENCE_M, distance: d, msg: d <= GEOFENCE_M ? `You're at the property (${d} m away).` : `You're ${d >= 1000 ? (d / 1000).toFixed(1) + " km" : d + " m"} from the property. The reviewer will see a location warning.` });
       },
-      () => setLoc({ ok: null, distance: null, msg: "Location permission was denied." }),
+      () => setLoc({ ok: null, distance: null, msg: "Location permission was denied.", where: null }),
       { enableHighAccuracy: true, timeout: 10000 });
   }
 
@@ -69,12 +70,12 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
 
   async function onSubmit() {
     setErr("");
-    if (property.geofence && loc.ok === null && !locWarned) {
+    if (property.geofence && !loc.where && !locWarned) {
       setLocWarned(true);
       return setErr("Location hasn't been checked. Validate it, or press Submit again to send without it. The reviewer will see that.");
     }
     setBusy(true);
-    const r = await submitTask(instanceId, items.map((it) => ({ itemId: it.id, ...ans[it.id] })), { ok: loc.ok, distance: loc.distance });
+    const r = await submitTask(instanceId, items.map((it) => ({ itemId: it.id, ...ans[it.id] })), loc.where);
     setBusy(false);
     if (!r.ok) return setErr(r.error);
     router.push("/tasks");
@@ -85,7 +86,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
     <div className="card grid">
       {timer?.startStop && status !== "changes" && (
         <div className="row2 timerbar">
-          {startedAt ? <span>Started at <b>{new Date(startedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</b>. Submitting stops the clock.</span>
+          {startedAt ? <span>Started at <b>{fmtTime(startedAt)}</b>. Submitting stops the clock.</span>
             : <><button type="button" className="btn primary" onClick={start}>Start task</button><span className="small muted">Tap Start when you begin, so time spent is tracked.</span></>}
           {timer.idealMinutes ? <><span className="spacer" /><span className="pill">Ideal: {timer.idealMinutes} min</span></> : null}
         </div>
@@ -137,7 +138,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
       {property.geofence && (
         <div className="row2">
           <button type="button" className="btn" onClick={checkLocation}>Validate location</button>
-          <button type="button" className="link small" onClick={() => setLoc({ ok: true, distance: 0, msg: "Simulated: you're at the property." })}>Simulate being on site</button>
+          <button type="button" className="link small" onClick={() => setLoc({ ok: null, distance: null, where: "simulated", msg: "Demo: location skipped. The reviewer will see it was simulated." })}>Simulate being on site (demo)</button>
           <span className={`small ${loc.ok === false ? "warn" : "muted"}`}>{loc.msg}</span>
         </div>
       )}

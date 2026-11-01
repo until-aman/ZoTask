@@ -1,7 +1,7 @@
 // Operations command center: every number on the dashboard comes from here, with the task ids behind it,
 // so each figure can be opened as a list. Every figure counts tasks, each task once.
 import { all } from "./db";
-import { HOUR, addDays, isoDate } from "./time";
+import { HOUR, addDays, isoDate, dayStart } from "./time";
 import { geo, rows, Row } from "./queries";
 import { User, scopeProps } from "./auth";
 import * as M from "./metrics";
@@ -25,7 +25,7 @@ export type Rv = { id: number; instance_id: number; reviewer_id: number; reviewe
   due_at: number | null; submitted_at: number; attempt: number; property_id: number; category: string; i_reviewer: number | null; comment: string | null };
 
 export const pct = (a: number, b: number) => (b ? Math.round((a / b) * 1000) / 10 : null);
-export const dayStart = (d: string) => new Date(d + "T00:00").getTime();
+export { dayStart };
 export function quant(xs: number[], q: number) {
   if (!xs.length) return null;
   const s = [...xs].sort((a, b) => a - b);

@@ -1,5 +1,6 @@
 "use client";
 // Action required: every open problem once, most severe first, with the person who must act and what to do.
+import { fmtAt } from "@/lib/time";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Issue, T } from "@/lib/command";
@@ -54,7 +55,7 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
     const sec = (title: string, xs: Issue[]) => `${title} (${xs.length})\n${xs.length ? xs.slice(0, 15).map(line).join("\n") + (xs.length > 15 ? `\n- …and ${xs.length - 15} more` : "") : "- None"}`;
     const t = handover.tasks;
     return [
-      `ZoTask daily handover · ${new Date(now).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
+      `ZoTask daily handover · ${fmtAt(now, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`,
       `Scope: ${handover.scope}`, "",
       sec("1. Critical unresolved", issues.filter((i) => i.sev === "Critical")),
       sec("2. Ground team overdue", issues.filter((i) => i.cat === "ground")),

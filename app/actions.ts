@@ -2,9 +2,10 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireUser, can } from "@/lib/auth";
+import { requireUser, can, inScope, taskInScope, requireTasks } from "@/lib/auth";
 import { all, one, run, tx } from "@/lib/db";
 import * as E from "@/lib/engine";
+import { km } from "@/lib/geo";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function guard(fn: () => Promise<string | void>): Promise<Result> {
@@ -22,11 +23,22 @@ export async function signIn(form: FormData) {
   redirect("/");
 }
 
-export async function submitTask(instanceId: number, answers: E.AnswerInput[], loc: { ok: boolean | null; distance: number | null }): Promise<Result> {
+/** Where the person was when submitting: their phone's coordinates, the demo "simulate" button, or nothing. The distance is worked out here, not in the browser. */
+export type Where = { lat: number; lng: number } | "simulated" | null;
+export async function submitTask(instanceId: number, answers: E.AnswerInput[], where: Where): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
-    const i = (await one<E.Instance & { cbm_id: number }>("SELECT i.*, p.cbm_id FROM instances i JOIN properties p ON p.id=i.property_id WHERE i.id=?", instanceId))!;
+    const i = await one<E.Instance & { cbm_id: number }>("SELECT i.*, p.cbm_id FROM instances i JOIN properties p ON p.id=i.property_id WHERE i.id=?", instanceId);
+    if (!i) throw new Error("Task not found.");
     if (i.assignee_id !== u.id && i.cbm_id !== u.id) throw new Error("Only the assignee or the property's CBM can submit this task.");
+    const site = (await one<{ lat: number | null; lng: number | null; geofence_m: number }>(
+      "SELECT p.lat, p.lng, t.geofence_m FROM properties p, templates t WHERE p.id=? AND t.id=?", i.property_id, i.template_id))!;
+    let loc: E.Loc = { ok: null, distance: null, source: null };
+    if (where === "simulated") loc = { ok: null, distance: null, source: "simulated" };
+    else if (where && Number.isFinite(where.lat) && Number.isFinite(where.lng) && site.lat !== null && site.lng !== null) {
+      const d = Math.round(km(site as { lat: number; lng: number }, where) * 1000);
+      loc = { ok: d <= site.geofence_m, distance: d, source: "gps" };
+    }
     await E.submit(instanceId, u.id, answers, loc, Date.now());
     return "Submitted";
   });
@@ -64,7 +76,8 @@ export async function auditTask(instanceId: number, decision: "pass" | "fail", f
 export async function answerFlags(instanceId: number, answers: Record<number, string>): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
-    const p = (await one<{ cbm_id: number }>("SELECT p.cbm_id FROM instances i JOIN properties p ON p.id=i.property_id WHERE i.id=?", instanceId))!;
+    const p = await one<{ cbm_id: number }>("SELECT p.cbm_id FROM instances i JOIN properties p ON p.id=i.property_id WHERE i.id=?", instanceId);
+    if (!p) throw new Error("Task not found.");
     if (p.cbm_id !== u.id && u.access_role !== "admin") throw new Error("Only the property's CBM can answer audit flags.");
     await E.answerAuditFlags(instanceId, u.id, answers, Date.now());
     return "Answers sent to the auditor";
@@ -93,6 +106,7 @@ export async function waiveTask(instanceId: number, reason: string): Promise<Res
   const u = await requireUser();
   return guard(async () => {
     if (!["cbm", "admin"].includes(u.access_role)) throw new Error("Only a CBM or admin can waive tasks.");
+    await requireTasks(u, [instanceId]);
     await E.waive(instanceId, u.id, reason || "Waived", Date.now());
     return "Waived";
   });
@@ -101,6 +115,8 @@ export async function waiveTask(instanceId: number, reason: string): Promise<Res
 export async function remindTasks(ids: number[]): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
+    if (!can.queue(u)) throw new Error("Only CBMs and the central team can send reminders.");
+    await requireTasks(u, ids);
     const { people, skipped } = await E.remind(ids, u.id, Date.now());
     return `Reminder logged for ${people} ${people === 1 ? "person" : "people"}${skipped ? ` · ${skipped} skipped, already reminded in the last 4h` : ""}`;
   });
@@ -110,6 +126,8 @@ export async function reassignReviewer(ids: number[], reviewerId: number): Promi
   const u = await requireUser();
   return guard(async () => {
     if (!["reviewer", "admin"].includes(u.access_role)) throw new Error("Only reviewers and admins can reassign.");
+    const to = await one<{ access_role: string }>("SELECT access_role FROM users WHERE id=?", reviewerId);
+    if (!to || !["reviewer", "admin"].includes(to.access_role)) throw new Error("Pick a reviewer.");
     await tx(async () => { for (const id of ids) await E.reassignReviewer(id, reviewerId, u.id, Date.now()); });
     return "Reassigned";
   });
@@ -154,6 +172,10 @@ export async function triggerTask(templateId: number, propertyId: number): Promi
   const u = await requireUser();
   return guard(async () => {
     if (!["cbm", "admin"].includes(u.access_role)) throw new Error("Only a CBM or admin can create tasks.");
+    if (!(await inScope(u, propertyId))) throw new Error("That property isn't one of yours.");
+    const t = await one<{ trigger: string; active: number }>("SELECT trigger, active FROM templates WHERE id=?", templateId);
+    if (!t || t.trigger === "scheduled" || !t.active) throw new Error("That task can't be started by hand.");
+    if (!(await one("SELECT 1 FROM template_properties WHERE template_id=? AND property_id=?", templateId, propertyId))) throw new Error("That task isn't set up for this property.");
     const id = await E.triggerEvent(templateId, propertyId, u.id, Date.now());
     if (!id) throw new Error("Couldn't create the task.");
     return "Task created and assigned";
@@ -207,7 +229,7 @@ export async function saveTemplate(id: number | null, t: TemplateInput): Promise
 
 export async function getTaskDetail(instanceId: number) {
   const u = await requireUser();
-  if (!can.dashboard(u)) return null;
+  if (!can.dashboard(u) || (await taskInScope(u, instanceId)) === null) return null;
   const { taskDetail } = await import("@/lib/detail");
   return taskDetail(instanceId, u);
 }
@@ -217,6 +239,7 @@ export async function acknowledgeIssues(ids: number[]): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
     if (!can.dashboard(u)) throw new Error("Only central roles can acknowledge issues.");
+    await requireTasks(u, ids);
     await tx(async () => { for (const id of ids) await E.logEvent(id, Date.now(), u.id, "acknowledged", "Issue acknowledged"); });
     return `Acknowledged ${ids.length} ${ids.length === 1 ? "issue" : "issues"}`;
   });
@@ -236,7 +259,8 @@ export async function escalateIssue(id: number, note: string): Promise<Result> {
 }
 
 export async function getHistory(instanceId: number) {
-  await requireUser();
+  const u = await requireUser();
+  if ((await taskInScope(u, instanceId)) === null) return [];
   const { eventsFor } = await import("@/lib/queries");
   return eventsFor(instanceId);
 }

@@ -15,6 +15,8 @@ Open http://localhost:3000 and pick anyone on the sign-in page to see ZoTask fro
 
 For a production build: `npm run build && npm start`.
 
+Run the tests with `npm test`. Each test file gets a fresh seeded database and runs with the clock on UTC (like Vercel), calling the real server actions as different people. All dates and times in ZoTask are India Standard Time, whatever zone the server runs in (`lib/time.ts`).
+
 ## Put it online (Vercel + Turso, free plans)
 
 The app stores data in SQLite through libSQL, so the same code runs on a local file or on [Turso](https://turso.tech) (hosted SQLite). Photos go to `data/uploads` locally, or to Vercel Blob when it is connected.

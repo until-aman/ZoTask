@@ -1,5 +1,6 @@
 "use client";
 // Any number of stakeholders of one kind side by side: the same task-level metrics as the dashboard, a ranking, and a written report.
+import { fmtDate, fmtAt } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CompareData, Kind, Metric } from "@/lib/compare";
@@ -7,7 +8,7 @@ import { CopyModal, DrillCtx, Drill, InfoTip, N, Sec, dur, fmtP } from "./parts"
 import { DrillDrawer, TaskDrawer } from "./Drawers";
 import { ActiveChip, DateRow, Field, FilterBar, SearchPick, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
 
-const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const nice = (d: string) => fmtDate(d, { day: "numeric", month: "short", year: "numeric" });
 const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from) : `${nice(r.from)} – ${nice(r.to)}`);
 const PRESETS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], ["7d", "Last 7 days"], ["14d", "Last 14 days"], ["30d", "Last 30 days"], ["custom", "Custom"]];
 const COLORS = ["#2563eb", "#d97706", "#059669", "#9333ea", "#dc2626", "#0891b2", "#db2777", "#65a30d"];
@@ -105,7 +106,7 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
     const L: string[] = [];
     const ofTxt = (m: Metric, i: number) => { const x = m.vals[i]; return m.fmt === "pct" && x.of !== undefined ? ` (${x.ids.length} of ${x.of})` : ""; };
     L.push(`# ${one} comparison: ${P.map((o) => o.label).join(", ")}`, "");
-    L.push(`Period: ${span(d.R)} (${d.R.days} days)`, `Generated: ${new Date(d.now).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`,
+    L.push(`Period: ${span(d.R)} (${d.R.days} days)`, `Generated: ${fmtAt(d.now, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`,
       "Counted per task: each task is counted once however many checks or reviews it had.", "");
     L.push("## Ranking", "", "Ranked by average position across the scored metrics (1.0 = best on every metric).", "", `| # | ${one} | Average position | Best on | Worst on | Tasks |`, "|---|---|---|---|---|---|");
     for (const r of ranking) L.push(`| ${place.get(r.i)} | ${r.o.label} | ${r.avgPos === null ? "—" : r.avgPos.toFixed(1)} | ${r.bestOn} | ${r.worstOn} | ${r.tasks}${r.tasks < MIN_TASKS ? " (few tasks, read with care)" : ""} |`);
@@ -256,7 +257,7 @@ function TrendN({ days, lines, label, names }: { days: string[]; lines: (number 
   const x = (i: number) => L + (n === 1 ? (W - L) / 2 : (i * (W - L - 8)) / (n - 1));
   const y = (v: number) => 6 + (1 - v / 100) * (H - Bt - 6);
   const segs = (vs: (number | null)[]) => vs.map((v, i) => (v === null ? null : `${x(i)},${y(v)}`)).reduce<string[][]>((acc, p) => { if (p === null) acc.push([]); else acc[acc.length - 1].push(p); return acc; }, [[]]).filter((s) => s.length);
-  const short = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const short = (d: string) => fmtDate(d);
   const mean = (vs: (number | null)[]) => { const v = avg(vs); return v === null ? null : Math.round(v); };
   return (
     <Sec title={`${label}, day by day`} tip={<InfoTip title={`${label}, day by day`} rows={[["Line", "Share for each day in the period"], ["Gaps", "Days with no tasks are left blank"], ["Legend", "Click a name to show only that line"]]} />}>

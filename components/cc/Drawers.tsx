@@ -1,5 +1,6 @@
 "use client";
 // Side drawers: a task list behind any figure, and one task's full record with actions. The dashboard stays put underneath.
+import { fmtDateTime, fmtDate } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,7 +13,7 @@ import Timeline from "@/components/Timeline";
 import Photo from "@/components/Photo";
 import { Drill, dur } from "./parts";
 
-const when = (ms: number) => new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const when = fmtDateTime;
 const lateBy = (t: T, now: number) =>
   t.sub ? (t.sub > t.due ? `Late ${dur(t.sub - t.due)}` : "On time") : t.status === "missed" ? `Missed (${dur(t.lateUntil - t.due)} grace)` : t.due < now ? `Open, ${dur(now - t.due)} past` : "Not due yet";
 
@@ -85,7 +86,7 @@ export function TaskDrawer({ id, now, back, close, issue, canEscalate, onDone }:
           {back && <button type="button" className="x" style={{ marginLeft: 0 }} onClick={back} aria-label="Back to list">‹</button>}
           <div style={{ minWidth: 0 }}>
             <h2>{r ? r.task : "Loading…"}</h2>
-            {r && <p>{r.property} · {r.cluster}, {r.city} · {new Date(r.task_date + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</p>}
+            {r && <p>{r.property} · {r.cluster}, {r.city} · {fmtDate(r.task_date)}</p>}
           </div>
           <button type="button" className="x" onClick={close} aria-label="Close">×</button>
         </div>
@@ -131,7 +132,7 @@ export function TaskDrawer({ id, now, back, close, issue, canEscalate, onDone }:
             ) : latest ? (
               <div className="grid" style={{ gap: 8 }}>
                 <h3 style={{ margin: 0 }}>Latest submission · attempt {latest.attempt}</h3>
-                <p className="small muted" style={{ margin: 0 }}>By {latest.by_name} · {when(latest.submitted_at)} · {latest.location_ok === null ? "location not checked" : latest.location_ok ? "at the property" : <span className="warn">{latest.distance_m} m away</span>}</p>
+                <p className="small muted" style={{ margin: 0 }}>By {latest.by_name} · {when(latest.submitted_at)} · {latest.location_src === "simulated" ? <span className="warn">location simulated (demo)</span> : latest.location_ok === null ? "location not checked" : latest.location_ok ? "at the property" : <span className="warn">{latest.distance_m} m away</span>}</p>
                 {d.items.map((it) => {
                   const a = latest.answers[it.id];
                   return (

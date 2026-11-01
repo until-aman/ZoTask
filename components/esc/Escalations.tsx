@@ -1,5 +1,6 @@
 "use client";
 // Escalation tracker: the central team raises issues with other teams, follows them to closure, and leadership sees the totals.
+import { fmtDay, fmtDate, fmtDateTime, addDays, dayStart, isoDate } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import { uploadPhoto } from "../upload";
 import { useRouter } from "next/navigation";
@@ -15,11 +16,10 @@ const PRIO: Record<string, string> = { high: "High", medium: "Medium", low: "Low
 const PRIO_DAYS: Record<string, number> = { high: 1, medium: 3, low: 7 };
 const DAY = 864e5;
 const isOpen = (s: string) => s === "open" || s === "wip";
-const day = (ms: number) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-const dayIso = (iso: string) => new Date(iso + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-const when = (ms: number) => new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const day = fmtDay;
+const dayIso = (iso: string) => fmtDate(iso);
+const when = fmtDateTime;
 const ago = (ms: number, now: number) => { const h = (now - ms) / 36e5; return h < 1 ? "just now" : h < 24 ? `${Math.floor(h)}h ago` : `${Math.floor(h / 24)}d ago`; };
-const addDays = (iso: string, n: number) => { const [y, m, d] = iso.split("-").map(Number); const t = new Date(y, m - 1, d + n, 12); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / DAY);
 const median = (l: number[]) => { if (!l.length) return null; const s = [...l].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const fmtDays = (v: number | null) => (v === null ? "—" : v < 1 ? `${Math.max(1, Math.round(v * 24))}h` : `${Math.round(v * 10) / 10}d`);
@@ -29,7 +29,7 @@ const PERIODS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], 
 type Dates = { k: string; from: string; to: string };
 /** A date choice as a [start, end) window in ms, plus a label for headings. */
 const windowOf = (w: Dates, today: string): { start: number; end: number; label: string } => {
-  const T = (iso: string) => new Date(iso + "T00:00").getTime(), t0 = T(today);
+  const T = dayStart, t0 = T(today);
   const back = (n: number) => ({ start: t0 - (n - 1) * DAY, end: t0 + DAY });
   if (w.k === "custom" && w.from && w.to) return { start: T(w.from), end: T(w.to) + DAY, label: w.from === w.to ? dayIso(w.from) : `${dayIso(w.from)} – ${dayIso(w.to)}` };
   if (w.k === "today") return { ...back(1), label: "today" };
@@ -117,7 +117,7 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
 
   const cols: Col<Esc>[] = [
     { key: "ref", label: "Ref", value: (r) => r.id, render: (r) => <button type="button" className="link" style={{ whiteSpace: "nowrap" }} onClick={() => setOpen(r.id)}>{r.ref}</button>, csv: (r) => r.ref, sticky: true },
-    { key: "created", label: "Raised on", value: (r) => r.created, render: (r) => day(r.created), csv: (r) => new Date(r.created).toISOString().slice(0, 10) },
+    { key: "created", label: "Raised on", value: (r) => r.created, render: (r) => day(r.created), csv: (r) => isoDate(r.created) },
     { key: "dept", label: "Department", value: (r) => r.department },
     { key: "prop", label: "Property", value: (r) => r.props.map((p) => p.name).join(", "), render: (r) => <span className="ell" style={{ maxWidth: 180, display: "inline-block" }} title={r.props.map((p) => p.name).join(", ")}>{r.props.map((p) => p.name.replace(/^Zolo /, "")).join(", ")}</span> },
     { key: "cluster", label: "Cluster", value: (r) => [...new Set(r.props.map((p) => p.cluster))].join(", "), hidden: true },

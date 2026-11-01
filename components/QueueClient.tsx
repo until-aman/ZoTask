@@ -1,6 +1,7 @@
 "use client";
 // Review Queue, following the Phase 1 mockup: City → Cluster → Property multi-select, dates default to today and
 // apply to every tab, saved filters with a default view, status sidebar grouped by who acts next.
+import { addDays, fmtDate, fmtDateTime } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,8 +26,7 @@ const tabName = (k: string) => grpOf(k).tabs.find((t) => t[0] === k)![1];
 const ROLES = ["CBM", "HK", "CC", "Reception", "Short stays"];
 const RNAME: Record<string, string> = { CBM: "Cluster Business Manager", HK: "Housekeeping Supervisor (HK)", CC: "Customer Care Executive (CC)", Reception: "Front Office / Reception Executive", "Short stays": "Short Stays Operations Executive" };
 
-function addDays(d: string, n: number) { const [y, m, dd] = d.split("-").map(Number); const x = new Date(y, m - 1, dd + n, 12); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; }
-const nice = (s: string) => new Date(s + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const nice = (s: string) => fmtDate(s);
 const fmtH = (h: number) => (h >= 48 ? Math.round(h / 24) + " days" : h + "h");
 const over = (t: QItem) => t.sla > 0 && t.h > t.sla;
 const bucket = (t: QItem) => (t.h > 72 ? "r" : t.h >= 24 ? "a" : "g");
@@ -284,7 +284,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                     {hist.map((e, i) => {
                       const cls = /missed|changes|failed|warning|reopened/.test(e.type) ? "r" : /passed|closed/.test(e.type) ? "g" : /submit/.test(e.type) ? "b" : e.type === "reminder" ? "a" : "";
                       const gap = i ? e.at - hist[i - 1].at : 0;
-                      return <li key={e.id} className={cls}>{gap > 60000 && <span className="dur">+{fmtH(Math.round(gap / 3600000))} · </span>}{e.type.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())}{e.actor ? ` by ${e.actor}` : ""}<small>{new Date(e.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}{e.detail ? ` · ${e.detail}` : ""}</small></li>;
+                      return <li key={e.id} className={cls}>{gap > 60000 && <span className="dur">+{fmtH(Math.round(gap / 3600000))} · </span>}{e.type.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())}{e.actor ? ` by ${e.actor}` : ""}<small>{fmtDateTime(e.at)}{e.detail ? ` · ${e.detail}` : ""}</small></li>;
                     })}
                   </ul>
                 </div>

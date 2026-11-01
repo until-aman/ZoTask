@@ -162,15 +162,16 @@ export async function missingEvidence(submissionId: number, templateId: number):
   });
 }
 
-export async function submit(instanceId: number, userId: number, answers: AnswerInput[], loc: { ok: boolean | null; distance: number | null }, at: number) {
+export type Loc = { ok: boolean | null; distance: number | null; source?: "gps" | "simulated" | null };
+export async function submit(instanceId: number, userId: number, answers: AnswerInput[], loc: Loc, at: number) {
   return await tx(async () => {
     const i = (await one<Instance>("SELECT * FROM instances WHERE id=?", instanceId))!;
     const t = (await one<Template>("SELECT * FROM templates WHERE id=?", i.template_id))!;
     if (!["current", "notsub", "changes"].includes(i.status)) throw new Error("This task can't be submitted right now.");
     const resub = i.status === "changes";
     const attempt = i.attempt + 1;
-    const s = await run("INSERT INTO submissions (instance_id, attempt, submitted_by, submitted_at, location_ok, distance_m) VALUES (?,?,?,?,?,?)",
-      instanceId, attempt, userId, at, loc.ok === null ? null : loc.ok ? 1 : 0, loc.distance);
+    const s = await run("INSERT INTO submissions (instance_id, attempt, submitted_by, submitted_at, location_ok, distance_m, location_src) VALUES (?,?,?,?,?,?,?)",
+      instanceId, attempt, userId, at, loc.ok === null ? null : loc.ok ? 1 : 0, loc.distance, loc.source ?? (loc.ok === null ? null : "gps"));
     const sid = Number(s.lastInsertRowid);
     for (const a of answers) {
       await run("INSERT INTO answers (submission_id, item_id, checked, value, note, photos, reply) VALUES (?,?,?,?,?,?,?)",
@@ -187,12 +188,13 @@ export async function submit(instanceId: number, userId: number, answers: Answer
       await logEvent(instanceId, at, userId, "submitted", (late ? "Submitted late" : "Submitted on time") + (next === "done" ? " · no review needed" : ""));
     }
     if (t.geofence && loc.ok === false) await logEvent(instanceId, at, userId, "location_warning", `Submitted ${loc.distance ?? "?"} m from property`);
+    if (t.geofence && loc.source === "simulated") await logEvent(instanceId, at, userId, "location_warning", "Location simulated, not checked");
     return sid;
   });
 }
 
 export async function latestSubmission(instanceId: number) {
-  return await one<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null }>(
+  return await one<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; location_src: string | null }>(
     "SELECT * FROM submissions WHERE instance_id=? ORDER BY attempt DESC LIMIT 1", instanceId);
 }
 
@@ -266,9 +268,15 @@ export async function answerAuditFlags(instanceId: number, userId: number, answe
   await tx(async () => {
     const i = (await one<Instance>("SELECT * FROM instances WHERE id=?", instanceId))!;
     if (i.status !== "auditflag") throw new Error("No open audit flags on this task.");
-    for (const [fid, text] of Object.entries(answers)) await run("UPDATE review_flags SET answer=?, answered_at=? WHERE id=?", text, at, Number(fid));
+    // Only the flags of this task's latest audit can be answered, and every one of them must be.
+    const audit = await one<{ id: number }>("SELECT id FROM reviews WHERE instance_id=? AND kind='audit' ORDER BY decided_at DESC, id DESC LIMIT 1", instanceId);
+    const open = audit ? await all<{ id: number }>("SELECT id FROM review_flags WHERE review_id=?", audit.id) : [];
+    const ids = new Set(open.map((f) => f.id));
+    for (const fid of Object.keys(answers)) if (!ids.has(Number(fid))) throw new Error("That answer is for a flag that isn't on this task.");
+    if (!open.length || open.some((f) => !answers[f.id]?.trim())) throw new Error("Answer every flag before sending.");
+    for (const f of open) await run("UPDATE review_flags SET answer=?, answered_at=? WHERE id=?", answers[f.id].trim(), at, f.id);
     await setStatus(instanceId, "flagans", at);
-    await logEvent(instanceId, at, userId, "flags_answered", `${Object.keys(answers).length} flag(s) answered`);
+    await logEvent(instanceId, at, userId, "flags_answered", `${open.length} flag(s) answered`);
   });
 }
 
@@ -301,6 +309,8 @@ export async function waive(instanceId: number, actorId: number, reason: string,
 }
 
 export async function reassignReviewer(instanceId: number, reviewerId: number, actorId: number, at: number) {
+  const sub = await latestSubmission(instanceId);
+  if (sub && sub.submitted_by === reviewerId) throw new Error("That person submitted the task, so they can't review it.");
   await run("UPDATE instances SET reviewer_id=? WHERE id=?", reviewerId, instanceId);
   const u = await one<{ name: string }>("SELECT name FROM users WHERE id=?", reviewerId);
   await logEvent(instanceId, at, actorId, "reassigned", `Reviewer: ${u?.name}`);
