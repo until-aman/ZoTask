@@ -9,6 +9,7 @@ const plugin = {
   name: "zotask-web",
   setup(b) {
     b.onResolve({ filter: /^next\/(headers|cache|navigation|link)$/ }, (a) => ({ path: shim({ "next/headers": "headers.ts", "next/cache": "cache.ts", "next/navigation": "navigation.ts", "next/link": "link.tsx" }[a.path]) }));
+    b.onResolve({ filter: /^node:zlib$/ }, () => ({ path: shim("zlib.ts") }));
     b.onResolve({ filter: /^@\// }, async (a) => b.resolve("./" + a.path.slice(2), { resolveDir: root, kind: a.kind }));
     b.onResolve({ filter: /(^|\/)db$/ }, (a) => {
       const p = path.resolve(a.resolveDir, a.path);
