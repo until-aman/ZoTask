@@ -1,6 +1,6 @@
 :root{
   color-scheme:light;
-  --bg:#f3f5f9; --card:#ffffff; --line:#e2e7f0; --line2:#eef1f6; --fg:#172033; --muted:#66728a; --faint:#9aa4b8;
+  --bg:#f3f5f9; --card:#ffffff; --line:#e2e7f0; --line2:#eef1f6; --fg:#172033; --muted:#566176; --faint:#687184;
   --blue:#2563eb; --blue-d:#1d4fd8; --blue-soft:#eaf0ff;
   --red:#c62828; --red-soft:#fdecec; --amber:#b45309; --amber-soft:#fff4de; --green:#1b7a3d; --green-soft:#e4f5ea;
   --purple:#6d3fc9; --purple-soft:#f2ecff;
@@ -123,7 +123,7 @@ tr:last-child td{border-bottom:0}
 .qpill[aria-current="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
 .qn{font-family:var(--mono);font-size:11px;font-weight:600;background:var(--bg);border-radius:999px;padding:0 5px;line-height:17px;color:var(--muted)}
 .qpill.hot .qn{background:#fdecec;color:var(--red)}
-.qpill[aria-current="true"] .qn{background:rgba(255,255,255,.22);color:#fff}
+.qpill[aria-current="true"] .qn{background:rgba(0,0,0,.22);color:#fff}
 @media (max-width:900px){.qtabs{flex-wrap:wrap;gap:8px}.qgrp{flex:1 1 100%}.qgrp-b{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}}
 .addview{width:100%;margin-top:4px;border:1px dashed var(--line);background:transparent;border-radius:8px;padding:7px;color:var(--blue);font-weight:700}
 main.q{min-width:0;display:grid;gap:12px}
@@ -175,9 +175,9 @@ main.q{min-width:0;display:grid;gap:12px}
 .qrow{border-bottom:1px solid var(--line2);cursor:pointer;position:relative}
 .qrow:last-child{border-bottom:0}
 .qrow:hover{background:#f8faff}
-.qrow[aria-selected="true"]{background:var(--blue-soft)}
+.qrow[data-open]{background:var(--blue-soft)}
 .qrow::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--sev,transparent)}
-.qrow input{accent-color:var(--blue);margin:0}
+.qrow input{accent-color:var(--blue);margin:0;width:24px;height:24px}
 .tname{font-weight:700;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tsub{color:var(--muted);font-size:12.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .who{font-size:13px} .who small,.next small{display:block;color:var(--muted);font-size:12px}
@@ -251,7 +251,7 @@ a.task:hover{border-color:var(--blue);text-decoration:none}
 .cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .cmp > div{background:var(--bg);border-radius:8px;padding:8px;font-size:13px}
 .tip{position:relative;display:inline-flex;vertical-align:middle;margin-left:6px}
-.tip-btn{width:18px;height:18px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--muted);font:700 11px/16px Georgia,serif;font-style:italic;padding:0}
+.tip-btn{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--muted);font:700 12px/22px Georgia,serif;font-style:italic;padding:0}
 .tip-btn:hover,.tip-btn[aria-expanded="true"]{border-color:var(--blue);color:var(--blue)}
 .tip-pop{position:absolute;z-index:60;top:24px;left:-8px;width:min(300px,80vw);display:grid;gap:8px;background:var(--fg);color:#fff;border-radius:8px;padding:10px 12px;font-size:12.5px;font-weight:500;line-height:1.45;text-transform:none;letter-spacing:0;box-shadow:var(--shadow);cursor:default;white-space:normal}
 .score h3{display:flex;align-items:center;margin:0}
@@ -383,10 +383,10 @@ table.aq td>.acts{display:flex}
 .esc-grid .span2{grid-column:1/-1}
 .esc-grid input,.esc-grid select,.esc-grid textarea{width:100%;font-weight:400}
 @media (max-width:560px){.esc-grid{grid-template-columns:minmax(0,1fr)}.esc-weeks .small{font-size:9px}}
-.outcome .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:4px 12px}
+.outcome .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:6px 12px}
 .legend b.lgn{font-weight:800;color:var(--fg)}
 .outcome .lgw{justify-content:center;gap:2px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 8px 3px 6px;min-width:0}
-.outcome .lgw .lg{white-space:nowrap}
+.outcome .lgw .lg{white-space:normal;text-align:left;min-width:0}
 .bk button.qf{display:inline-flex;align-items:center;gap:8px;padding:4px 5px 4px 12px}
 .qf .cnt{min-width:24px;padding:1px 7px;border-radius:999px;background:var(--line2);color:var(--fg);font-size:12px;text-align:center}
 .qf .cnt.r{background:var(--red-soft);color:var(--red)}

@@ -144,8 +144,8 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
       </div>
 
       <div className="seg" role="tablist" style={{ width: "fit-content", maxWidth: "100%" }}>
-        <button type="button" role="tab" aria-pressed={tab === "tracker"} aria-selected={tab === "tracker"} onClick={() => setTab("tracker")}>Tracker</button>
-        <button type="button" role="tab" aria-pressed={tab === "summary"} aria-selected={tab === "summary"} onClick={() => setTab("summary")}>Leadership summary</button>
+        <button type="button" role="tab" aria-selected={tab === "tracker"} onClick={() => setTab("tracker")}>Tracker</button>
+        <button type="button" role="tab" aria-selected={tab === "summary"} onClick={() => setTab("summary")}>Leadership summary</button>
       </div>
 
       {tab === "tracker" ? <>
