@@ -13,9 +13,23 @@ async function shrink(f: File): Promise<Blob> {
 
 /** Uploads one photo and returns its stored name, or null if the upload failed. */
 export async function uploadPhoto(f: File): Promise<string | null> {
-  const b = await shrink(f);
-  const fd = new FormData();
-  fd.append("file", b instanceof File ? b : new File([b], f.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }));
-  const res = await fetch("/api/upload", { method: "POST", body: fd });
-  return res.ok ? (await res.json()).name : null;
+  const r = await tryUpload(f);
+  return "name" in r ? r.name : null;
+}
+
+/** Uploads one photo; on failure says why, in words the person can act on. */
+export async function tryUpload(f: File): Promise<{ name: string } | { error: string }> {
+  try {
+    const b = await shrink(f);
+    const fd = new FormData();
+    fd.append("file", b instanceof File ? b : new File([b], f.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }));
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    if (res.ok) return { name: (await res.json()).name };
+    if (res.status === 401) return { error: "You've been signed out. Sign in again, then add the photo." };
+    if (res.status === 413) return { error: "That photo is too large (max 4 MB)." };
+    if (res.status === 415) return { error: "Only photos can be added (JPG, PNG, WebP, HEIC)." };
+    return { error: "The upload failed. Try again." };
+  } catch {
+    return { error: "No connection. Check your network and add the photo again." };
+  }
 }
