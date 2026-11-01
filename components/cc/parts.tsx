@@ -56,7 +56,7 @@ export function Tile({ label, def, k, rate = true, goodUp = true, band, target, 
   const r = band ? rag(v, band[0], band[1], !goodUp) : "";
   const act = () => k.ids.length && open({ title: label, note: unitNote, ids: k.ids });
   return (
-    <div className={`kpi ${k.ids.length ? "click" : ""}`} role="button" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.key === "Enter") act(); }} aria-label={`${label}: show tasks`}>
+    <div className={`kpi ${k.ids.length ? "click" : ""}`} role="group" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); act(); } }} aria-label={`${label}: press Enter to show tasks`}>
       {band && <span className={`rag ${r}`} title={RAG_LABEL[r]} />}
       <div className="kpi-h"><div className="v">{rate ? fmtP(v) : k.n}</div><div className="lab">{label}<DefTip label={label} def={def} k={k} rate={rate} target={target} /></div></div>
       <div className="foot"><span className="kpi-m">{rate && k.of !== undefined && <span className="sub mono">{k.n} of {k.of}</span>}{k.prev !== undefined && <Delta cur={v} prev={k.prev} goodUp={goodUp} unit={rate ? "pts" : ""} />}</span>{target && <span className="tgt">{target}</span>}</div>
@@ -69,7 +69,7 @@ export function Mini({ label, k, tone, def, of }: { label: string; k: K; tone?: 
   const { open } = useDrill();
   const act = () => k.ids.length && open({ title: label, note: def.means, ids: k.ids });
   return (
-    <div className={`mini ${k.ids.length ? "click" : ""}`} role="button" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.key === "Enter") act(); }}>
+    <div className={`mini ${k.ids.length ? "click" : ""}`} role="group" tabIndex={0} onClick={act} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); act(); } }} aria-label={`${label}: press Enter to show tasks`}>
       <b className={tone ? `t-${tone}` : ""}>{k.n}</b><span>{label}{of && k.of !== undefined ? <small> of {k.of}</small> : null}</span><DefTip label={label} def={def} />
     </div>
   );

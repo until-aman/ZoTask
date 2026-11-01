@@ -223,8 +223,8 @@ export function sortRows<R>(rows: R[], sort: SortState, value: (r: R, key: strin
 export function SortHead({ k, label, sort, setSort, className = "" }: { k: string; label: string; sort: SortState; setSort: (s: SortState) => void; className?: string }) {
   const on = sort?.key === k;
   return (
-    <span className={`sorth ${className}`} aria-sort={on ? (sort!.dir === 1 ? "ascending" : "descending") : "none"}>
-      <button type="button" className="sortbtn" onClick={() => setSort(nextSort(sort, k))}>{label}<span className="sorti">{on ? (sort!.dir === 1 ? "▲" : "▼") : "↕"}</span></button>
+    <span className={`sorth ${className}`}>
+      <button type="button" className="sortbtn" aria-label={`${label}, ${on ? (sort!.dir === 1 ? "sorted ascending" : "sorted descending") : "not sorted"}. Sort`} onClick={() => setSort(nextSort(sort, k))}>{label}<span className="sorti">{on ? (sort!.dir === 1 ? "▲" : "▼") : "↕"}</span></button>
     </span>
   );
 }

@@ -232,8 +232,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               const sev = g.open ? (bucket(t) === "r" ? "var(--red)" : bucket(t) === "a" ? "var(--amber)" : "var(--green)") : "transparent";
               return (
                 <div key={t.id}>
-                  <div className="qrow" role="button" tabIndex={0} aria-selected={open === t.id} style={{ ["--sev" as string]: sev }}
-                    onClick={(e) => { if ((e.target as HTMLElement).closest("input")) return; setOpen(t.id); }} onKeyDown={(e) => { if (e.key === "Enter") setOpen(t.id); }}>
+                  <div className="qrow" role="group" tabIndex={0} aria-label={`${t.t}, ${t.p}: press Enter for details`} data-open={open === t.id || undefined} style={{ ["--sev" as string]: sev }}
+                    onClick={(e) => { if ((e.target as HTMLElement).closest("input")) return; setOpen(t.id); }} onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") setOpen(t.id); }}>
                     <span><input type="checkbox" aria-label="Select" checked={sel.has(t.id)} onChange={(e) => { const s = new Set(sel); if (e.target.checked) s.add(t.id); else s.delete(t.id); setSel(s); }} /></span>
                     <div style={{ minWidth: 0 }}>
                       <div className="tname">{t.t}{t.crit && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}</div>
