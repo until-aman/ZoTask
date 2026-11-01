@@ -31,13 +31,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="page narrow">
-      <Link href="/tasks" className="small">‹ My Tasks</Link>
-      <div className="row2">
+      <Link href="/tasks" className="crumb">‹ My Tasks</Link>
+      <div className="phead">
         <div>
           <h1>{r.task}</h1>
-          <p className="muted" style={{ margin: "2px 0 0" }}>{r.property} · {r.cluster}, {r.city} · {fmtDate(r.task_date)} · {r.window_start}–{r.window_end}</p>
+          <p className="phead-sub">{r.property} · {r.cluster}, {r.city} · {fmtDate(r.task_date)} · {r.window_start}–{r.window_end}</p>
         </div>
-        <span className="spacer" />
         <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
       </div>
       {tpl.description && <p className="card" style={{ margin: 0 }}>{tpl.description}</p>}

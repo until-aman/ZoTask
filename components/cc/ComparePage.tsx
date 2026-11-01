@@ -12,7 +12,7 @@ import { ActiveChip, DateRow, Field, FilterBar, SearchPick, SavedView, SortHead,
 const nice = (d: string) => fmtDate(d, { day: "numeric", month: "short", year: "numeric" });
 const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from) : `${nice(r.from)} – ${nice(r.to)}`);
 const PRESETS: [string, string][] = [["today", "Today"], ["yday", "Yesterday"], ["7d", "Last 7 days"], ["14d", "Last 14 days"], ["30d", "Last 30 days"], ["custom", "Custom"]];
-const COLORS = ["#2563eb", "#d97706", "#059669", "#9333ea", "#dc2626", "#0891b2", "#db2777", "#65a30d"];
+const COLORS = ["#7a5af8", "#0a47b0", "#12a3b4", "#e0571e", "#a3123a", "#1f9e3a", "#d97917", "#687385"];
 const fmt = (m: Metric, v: number | null) => (m.fmt === "pct" ? fmtP(v === null ? null : Math.round(v * 10) / 10) : m.fmt === "dur" ? dur(v) : v === null ? "—" : String(Math.round(v * 10) / 10));
 const diff = (m: Metric, x: number, y: number) => (m.fmt === "pct" ? `${Math.abs(Math.round((x - y) * 10) / 10)} pts` : m.fmt === "dur" ? dur(Math.abs(x - y)) : String(Math.round(Math.abs(x - y) * 10) / 10));
 const avg = (l: (number | null)[]) => { const v = l.filter((x): x is number => x !== null); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : null; };
@@ -137,12 +137,11 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
   return (
     <DrillCtx.Provider value={ctx}>
       <div className="page cc">
-        <div className="row2">
+        <div className="phead">
           <div>
             <h1>Compare</h1>
-            <p className="muted" style={{ margin: "2px 0 0" }}>Put {lc(kindLabel)} side by side for {span(d.R)}. Pick 2 to {d.max}. Every number opens the tasks behind it.</p>
+            <p className="phead-sub">Put {lc(kindLabel)} side by side for {span(d.R)}. Pick 2 to {d.max}. Every number opens the tasks behind it.</p>
           </div>
-          <span className="spacer" />
           {ready && <button type="button" className="btn primary" onClick={() => setReport(buildReport())}>Generate report</button>}
         </div>
 

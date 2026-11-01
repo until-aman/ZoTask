@@ -60,9 +60,9 @@ function Chart({ m, cur, prev, showPrev }: { m: (typeof METRICS)[number]; cur: {
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={`${m.label} trend`} onMouseLeave={() => setHover(null)}>
         {[0, 0.5, 1].map((f) => <g key={f}><line x1={L} x2={W} y1={y(max * f)} y2={y(max * f)} stroke="var(--line2)" /><text x={L - 4} y={y(max * f) + 3} textAnchor="end" fontSize="9" fill="var(--faint)">{Math.round(max * f)}{m.rate ? "%" : ""}</text></g>)}
         {showPrev && path(pv).map((s, i) => <polyline key={`p${i}`} points={s.join(" ")} fill="none" stroke="var(--faint)" strokeWidth="1.4" strokeDasharray="4 3" />)}
-        {path(cv).map((s, i) => <polyline key={`c${i}`} points={s.join(" ")} fill="none" stroke="var(--blue)" strokeWidth="2" />)}
+        {path(cv).map((s, i) => <polyline key={`c${i}`} points={s.join(" ")} fill="none" stroke="var(--accent)" strokeWidth="2" />)}
         {cv.map((v, i) => v === null ? null : (
-          <circle key={i} cx={x(i)} cy={y(v)} r={h === i ? 5 : 3} fill={h === i ? "var(--blue-d)" : "var(--blue)"} style={{ cursor: "pointer" }}
+          <circle key={i} cx={x(i)} cy={y(v)} r={h === i ? 5 : 3} fill={h === i ? "var(--accent-text)" : "var(--accent)"} style={{ cursor: "pointer" }}
             onMouseEnter={() => setHover(i)} onFocus={() => setHover(i)} tabIndex={0}
             onClick={() => { const ids = cur[i].p?.[m.key]?.[m.rate ? 1 : 0] ?? []; open({ title: `${m.label} · ${cur[i].label}`, note: m.tip, ids }); }} />
         ))}
@@ -99,7 +99,7 @@ export function Lifecycle({ d }: { d: CC }) {
   const Row = ({ s, base, prevN }: { s: { label: string; ids: number[]; time?: number | null; timeLabel?: string }; base: number; prevN: number | null }) => (
     <div className="stage">
       <span className="small" style={{ fontWeight: 700 }}>{s.label}</span>
-      <div className="bar"><i style={{ width: `${base ? (s.ids.length / base) * 100 : 0}%`, background: "var(--blue)" }} /></div>
+      <div className="bar"><i style={{ width: `${base ? (s.ids.length / base) * 100 : 0}%`, background: "var(--accent)" }} /></div>
       <span className="small n"><N ids={s.ids} title={s.label} /></span>
       <span className="small muted n">{prevN === null ? "" : fmtP(pct(s.ids.length, prevN))}</span>
       <span className="small muted">{s.time !== undefined ? `${dur(s.time ?? null)} ${s.timeLabel}` : ""}</span>

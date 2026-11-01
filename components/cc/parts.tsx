@@ -75,7 +75,7 @@ export function Mini({ label, k, tone, def, of }: { label: string; k: K; tone?: 
   );
 }
 
-export function Spark({ data, color = "var(--blue)", max = 100 }: { data: (number | null)[]; color?: string; max?: number }) {
+export function Spark({ data, color = "var(--accent)", max = 100 }: { data: (number | null)[]; color?: string; max?: number }) {
   const w = 80, h = 24;
   const pts = data.map((v, i) => (v === null ? null : [i * (w / Math.max(1, data.length - 1)), h - 2 - (v / (max || 1)) * (h - 4)])).filter(Boolean) as number[][];
   if (pts.length < 2) return <span className="muted small">—</span>;

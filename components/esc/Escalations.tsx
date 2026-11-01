@@ -134,12 +134,11 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
 
   return (
     <div className="page cc">
-      <div className="row2">
+      <div className="phead">
         <div>
           <h1>Escalations</h1>
-          <p className="muted" style={{ margin: "2px 0 0" }}>Raise issues to the right team, follow them to closure, and see where things are stuck. Replaces the action item sheets.</p>
+          <p className="phead-sub">Raise issues to the right team, follow them to closure, and see where things are stuck. Replaces the action item sheets.</p>
         </div>
-        <span className="spacer" />
         {d.canRaise && <button type="button" className="btn primary" onClick={() => setRaising(true)}>+ Raise escalation</button>}
       </div>
 
@@ -232,7 +231,7 @@ function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; peri
           <div className="stages">{ageRows.map((x) => (
             <div key={x.l} className="stage" style={{ gridTemplateColumns: "90px minmax(0,1fr) 40px" }}>
               <span className="small" style={{ fontWeight: 700 }}>{x.l}</span>
-              <div className="bar"><i style={{ width: `${(x.rows.length / maxAge) * 100}%`, background: x.l.startsWith("15") || x.l.startsWith("8") ? "var(--red)" : "var(--blue)" }} /></div>
+              <div className="bar"><i style={{ width: `${(x.rows.length / maxAge) * 100}%`, background: x.l.startsWith("15") || x.l.startsWith("8") ? "var(--red)" : "var(--accent)" }} /></div>
               <span className="small n"><C l={x.rows} label={`Open ${x.l}`} /></span>
             </div>
           ))}</div>
@@ -241,7 +240,7 @@ function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; peri
           <div className="esc-weeks">{weeks.map((w) => (
             <div key={w.label} className="esc-week">
               <div className="esc-bars">
-                <button type="button" title={`${w.raised.length} raised`} style={{ height: `${(w.raised.length / wMax) * 100}%`, background: "var(--blue)" }} onClick={() => w.raised.length && show(`Raised week of ${w.label}`, w.raised)} />
+                <button type="button" title={`${w.raised.length} raised`} style={{ height: `${(w.raised.length / wMax) * 100}%`, background: "var(--accent)" }} onClick={() => w.raised.length && show(`Raised week of ${w.label}`, w.raised)} />
                 <button type="button" title={`${w.closed.length} closed`} style={{ height: `${(w.closed.length / wMax) * 100}%`, background: "var(--green)" }} onClick={() => w.closed.length && show(`Closed week of ${w.label}`, w.closed)} />
               </div>
               <span className="small muted">{w.label}</span>

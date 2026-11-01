@@ -89,7 +89,7 @@ export function Reviewers({ d }: { d: CC }) {
         { key: "med", label: "Usual review wait", num: true, tip: <InfoTip title="Usual review wait" rows={[["Means", "Typical time a task waits for its review"], ["Formula", "Middle value across tasks reviewed"]]} />, value: (r) => r.median, render: (r) => dur(r.median), csv: (r) => (r.median === null ? "" : Math.round(r.median / 60000)) },
         { key: "re", label: "Re-reviewed", num: true, tip: <InfoTip title="Re-reviewed" rows={[["Means", "Tasks this reviewer reviewed more than once in the period"]]} />, value: (r) => r.reReviewed.length, render: (r) => <N ids={r.reReviewed} title={`${r.name}: tasks re-reviewed`} /> },
         { key: "sb", label: "Sent back %", num: true, tip: <InfoTip title="Sent back %" rows={[["Means", "Share of reviewed tasks sent back. High is not always bad"], ["Formula", "Tasks sent back ÷ tasks reviewed"]]} />, value: (r) => r.sentBackRate, render: (r) => <N ids={r.sentBack} title={`${r.name}: tasks sent back`}>{fmtP(r.sentBackRate)}</N> },
-        { key: "daily", label: "Tasks reviewed per day", value: () => null, render: (r) => <Spark data={r.daily} max={Math.max(1, ...r.daily)} color="var(--purple)" />, csv: (r) => r.daily.join(" ") },
+        { key: "daily", label: "Tasks reviewed per day", value: () => null, render: (r) => <Spark data={r.daily} max={Math.max(1, ...r.daily)} color="var(--navy)" />, csv: (r) => r.daily.join(" ") },
       ]} />
     </Sec>
   );
