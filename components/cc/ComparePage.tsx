@@ -4,8 +4,9 @@ import { fmtDate, fmtAt } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CompareData, Kind, Metric } from "@/lib/compare";
-import { CopyModal, DrillCtx, Drill, InfoTip, N, Sec, dur, fmtP } from "./parts";
+import { DrillCtx, Drill, InfoTip, N, Sec, dur, fmtP } from "./parts";
 import { DrillDrawer, TaskDrawer } from "./Drawers";
+import CompareReport, { Rep } from "./CompareReport";
 import { ActiveChip, DateRow, Field, FilterBar, SearchPick, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
 
 const nice = (d: string) => fmtDate(d, { day: "numeric", month: "short", year: "numeric" });
@@ -53,7 +54,7 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
   const router = useRouter();
   const [drill, setDrill] = useState<Drill | null>(null);
   const [task, setTask] = useState<{ id: number; fromList: boolean } | null>(null);
-  const [report, setReport] = useState<string | null>(null);
+  const [report, setReport] = useState<Rep | null>(null);
   const [toast, setToast] = useState("");
   const [sort, setSort] = useState<SortState>(null);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); }, [toast]);
@@ -102,35 +103,32 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
   const leaderOf = (s: St) => P.filter((_, i) => s.rank[i] === s.top).map((o) => o.label).join(", ");
   const actions = (i: number) => [...new Set(split(i).behind.map((x) => ACTION[x.m.key]).filter(Boolean))].slice(0, 4);
 
-  const buildReport = () => {
-    const L: string[] = [];
-    const ofTxt = (m: Metric, i: number) => { const x = m.vals[i]; return m.fmt === "pct" && x.of !== undefined ? ` (${x.ids.length} of ${x.of})` : ""; };
-    L.push(`# ${one} comparison: ${P.map((o) => o.label).join(", ")}`, "");
-    L.push(`Period: ${span(d.R)} (${d.R.days} days)`, `Generated: ${fmtAt(d.now, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`,
-      "Counted per task: each task is counted once however many checks or reviews it had.", "");
-    L.push("## Ranking", "", "Ranked by average position across the scored metrics (1.0 = best on every metric).", "", `| # | ${one} | Average position | Best on | Worst on | Tasks |`, "|---|---|---|---|---|---|");
-    for (const r of ranking) L.push(`| ${place.get(r.i)} | ${r.o.label} | ${r.avgPos === null ? "—" : r.avgPos.toFixed(1)} | ${r.bestOn} | ${r.worstOn} | ${r.tasks}${r.tasks < MIN_TASKS ? " (few tasks, read with care)" : ""} |`);
-    L.push("", `Top performer: ${ranking[0].o.label}. Needs the most support: ${ranking[ranking.length - 1].o.label}.`, "");
-    L.push("## Metrics", "", `| Metric | ${P.map((o) => o.label).join(" | ")} | Best |`, `|---|${P.map(() => "---").join("|")}|---|`);
-    d.metrics.forEach((m, k) => { const s = st[k]; L.push(`| ${m.label} | ${m.vals.map((x, i) => `${fmt(m, x.v)}${ofTxt(m, i)}`).join(" | ")} | ${s?.split ? leaderOf(s) : s ? "Same" : "Not scored"} |`); });
-    L.push("");
-    for (const r of ranking) {
-      const i = r.i, o = r.o, f = d.focus[i], { ahead, behind } = split(i);
-      L.push(`## ${place.get(i)}. ${o.label}${o.sub ? ` (${o.sub})` : ""}`, "");
-      L.push("Doing well (better than the group average):");
-      if (!ahead.length) L.push("- Not above the group average on any metric in this period.");
-      for (const x of ahead) L.push(`- ${x.m.label}: ${fmt(x.m, x.v)} vs average ${fmt(x.m, x.s.mean)}${x.s.rank[i] === x.s.top ? " (best in group)" : ""}`);
-      L.push("", "Needs improvement (worse than the group average):");
-      if (!behind.length) L.push("- Not below the group average on any metric in this period.");
-      for (const x of behind) L.push(`- ${x.m.label}: ${fmt(x.m, x.v)} vs average ${fmt(x.m, x.s.mean)} and best ${fmt(x.m, x.s.best)} (${leaderOf(x.s)}), ${diff(x.m, x.v, x.s.best)} behind the best`);
-      if (f.types.length) { L.push("", d.kind === "reviewer" ? "Task types reviewed least on time:" : "Task types done least on time:"); for (const t of f.types) L.push(`- ${t.task}: ${fmtP(t.onTime)} on time of ${t.due}${t.missed ? `, ${t.missed} missed` : ""}`); }
-      if (f.reasons.length) { L.push("", "Most common send-back reasons:"); for (const x of f.reasons) L.push(`- ${x.reason}: ${x.ids.length} ${x.ids.length === 1 ? "task" : "tasks"}`); }
-      const ac = actions(i);
-      if (ac.length) { L.push("", "Recommended actions:"); for (const x of ac) L.push(`- ${x}`); }
-      L.push("");
-    }
-    L.push("---", "Volume metrics and those with no right direction (sent back %, re-reviewed) are shown for context and not scored.");
-    return L.join("\n");
+  const buildReport = (): Rep => {
+    const ofTxt = (m: Metric, i: number) => { const x = m.vals[i]; return m.fmt === "pct" && x.of !== undefined ? `${x.ids.length} of ${x.of}` : ""; };
+    return {
+      title: `${one} comparison`, names: P.map((o) => o.label), colors: P.map((_, i) => COLORS[i]), one,
+      period: `${span(d.R)} (${d.R.days} day${d.R.days === 1 ? "" : "s"})`,
+      generated: fmtAt(d.now, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+      file: `compare-${d.kind}-${d.R.from}-to-${d.R.to}`,
+      ranking: ranking.map((r) => ({ place: place.get(r.i)!, label: r.o.label, sub: r.o.sub ?? "", color: COLORS[r.i], avgPos: r.avgPos === null ? "—" : r.avgPos.toFixed(1), bestOn: r.bestOn, worstOn: r.worstOn, tasks: r.tasks, few: r.tasks < MIN_TASKS })),
+      metrics: d.metrics.map((m, k) => {
+        const s = st[k];
+        return { label: m.label, scored: !!s, best: s?.split ? leaderOf(s) : s ? "Same" : "Not scored",
+          cells: m.vals.map((x, i) => ({ v: fmt(m, x.v), of: ofTxt(m, i), tone: s?.split && s.rank[i] === s.top ? "best" : s?.split && s.rank[i] === s.bottom ? "worst" : "" })) };
+      }),
+      people: ranking.map((r) => {
+        const i = r.i, o = r.o, f = d.focus[i], { ahead, behind } = split(i);
+        return {
+          place: place.get(i)!, label: o.label, sub: o.sub ?? "", color: COLORS[i],
+          ahead: ahead.map((x) => ({ metric: x.m.label, value: fmt(x.m, x.v), avg: fmt(x.m, x.s.mean), top: x.s.rank[i] === x.s.top })),
+          behind: behind.map((x) => ({ metric: x.m.label, value: fmt(x.m, x.v), avg: fmt(x.m, x.s.mean), best: fmt(x.m, x.s.best), leader: leaderOf(x.s), gap: diff(x.m, x.v, x.s.best) })),
+          typesTitle: d.kind === "reviewer" ? "Task types reviewed least on time" : "Task types done least on time",
+          types: f.types.map((t) => ({ task: t.task, onTime: fmtP(t.onTime), due: t.due, missed: t.missed })),
+          reasons: f.reasons.map((x) => ({ reason: x.reason, n: x.ids.length })),
+          actions: actions(i),
+        };
+      }),
+    };
   };
 
   const unpicked = d.options.filter((o) => !ids.includes(o.id));
@@ -244,7 +242,7 @@ export default function ComparePage({ data: d, views, bare }: { data: CompareDat
       {drill && !task && <DrillDrawer drill={drill} tasks={d.tasks} now={d.now} close={() => setDrill(null)} openTask={(id) => setTask({ id, fromList: true })} />}
       {task && <TaskDrawer id={task.id} now={d.now} canEscalate={d.canEscalate} onDone={setToast}
         back={task.fromList && drill ? () => setTask(null) : undefined} close={() => { setTask(null); setDrill(null); }} />}
-      {report !== null && <CopyModal title="Comparison report" text={report} file={`compare-${d.kind}-${d.R.from}-to-${d.R.to}.md`} close={() => setReport(null)} />}
+      {report && <CompareReport rep={report} close={() => setReport(null)} />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </DrillCtx.Provider>
   );
