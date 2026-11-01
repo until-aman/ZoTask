@@ -30,7 +30,7 @@ export default function Nav({ links }: { links: [string, string][] }) {
   return (
     <nav className="nav" aria-label="ZoTask">
       {links.map(([href, label]) => (
-        <Link key={href} href={href} className={path.startsWith(href) ? "on" : ""} aria-current={path.startsWith(href) ? "page" : undefined}>{ICONS[href]}<span>{label}</span></Link>
+        <Link key={href} href={href} className={path.startsWith(href) ? "on" : ""} aria-current={path.startsWith(href) ? "page" : undefined} title={label}>{ICONS[href]}<span>{label}</span></Link>
       ))}
     </nav>
   );

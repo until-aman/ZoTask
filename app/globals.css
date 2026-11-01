@@ -40,10 +40,23 @@ h3{margin:0 0 6px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;c
 .nav a.on svg{color:var(--blue)}
 .me{margin-top:auto;display:grid;gap:2px;font-size:12.5px;color:var(--muted);padding:12px 6px 2px;border-top:1px solid var(--line2)}
 .me b{color:var(--fg);font-size:13.5px}
+.shell{transition:grid-template-columns .2s ease}
+.sidetog{margin-left:auto;display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;flex:none}
+.sidetog:hover{color:var(--blue);border-color:var(--blue)}
+@media (min-width:901px){
+  .shell.sidemin{grid-template-columns:64px minmax(0,1fr)}
+  .shell.sidemin .side{padding:14px 8px;align-items:center}
+  .shell.sidemin .side-brand{flex-direction:column;padding:0 0 6px}
+  .shell.sidemin .sidetog{margin:0}
+  .shell.sidemin .brand,.shell.sidemin .nav a span,.shell.sidemin .me{display:none}
+  .shell.sidemin .nav{width:100%}
+  .shell.sidemin .nav a{justify-content:center;padding:9px 0}
+}
 @media (max-width:900px){
   .shell{display:block;--toph:var(--sideh,104px)}
   .side{height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 12px;border-right:0;border-bottom:1px solid var(--line);padding:8px 16px}
   .side-brand{padding:0}
+  .sidetog{display:none}
   .me{margin:0 0 0 auto;padding:0;border:0;display:flex;gap:6px;align-items:center;white-space:nowrap}
   .me span{display:none}
   .nav{order:3;flex-direction:row;flex:1 1 100%;overflow-x:auto;scrollbar-width:none}
