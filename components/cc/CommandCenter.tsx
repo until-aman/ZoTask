@@ -1,6 +1,7 @@
 "use client";
 // Operations command center. Order follows the questions ops asks: how are we doing, what needs action now,
 // why is it happening, and who is accountable. Every number opens the tasks behind it in a side drawer.
+import { fmtDate, fmtTime } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import type { CC, Issue } from "@/lib/command";
 import DashFilters from "@/components/DashFilters";
@@ -11,7 +12,7 @@ import ActionQueue from "./ActionQueue";
 import { Compare, Lifecycle, Reasons, Recurring, Trends } from "./Insights";
 import { Cbms, Housekeeping, Properties, Reviewers } from "./Accountability";
 
-const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const nice = (d: string) => fmtDate(d);
 const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from) : `${nice(r.from)} – ${nice(r.to)}`);
 
 function Health({ d, part }: { d: CC; part: "top" | "rest" }) {
@@ -123,7 +124,7 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
         <div className="row2">
           <div>
             <h1>Operations command center</h1>
-            <p className="muted" style={{ margin: "2px 0 0" }}>{span(d.R)} vs {span(d.P)} · {d.propCount} properties{d.mine ? " · my portfolio" : ""}{d.filters.rv ? ` · reviewer: ${d.reviewerOpts.find((r) => String(r.id) === d.filters.rv)?.name ?? ""}` : ""} · data as of {new Date(d.now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</p>
+            <p className="muted" style={{ margin: "2px 0 0" }}>{span(d.R)} vs {span(d.P)} · {d.propCount} properties{d.mine ? " · my portfolio" : ""}{d.filters.rv ? ` · reviewer: ${d.reviewerOpts.find((r) => String(r.id) === d.filters.rv)?.name ?? ""}` : ""} · data as of {fmtTime(d.now)}</p>
           </div>
         </div>
         <DashFilters geo={d.geo} cats={d.cats} init={{ range: d.preset, ...d.filters }} range={d.R} mine={d.role === "reviewer" ? d.mine : undefined} reviewers={d.reviewerOpts}

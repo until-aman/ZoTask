@@ -2,7 +2,7 @@
 // on-time uses tasks past their deadline as the denominator, review SLA counts the overdue backlog,
 // "verified" counts tasks (not pass decisions), and every per-person rollup credits one accountable CBM.
 import { all } from "./db";
-import { HOUR, addDays, isoDate } from "./time";
+import { HOUR, addDays, isoDate, dayStart, DAY, fmtDateTime } from "./time";
 import { rows, Row } from "./queries";
 
 export type Range = { from: string; to: string };
@@ -40,7 +40,7 @@ export function execution(list: Row[], now: number) {
 
 type Rev = { id: number; instance_id: number; reviewer_id: number; reviewer: string; kind: string; decision: string; decided_at: number; due_at: number | null; submitted_at: number; property_id: number };
 export async function reviewsIn(r: Range, props: number[]): Promise<Rev[]> {
-  const from = new Date(r.from + "T00:00").getTime(), to = new Date(r.to + "T00:00").getTime() + 864e5;
+  const from = dayStart(r.from), to = dayStart(r.to) + DAY;
   return await all<Rev>(`SELECT rv.id, rv.instance_id, rv.reviewer_id, u.name reviewer, rv.kind, rv.decision, rv.decided_at, rv.due_at, s.submitted_at, i.property_id
     FROM reviews rv JOIN users u ON u.id=rv.reviewer_id JOIN submissions s ON s.id=rv.submission_id JOIN instances i ON i.id=rv.instance_id
     WHERE rv.decided_at>=? AND rv.decided_at<? AND i.property_id IN (${props.join(",") || 0})`, from, to);
@@ -80,7 +80,7 @@ export function attention(openRows: Row[], period: Row[], now: number, q: string
     else if (r.status === "auditflag" && age > 48)
       out.push({ id: r.id, sev: "a", title: `Audit questions unanswered · ${r.task}`, sub: `${r.property} · ${Math.round(age)}h`, owner: r.cbm ?? "", age, href });
     else if (r.status === "notsub" && r.criticality === "high")
-      out.push({ id: r.id, sev: "r", title: `Critical task not done · ${r.task}`, sub: `${r.property} · due by ${new Date(r.late_until_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`, owner: r.assignee ?? "", age, href });
+      out.push({ id: r.id, sev: "r", title: `Critical task not done · ${r.task}`, sub: `${r.property} · due by ${fmtDateTime(r.late_until_at)}`, owner: r.assignee ?? "", age, href });
   }
   const byProp = new Map<number, Row[]>();
   for (const r of period) byProp.set(r.property_id, [...(byProp.get(r.property_id) ?? []), r]);
@@ -106,12 +106,12 @@ export async function loadOpen(props: number[]) {
   return await rows(`i.status IN ('review','resub','audit','auditflag','flagans','changes','notsub') AND i.property_id IN (${props.join(",") || 0})`);
 }
 export async function reasons(r: Range, props: number[]) {
-  const from = new Date(r.from + "T00:00").getTime(), to = new Date(r.to + "T00:00").getTime() + 864e5;
+  const from = dayStart(r.from), to = dayStart(r.to) + DAY;
   return await all<{ reason: string; n: number }>(`SELECT f.reason, count(DISTINCT rv.instance_id) n FROM review_flags f JOIN reviews rv ON rv.id=f.review_id JOIN instances i ON i.id=rv.instance_id
     WHERE rv.kind='review' AND rv.decided_at>=? AND rv.decided_at<? AND i.property_id IN (${props.join(",") || 0}) GROUP BY f.reason ORDER BY n DESC`, from, to);
 }
 export async function reopenAfterPass(r: Range) {
-  const from = new Date(r.from + "T00:00").getTime(), to = new Date(r.to + "T00:00").getTime() + 864e5;
+  const from = dayStart(r.from), to = dayStart(r.to) + DAY;
   return (await all<{ instance_id: number }>("SELECT instance_id FROM events WHERE type='reopened' AND at>=? AND at<?", from, to)).map((x) => x.instance_id);
 }
 export { isoDate };

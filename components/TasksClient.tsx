@@ -1,5 +1,6 @@
 "use client";
 // My Tasks for the ground team and CBMs: counts per list on top, then search and filters, then the tasks, 20 a page.
+import { fmtDate } from "@/lib/time";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,7 +33,7 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
   const [size, setSize] = usePageSize();
   const pg = clampPage(page, list.length, size);
   const shown = list.slice(pg * size, pg * size + size);
-  const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const nice = (d: string) => fmtDate(d);
   const dateQ = range === "custom" ? `&range=custom&from=${from}&to=${to}` : range === "today" ? "" : `&range=${range}`;
   const go = (t: string, q = dateQ) => router.push(`/tasks?tab=${t}${q}`);
   const span = from === to ? nice(from) : `${nice(from)} – ${nice(to)}`;

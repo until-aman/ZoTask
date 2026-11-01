@@ -1,7 +1,7 @@
 // Escalations: issues the central team raises with another team or person and follows until closed.
 import { all, one, run, tx } from "./db";
 import { DAY, isoDate, addDays } from "./time";
-import { User, scopeProps } from "./auth";
+import { User, scopeProps, inScope } from "./auth";
 import { geo } from "./queries";
 import { logEvent } from "./engine";
 
@@ -25,12 +25,26 @@ export type EscInput = {
   ownerName: string; ownerEmail: string; cc: string; due: string; mailSent: boolean; mailSubject: string; link: string; photos: string[]; instanceId: number | null;
 };
 
+/** The ZoTask account behind an owner, matched by email first, then by exact name. */
+async function ownerAccount(name: string, email: string) {
+  if (email.trim()) { const byEmail = await one<{ id: number }>("SELECT id FROM users WHERE lower(email)=lower(?)", email.trim()); if (byEmail) return byEmail.id; }
+  return (await one<{ id: number }>("SELECT id FROM users WHERE name=?", name.trim()))?.id ?? null;
+}
+
 export async function raise(u: User, x: EscInput, now: number) {
   if (!x.title.trim()) throw new Error("Add what the issue is.");
   if (!x.propertyIds.length) throw new Error("Pick at least one property.");
   if (!x.ownerName.trim()) throw new Error("Add who it is raised to.");
+  if (!PRIORITY[x.priority]) throw new Error("Pick a priority: High, Medium or Low.");
+  if (!DEPARTMENTS.includes(x.department)) throw new Error("Pick a department from the list.");
+  if (x.due && (!/^\d{4}-\d{2}-\d{2}$/.test(x.due) || x.due < isoDate(now))) throw new Error("Expected closure can't be in the past.");
+  for (const p of x.propertyIds) if (!(await inScope(u, p))) throw new Error("One of those properties isn't yours.");
+  if (x.instanceId) {
+    const i = await one<{ property_id: number }>("SELECT property_id FROM instances WHERE id=?", x.instanceId);
+    if (!i || !(await inScope(u, i.property_id))) throw new Error("That task isn't at one of your properties.");
+  }
   const due = x.due || addDays(isoDate(now), PRIORITY_DAYS[x.priority] ?? 3);
-  const owner = await one<{ id: number }>("SELECT id FROM users WHERE lower(email)=lower(?) OR name=?", x.ownerEmail.trim(), x.ownerName.trim());
+  const owner = { id: await ownerAccount(x.ownerName, x.ownerEmail) };
   return await tx(async () => {
     const id = Number((await run(`INSERT INTO escalations (department, title, detail, priority, status, raised_by, owner_name, owner_email, owner_id, cc, mail_subject, mail_sent_at, link, due_date, photos, instance_id, created_at, updated_at)
       VALUES (?,?,?,?, 'open', ?,?,?,?,?,?,?,?,?,?,?,?,?)`, x.department, x.title.trim(), x.detail.trim() || null, x.priority, u.id, x.ownerName.trim(), x.ownerEmail.trim() || null, owner?.id ?? null,
@@ -49,6 +63,7 @@ export async function update(u: User, id: number, p: EscPatch, now: number) {
   if (!e) throw new Error("Escalation not found.");
   if (!["admin", "reviewer", "auditor"].includes(u.access_role) && e.raised_by !== u.id && e.owner_id !== u.id) throw new Error("Only the central team, the person who raised it or its owner can update this.");
   if (p.status && !ESC_STATUS[p.status]) throw new Error("Unknown status.");
+  if (p.due && !/^\d{4}-\d{2}-\d{2}$/.test(p.due)) throw new Error("Pick a valid date.");
   const parts: string[] = [];
   const status = p.status && p.status !== e.status ? p.status : null;
   const due = p.due && p.due !== e.due_date ? p.due : null;
@@ -59,7 +74,10 @@ export async function update(u: User, id: number, p: EscPatch, now: number) {
   if (p.mailSent && !e.mail_sent_at) parts.push("Email sent");
   if (p.photos?.length) parts.push(`${p.photos.length} photo${p.photos.length > 1 ? "s" : ""} added`);
   if (!parts.length && !p.note?.trim() && p.mailSubject === undefined && p.link === undefined) throw new Error("Nothing to update.");
+  // A new owner takes over the escalation in ZoTask too, so the right person can update it.
+  const ownerId = owner ? await ownerAccount(owner, p.ownerEmail ?? "") : undefined;
   await tx(async () => {
+    if (owner) await run("UPDATE escalations SET owner_id=? WHERE id=?", ownerId, id);
     await run(`UPDATE escalations SET status=coalesce(?, status), due_date=coalesce(?, due_date), owner_name=coalesce(?, owner_name), owner_email=CASE WHEN ? IS NULL THEN owner_email ELSE ? END,
       mail_sent_at=CASE WHEN ? AND mail_sent_at IS NULL THEN ? ELSE mail_sent_at END, mail_subject=coalesce(?, mail_subject), link=coalesce(?, link),
       photos=?, updated_at=?, closed_at=CASE WHEN ? IN ('done','dropped') THEN ? WHEN ? IN ('open','wip') THEN NULL ELSE closed_at END WHERE id=?`,

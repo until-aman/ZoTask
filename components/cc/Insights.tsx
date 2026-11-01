@@ -1,5 +1,6 @@
 "use client";
 // Why it's happening: trends, the task lifecycle, rejection reasons, recurring patterns and city/cluster comparison.
+import { fmtDate } from "@/lib/time";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CC } from "@/lib/command";
@@ -16,7 +17,7 @@ const METRICS: { key: string; label: string; rate: boolean; goodUp: boolean; tip
   { key: "rejections", label: "Tasks sent back", rate: false, goodUp: false, tip: "Tasks sent back for changes that day" },
   { key: "repeatRate", label: "Sent back again", rate: true, goodUp: false, tip: "Send-backs on a second or later attempt ÷ all send-backs that day" },
 ];
-const nice = (d: string) => new Date(d + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const nice = (d: string) => fmtDate(d);
 
 /** Merges day points into weeks. Rates add numerators and denominators, counts add up, the backlog takes the last day. */
 function bucketize(points: Pt[], days: string[], weekly: boolean) {
