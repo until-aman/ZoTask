@@ -1,0 +1,480 @@
+[
+ {
+  "name": "HK attendance and grooming",
+  "category": "Housekeeping",
+  "window_start": "10:30",
+  "window_end": "11:00",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Connected with the HK/SHK team?",
+    "kind": "yesno",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• HK/SHK connection call made by shift start (10:30 AM): Yes/No\n• If No: number of attempts and time of 11:00 AM escalation\nHow:\n• Check the ZoTask entry and its timestamp against shift start\n• If No: Call the ACEM to understand the reason.\n• Not connected by 11:00 AM: Escalate to HK Manager to arrange immediate cover"
+   },
+   {
+    "label": "How many SHK's are present?",
+    "kind": "count",
+    "count_of": "SHK",
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Number of SHKs present\n• Roster allocation for this property\n• Shortfall or zero count\nHow:\n• Compare the SHK count with the Staff Roster tab (ACEM Visibility Tracker v2)\n• Shortfall: ask HK Manager for cover and note affected areas\n• Zero: escalate to HK Manager and Ops Manager immediately\n• Ask ACEM for a live, time-stamped team photo as proof; an 'all present' message is not proof\nLinks:\n• Check \"Staff Roaster\" tab : ACEM Visibility Tracker v2\nStaff Roaster tab --> Need to be added"
+   },
+   {
+    "label": "How many HK's are present?",
+    "kind": "count",
+    "count_of": "HK",
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Number of HKs present\n• Roster allocation for this property\n• Shortfall or zero count\nHow:\n• Compare the HK count with the Staff Roster tab (ACEM Visibility Tracker v2)\n• Shortfall: ask HK Manager for cover and note affected areas\n• Zero: escalate to HK Manager and Ops Manager immediately\n• Ask ACEM for a live, time-stamped team photo as proof; an 'all present' message is not proof\nLinks:\n• Check \"Staff Roaster\" tab : ACEM Visibility Tracker v2\nStaff Roaster tab --> Need to be added"
+   },
+   {
+    "label": "Checked that SHK/HK staff are in uniform and properly dressed. (Share timestamped photo showing all staff together)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Photo uploaded today showing each SHK/HK in uniform\n• Name and reason for any non-compliant staff\nHow:\n• Open the uploaded photo and check each person is in uniform and properly dressed\n• Count people in the photo against the HK+ SHK count\n• Non-compliant staff: ask ACEM for name and reason, then raise to HK Manager"
+   }
+  ]
+ },
+ {
+  "name": "Water supply updates",
+  "category": "Facilities",
+  "window_start": "10:30",
+  "window_end": "11:00",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Have you got the water supply (tanker/can) for the day? Yes/No (If No, then state the reason and support required)",
+    "kind": "yesno",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Water supply (tanker/can) arranged for the day: Yes/No\n• If No: reason and support required\n• Backup plan from ACEM\nHow:\n• Check it in ZoSpend -Water Tanker/Can Live tracker sheet\n• If No: check the reason and support requested, and confirm the backup plan with ACEM\n• Supply gap: escalate to CEM and City Head\n• Cross-check with the water form entry (row 8)\nLinks:\nZoSpend - Water Tanker/Can Form Fills"
+   },
+   {
+    "label": "Have you filled in the water form in the PM app? (If No, then state the reason and support required)",
+    "kind": "yesno",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Water form filled in the PM app for the day\n• Entry present in the Water Entry Live Tracker\nHow:\n• Compare the PM app status with the Water Entry Live Tracker\n• No entry: ask ACEM to fill the water entry form in the PM app\nLinks:\nZoSpend - Water Tanker/Can Form Fills"
+   }
+  ]
+ },
+ {
+  "name": "Model room or bed readiness",
+  "category": "Operations",
+  "window_start": "11:30",
+  "window_end": "12:00",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Checked the model room or model bed is ready to show. (Enter the Room No.)",
+    "kind": "text",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Model room/bed checked: Yes/No\n• Room number entered\n• Update time (before 12:00 PM)\nHow:\n• Check the room number against the timestamped photo showing the room number\n• Confirm it is the designated model room\n• Not updated by 12:15 PM: ask ACEM to update and escalate to CEM"
+   }
+  ]
+ },
+ {
+  "name": "Reception, lift and garbage check",
+  "category": "Facilities",
+  "window_start": "11:30",
+  "window_end": "12:00",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Checked that reception is clean and dust-free.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Reception is clean and dust-free\n• Desk and floor are dust-free\n• Photo covers the full reception\nHow:\n• Check today's reception photo (time-stamped) in the PM app\n• Not clean: ask ACEM for a re-clean and after-photo; route to HK Manager if unresolved"
+   },
+   {
+    "label": "Checked that the lift is clean.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Lift is clean (floor, walls, litter)\n• N/A status matches the property record\n• Malfunction reported and urgent ticket raised\nHow:\n• Check today's lift photo\n• Verify any N/A against the property record\n• Malfunction: confirm an urgent ticket in the R&M Tickets Sheet / SCAR and escalate to Maintenance and Ops Manager\nLinks:\nR&M Tickets Sheet: Tickets Tracker_CL_RnM & SCAR"
+   },
+   {
+    "label": "After how many days the garbage is usually cleared by the vendor?",
+    "kind": "number",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Days the vendor usually takes to clear garbage (0/1/2/3+)\n• Escalation level that number triggers\nHow:\n• Compare the number with the vendor pickup log\n• 3+ days: confirm ACEM has asked the vendor for early pickup or a vendor change\n• Escalate by the garbage escalation matrix (thresholds still to be approved)"
+   },
+   {
+    "label": "For how many consecutive days has garbage collection been missed?",
+    "kind": "number",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Consecutive days garbage collection was missed\n• Garbage-area photo shows the area is clean\nHow:\n• Check today's garbage-area photo\n• Match the missed-day count with the vendor pickup log\n• Escalate by the garbage escalation matrix used in row 13"
+   }
+  ]
+ },
+ {
+  "name": "Sales calls and lead updates (Part 1 of 4)",
+  "category": "Sales",
+  "window_start": "10:30",
+  "window_end": "12:30",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Connected with all pending Leads (SV's, magicbricks, inside sales, etc.) till now and updated comments.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Every lead due in SV's (MTD) has a timestamped comment and outcome\n• Every lead due in the Magicbricks sheet (MTD) has a timestamped comment and outcome\n• Every lead due in the Inside Sales WhatsApp group has a comment and outcome\n• Missed or blank-comment leads listed\nHow:\n• Open the CRM scheduled-visit list and check comments on each due SV\n• Open the Magicbricks sheet and check comment status on each due lead\n• Open the Inside Sales WhatsApp group and check each lead has a comment\n• Check all four sources: PM app (visits, overdue, callbacks), Inside Sales WhatsApp, Magicbricks sheet, customer WhatsApp\n• Missed or blank leads: send to ACEM to update before the round deadline (12:30 PM)\nLinks:\n• CRM: https://crm.zolostays.com/scheduledVisit\n• Magicbricks sheet (city-wise): CBM_central_node_workflow_final.xlsx\n• Inside sales WhatsApp group (city-wise): Whatsapp City Groups"
+   }
+  ]
+ },
+ {
+  "name": "Z Express / short-stay check-in readiness",
+  "category": "Short stays",
+  "window_start": "12:00",
+  "window_end": "13:00",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "How many short-stay check-ins are expected today?",
+    "kind": "number",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Expected short-stay check-ins today (PM app count)\n• Matches Zexpress dashboard bookings\n• D-1 stale check-ins cleared\n• D-1 KYC compliance\n• D-1 ratings collected\nHow:\n• Reconcile the PM app count with the Zexpress dashboard\n• Check D-1 status in the ACEM Visibility Tracker v2\n• Mismatch: ask ACEM to confirm with the Z Express team and note the difference\nLinks:\nACEM Visibility Tracker v2"
+   },
+   {
+    "label": "How many of these rooms are ready?",
+    "kind": "number",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Number of short-stay rooms ready vs expected check-ins\n• Size of the gap (large gap = escalation)\nHow:\n• Reconcile the ready count with expected check-ins\n• Large gap: ask HK Manager to prioritise short-stay rooms and escalate to CEM and ATQ team"
+   }
+  ]
+ },
+ {
+  "name": "Sales calls and lead updates (Part 2 of 4)",
+  "category": "Sales",
+  "window_start": "12:30",
+  "window_end": "14:30",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Connected with all pending Leads (SV's, magicbricks, inside sales, etc.) till now and updated comments.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Every lead due in SV's (MTD) has a timestamped comment and outcome\n• Every lead due in the Magicbricks sheet (MTD) has a timestamped comment and outcome\n• Every lead due in the Inside Sales WhatsApp group has a comment and outcome\n• Missed or blank-comment leads listed\nHow:\n• Open the CRM scheduled-visit list and check comments on each due SV\n• Open the Magicbricks sheet and check comment status on each due lead\n• Open the Inside Sales WhatsApp group and check each lead has a comment\n• Check all four sources: PM app (visits, overdue, callbacks), Inside Sales WhatsApp, Magicbricks sheet, customer WhatsApp\n• Missed or blank leads: send to ACEM to update before the round deadline (2:30 PM)\nLinks:\n• CRM: https://crm.zolostays.com/scheduledVisit\n• Magicbricks sheet (city-wise): CBM_central_node_workflow_final.xlsx\n• Inside sales WhatsApp group (city-wise): Whatsapp City Groups"
+   }
+  ]
+ },
+ {
+  "name": "Property visit and walk",
+  "category": "Operations",
+  "window_start": "12:00",
+  "window_end": "19:30",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 1,
+  "start_stop": 1,
+  "criticality": "high",
+  "items": [
+   {
+    "label": "Started the property walk with a staff member (Upload your timestamped photo with the staff member)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Walk started with a staff member: Yes/No\n• Staff name recorded\n• Photo with the staff member uploaded (time-stamped, today)\nHow:\n• Check the staff name and the photo with the staff member\n• Confirm the walk with ACEM if the name or photo is missing"
+   },
+   {
+    "label": "Checked that reception is clean and dust-free. (Share timestamped photo of reception)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Today's reception photo uploaded (time-stamped)\n• Reception is clean and dust-free\n• Photo covers the full reception\nHow:\n• Inspect the photo for cleanliness, clutter and damage\n• Dirt: ask HK Manager for cleaning and an after-photo\n• Damage: verify the ticket and owner in SCAR"
+   },
+   {
+    "label": "Is there clutter in reception? Yes / No",
+    "kind": "yesno",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Clutter in reception: Yes/No\nHow:\nIf No, then understand the reason and ensure the problem is escalated to relevant stakeholder."
+   },
+   {
+    "label": "Checked the lift is clean. (Share timestamped photo of lift)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Today's lift photo uploaded\n• Lift is clean (floor, walls, litter)\n• No clutter\n• No visible damage\nHow:\n• Inspect the photo for cleanliness, clutter and damage\n• Dirt: ask HK Manager for cleaning and an after-photo\n• Damage: verify the SCAR ticket and owner; escalate to Maintenance and Ops Manager"
+   },
+   {
+    "label": "Checked the terrace is clean. (Share timestamped photo of terrace)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Today's terrace photo uploaded\n• Terrace is clean\n• No clutter\n• No visible damage\nHow:\n• Inspect the photo for cleanliness, clutter and damage\n• Dirt: ask HK Manager for cleaning and an after-photo\n• Damage: verify the SCAR ticket and owner; escalate to Maintenance and Ops Manager"
+   },
+   {
+    "label": "Checked the kitchen is clean (Share timestamped photo of kitchen)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Today's kitchen photo uploaded\n• Kitchen is clean\n• No clutter\n• No visible damage\nHow:\n• Inspect the photo for cleanliness, clutter and damage\n• Dirt: ask HK Manager for cleaning and an after-photo\n• Damage: verify the SCAR ticket and owner; escalate to Maintenance and Ops Manager"
+   },
+   {
+    "label": "Checked the model room or model bed is ready to show. (Enter the Room Number and upload a timestamped photo)",
+    "kind": "text",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Model room/bed checked: Yes/No\n• Room number entered and photo uploaded\n• Update time (before 12:00 PM)\nHow:\n• Check the room number against the timestamped photo showing the room number\n• Confirm it is the designated model room\n• Not updated by 12:15 PM: ask ACEM to update and escalate to CEM"
+   },
+   {
+    "label": "Checked that the bedsheet and pillow is clean and neatly laid on the model bed. (Share timestamped photo of bedsheet and pillow)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Bedsheet is clean\n• No stains\n• Neatly laid, no creases\n• Today's photo uploaded\nHow:\n• Zoom into the bedsheet photo and check for stains, creases and neat laying\n• Unclear or not clean: ask ACEM for a new photo and HK Manager to replace the sheet"
+   },
+   {
+    "label": "Checked that the washroom is clean. (Share timestamped photo of model room's washroom)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Washroom is clean\n• No visible dirt or stains\n• Fittings in working condition\n• Today's photo uploaded\nHow:\n• Review the washroom photo\n• Dirt: ask HK Manager for cleaning and an after-photo\n• Broken fitting: raise a Maintenance ticket in SCAR"
+   },
+   {
+    "label": "Were any issues found? Yes / No (If Yes, then please elaborate and upload timestamped photo)",
+    "kind": "yesno",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Issues found: Yes/No\n• Per issue: location, impact, photo, ticket/action, owner, due date\n• No: no unreported issues\nHow:\n• Review today's area photos and the open tickets for the property in SCAR\n• No: confirm no issues are unreported\n• Yes: confirm each issue is assigned and has a due date; follow up and reopen if unresolved\n• Route cleaning to HK Manager, repairs to Maintenance, safety to Ops Manager immediately\nLinks:\n• SCAR Sheet (tickets): New, Open & Pending Tickets_Live - Coliving"
+   }
+  ]
+ },
+ {
+  "name": "Sales calls and lead updates (Part 3 of 4)",
+  "category": "Sales",
+  "window_start": "14:30",
+  "window_end": "16:30",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Connected with all pending Leads (SV's, magicbricks, inside sales, etc.) till now and updated comments.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Every lead due in SV's (MTD) has a timestamped comment and outcome\n• Every lead due in the Magicbricks sheet (MTD) has a timestamped comment and outcome\n• Every lead due in the Inside Sales WhatsApp group has a comment and outcome\n• Missed or blank-comment leads listed\nHow:\n• Open the CRM scheduled-visit list and check comments on each due SV\n• Open the Magicbricks sheet and check comment status on each due lead\n• Open the Inside Sales WhatsApp group and check each lead has a comment\n• Check all four sources: PM app (visits, overdue, callbacks), Inside Sales WhatsApp, Magicbricks sheet, customer WhatsApp\n• Missed or blank leads: send to ACEM to update before the round deadline (4:30 PM)\nLinks:\n• CRM: https://crm.zolostays.com/scheduledVisit\n• Magicbricks sheet (city-wise): CBM_central_node_workflow_final.xlsx\n• Inside sales WhatsApp group (city-wise): Whatsapp City Groups"
+   }
+  ]
+ },
+ {
+  "name": "New resident meetings",
+  "category": "Resident experience",
+  "window_start": "10:30",
+  "window_end": "19:30",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "How many residents joined this property in the last 7 days?",
+    "kind": "number",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Unique count of residents who joined in the last 7 days\n• Duplicate or missing residents\nHow:\n• Count unique arrivals in the New residents list tab (ACEM Visibility Tracker v2)\n• Compare with ACEM's count and resolve any difference with ACEM\nLinks:\n• Check \"New residents list\" tab : ACEM Visibility Tracker v2\nNew residents tab --> Need to be added"
+   },
+   {
+    "label": "Of these residents, how many have you met in person and filled the OES form? (Shares Names of residents)",
+    "kind": "number",
+    "count_of": null,
+    "photo": false,
+    "note": true,
+    "guide": "What to check:\n• Residents met in person (count, names, room numbers)\n• OES filled for each resident\n• Planned dates for pending residents\n• Each new resident met within 7 days of moving in\nHow:\n• Reconcile last-7-day arrivals with OES responses (Goal Tracking Framework - Live Month)\n• Randomly call a sample resident to confirm the in-person meeting\n• Day-7 misses: check the reason and revised date\n• Confirm the report lists counts with names and room numbers\nLinks:\n• OES responses sheet: Goal Tracking Framework - Live Month"
+   }
+  ]
+ },
+ {
+  "name": "Sales calls and lead updates (Part 4 of 4)",
+  "category": "Sales",
+  "window_start": "17:00",
+  "window_end": "19:00",
+  "frequency": "daily",
+  "days": [],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Connected with all pending Leads (SV's, magicbricks, inside sales, etc.) till now and updated comments.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Every lead due in SV's (MTD) has a timestamped comment and outcome\n• Every lead due in the Magicbricks sheet (MTD) has a timestamped comment and outcome\n• Every lead due in the Inside Sales WhatsApp group has a comment and outcome\n• Missed or blank-comment leads listed\nHow:\n• Open the CRM scheduled-visit list and check comments on each due SV\n• Open the Magicbricks sheet and check comment status on each due lead\n• Open the Inside Sales WhatsApp group and check each lead has a comment\n• Check all four sources: PM app (visits, overdue, callbacks), Inside Sales WhatsApp, Magicbricks sheet, customer WhatsApp\n• Missed or blank leads: send to ACEM to update before the round deadline (7:00 PM)\n• If still overdue 1 hour after informing ACEM: escalate to CEM and City Head\nLinks:\n• CRM: https://crm.zolostays.com/scheduledVisit\n• Magicbricks sheet (city-wise): CBM_central_node_workflow_final.xlsx\n• Inside sales WhatsApp group (city-wise): Whatsapp City Groups"
+   }
+  ]
+ },
+ {
+  "name": "Central support meeting and ticket updates",
+  "category": "Support",
+  "window_start": "10:30",
+  "window_end": "19:30",
+  "frequency": "weekly",
+  "days": [
+   1,
+   4
+  ],
+  "geofence": 0,
+  "start_stop": 0,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Reviewed open issues and tickets before the meeting.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Open tickets reviewed before the meeting\n• Status, owner and due date for each ticket\n• Overdue tickets highlighted\n• Tickets pulled from PM app, SCAR and direct complaints\nHow:\n• Open the R&M Tickets Sheet and SCAR Sheet and filter open tickets for this property\n• Check status, owner and due date for each\n• Request ACEM's overdue summary before the meeting\nLinks:\n1. R&M Tickets Sheet: Tickets Tracker_CL_RnM & SCAR\n2. SCAR Sheet (tickets): New, Open & Pending Tickets_Live - Coliving"
+   },
+   {
+    "label": "Updated the status of tickets under my scope.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Each in-scope ticket has real progress and a next action\n• No unresolved work marked closed\n• Closure evidence for resolved tickets\n• Resident confirms the issue is fixed\nHow:\n• Review the update history of each ticket in SCAR\n• Inspect the closure evidence\n• Call the resident to confirm the issue is resolved before accepting a closure\n• Reopen unsupported closures; overdue or repeat delays to Ops Manager\nLinks:\n1. R&M Tickets Sheet: Tickets Tracker_CL_RnM & SCAR\n2. SCAR Sheet (tickets): New, Open & Pending Tickets_Live - Coliving"
+   },
+   {
+    "label": "Attended the meeting with central support.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• ACEM attended the meeting\n• Support team SPOC attended the meeting\nHow:\n• Confirm attendance against the calendar invite\n• If absent: note the reason and revised date, and ask ACEM for an urgent issue update"
+   },
+   {
+    "label": "Was it the First or Second meeting of the week?",
+    "kind": "text",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• First or second meeting of the week\n• Two distinct meetings held in the same week\nHow:\n• Check the calendar for two meetings this week\n• At week end: flag a missing second meeting and arrange a revised slot"
+   },
+   {
+    "label": "Discussed pending issues and support required.",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Pending issues covered in the meeting\n• Support required discussed\n• Overdue tickets escalated\nHow:\n• Compare the MoM/agenda with pending tickets in the SCAR Sheet\n• Confirm each overdue ticket has an owner decision; add missed topics\nLinks:\n1. R&M Tickets Sheet: Tickets Tracker_CL_RnM & SCAR\n2. SCAR Sheet (tickets): New, Open & Pending Tickets_Live - Coliving"
+   },
+   {
+    "label": "Recorded the agreed actions from the meeting. (Share minutes of meeting)",
+    "kind": "check",
+    "count_of": null,
+    "photo": false,
+    "note": true,
+    "guide": "What to check:\n• Minutes of the meeting shared\n• Each action has an owner and due date\n• Ticket reference where relevant\nHow:\n• Compare the MoM with the discussion\n• Confirm owners, due dates and ticket references\n• Follow up with action owners on missing or disputed items"
+   }
+  ]
+ },
+ {
+  "name": "Washing machine cleanliness and damage check",
+  "category": "Facilities",
+  "window_start": "10:30",
+  "window_end": "19:30",
+  "frequency": "weekly",
+  "days": [
+   1
+  ],
+  "geofence": 1,
+  "start_stop": 1,
+  "criticality": "normal",
+  "items": [
+   {
+    "label": "Checked that the washing machines are clean. (Share timestamped photo)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Each washing machine is clean (weekly)\n• Each machine identified in its photo\n• Any breakdown reported\nHow:\n• Check each washing machine photo\n• Request a resend for unclear photos\n• Breakdown: raise as a separate maintenance issue to the MEP team and ask ACEM to notify residents"
+   },
+   {
+    "label": "Checked that the washing machine area is clean. (Share timestamped photo)",
+    "kind": "check",
+    "count_of": null,
+    "photo": true,
+    "note": false,
+    "guide": "What to check:\n• Washing machine area is clean\n• No stagnant water\n• No drainage fault\nHow:\n• Inspect the floor, clutter and stagnant water in the photo\n• Water or drainage fault: ask ACEM whether the MEP team was informed; raise a maintenance ticket if not"
+   },
+   {
+    "label": "Was any damage found anywhere (Reception, lift, terrace, kitchen, store room, etc.) in the property? Yes / No\nIf yes, mention the location, damage and rectification required.",
+    "kind": "yesno",
+    "count_of": null,
+    "photo": false,
+    "note": false,
+    "guide": "What to check:\n• Damage found: Yes/No (reception, lift, terrace, kitchen, storeroom, etc.)\n• For Yes: location, damage, ticket, owner, due date\nHow:\n• For No: compare area photos with open damage tickets in SCAR\n• For Yes: check location, ticket creation, owner, due date and after-photo\n• Escalate overdue or repeat damage to Ops Manager; Maintenance for repairs\nLinks:\nR&M Tickets Sheet: Tickets Tracker_CL_RnM & SCAR"
+   }
+  ]
+ }
+]

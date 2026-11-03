@@ -17,7 +17,7 @@ async function freshTask() {
   yes(await A.triggerTask(t.id, 1));
   const i = (await one<{ id: number; assignee_id: number; template_id: number }>("SELECT id, assignee_id, template_id FROM instances WHERE template_id=? ORDER BY id DESC LIMIT 1", t.id))!;
   const items = await E.itemsFor(i.template_id);
-  const answers = items.map((it) => ({ itemId: it.id, checked: true, value: "5", note: "ok", photos: it.photo_required ? ["x.jpg"] : [] }));
+  const answers = items.map((it) => ({ itemId: it.id, checked: true, value: it.kind === "yesno" ? "No" : "5", note: "ok", photos: it.photo_required ? ["x.jpg"] : [] }));
   return { ...i, items, answers };
 }
 
@@ -74,4 +74,16 @@ test("P0-7: the server works out the distance; a simulated location is recorded 
   assert.equal(s2.location_ok, null);
   assert.equal(s2.location_src, "simulated");
   assert.ok(await one("SELECT 1 FROM events WHERE instance_id=? AND type='location_warning'", sim.id));
+});
+
+test("a reviewer can pass an item with missing evidence, and the history says so", async () => {
+  const t = await freshTask();
+  const prop = (await one<{ lat: number; lng: number }>("SELECT lat, lng FROM properties WHERE id=1"))!;
+  signInAs(t.assignee_id);
+  yes(await A.submitTask(t.id, t.answers.map((a) => ({ ...a, photos: [] })), { lat: prop.lat, lng: prop.lng }));
+  signInAs(REVIEWER);
+  yes(await A.reviewTask(t.id, "pass", [], "Photo upload was broken", Date.now()));
+  assert.equal(await status(t.id), "audit");
+  const ev = (await one<{ detail: string }>("SELECT detail FROM events WHERE instance_id=? AND type='passed'", t.id))!;
+  assert.match(ev.detail, /accepted without evidence: Area clean/);
 });

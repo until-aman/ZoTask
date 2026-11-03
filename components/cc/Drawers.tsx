@@ -19,11 +19,12 @@ const lateBy = (t: T, now: number) =>
 
 export function DrillDrawer({ drill, tasks, now, close, openTask }: { drill: Drill; tasks: Record<number, T>; now: number; close: () => void; openTask: (id: number) => void }) {
   const [q, setQ] = useState("");
-  const [sort, setSort] = useState<"due" | "property" | "status">("due");
+  const [sort, setSort] = useState<"due" | "property" | "status" | "sched" | "last">("due");
   const list = useMemo(() => {
     const l = drill.ids.map((id) => tasks[id]).filter(Boolean)
       .filter((t) => !q || `${t.task} ${t.property} ${t.assignee} ${t.city} ${t.cluster}`.toLowerCase().includes(q.toLowerCase()));
-    return l.sort((a, b) => (sort === "due" ? b.due - a.due : sort === "property" ? a.property.localeCompare(b.property) : a.status.localeCompare(b.status)));
+    return l.sort((a, b) => (sort === "due" ? b.due - a.due : sort === "property" ? a.property.localeCompare(b.property)
+      : sort === "sched" ? b.start - a.start : sort === "last" ? b.lastAt - a.lastAt : a.status.localeCompare(b.status)));
   }, [drill, tasks, q, sort]);
   return (
     <>
@@ -35,7 +36,7 @@ export function DrillDrawer({ drill, tasks, now, close, openTask }: { drill: Dri
         </div>
         <div className="row2" style={{ padding: "10px 18px", borderBottom: "1px solid var(--line)" }}>
           <input type="search" className="search" placeholder="Search task, property or person" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search tasks" />
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort"><option value="due">Newest deadline</option><option value="property">Property</option><option value="status">Status</option></select>
+          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort"><option value="due">Newest deadline</option><option value="property">Property</option><option value="status">Status</option><option value="sched">Scheduled (newest)</option><option value="last">Last action (newest)</option></select>
         </div>
         <div className="db" style={{ padding: 0, gap: 0 }}>
           {!list.length && <div className="empty"><b>No tasks match</b>Try a different search.</div>}
@@ -44,6 +45,7 @@ export function DrillDrawer({ drill, tasks, now, close, openTask }: { drill: Dri
               <div style={{ minWidth: 0 }}>
                 <div className="tname" style={{ fontSize: 13.5 }}>{t.task}{t.crit && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}</div>
                 <div className="tsub">{t.property} · {t.cluster}, {t.city}</div>
+                <div className="tsub">Scheduled {fmtDate(t.date)}, {t.win} · Last action: {t.lastL}, {when(t.lastAt)}</div>
                 <div className="tsub">{t.assignee ?? "Unassigned"} · due {when(t.due)} · <span className={t.sub && t.sub <= t.due ? "" : "warn"}>{lateBy(t, now)}</span></div>
               </div>
               <span className={`pill ${STATUS_PILL[t.status]}`}>{STATUS_LABEL[t.status]}</span>

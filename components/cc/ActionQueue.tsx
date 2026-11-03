@@ -1,17 +1,20 @@
 "use client";
 // Action required: every open problem once, most severe first, with the person who must act and what to do.
-import { fmtAt } from "@/lib/time";
+import { fmtAt, fmtDate, fmtDateTime } from "@/lib/time";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Issue, T } from "@/lib/command";
 import { acknowledgeIssues, remindTasks } from "@/app/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/statuses";
 import { InfoTip, dur, useDrill, CopyModal } from "./parts";
+import { ColumnsMenu, ExportMenu, Person, RowMenu, useHiddenCols } from "@/components/ui/TableKit";
 import { ActiveChip, Field, FilterBar, SearchPick, Pager, SortState, clampPage, usePageSize, Stats, nextSort, sortRows } from "@/components/ui/Filters";
 
 const CATS: [Issue["cat"] | "all", string][] = [["all", "All"], ["critical", "Critical"], ["ground", "Ground team overdue"], ["review", "Review SLA breaches"], ["repeat", "Repeated rejections"], ["exception", "Exceptions"]];
 const SEVC: Record<string, string> = { Critical: "r", High: "r", Medium: "a", Low: "" };
 const SEVN: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+const COLS = [{ key: "sev", label: "Severity", fixed: true }, { key: "issue", label: "Issue", fixed: true }, { key: "prop", label: "Property" }, { key: "owner", label: "Responsible" },
+  { key: "sched", label: "Scheduled" }, { key: "last", label: "Last action" }, { key: "status", label: "Status" }, { key: "over", label: "Over limit" }, { key: "back", label: "Sent back" }, { key: "cmt", label: "Latest comment" }];
 const ago = (now: number, at: number) => `${dur(now - at)} ago`;
 
 export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toast, handover }: {
@@ -34,7 +37,8 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
   const list = issues.filter((i) => (cat === "all" || i.cat === cat) && (!owner || i.owner === owner) && (!sev || i.sev === sev) && (!hideAck || (!i.ack && !i.esc))
     && (!q || `${i.task} ${i.property} ${i.owner} ${i.type} ${i.city} ${i.cluster}`.toLowerCase().includes(q.toLowerCase())));
   const sorted = sortRows(list, sort, (i, k) => k === "sev" ? SEVN[i.sev] : k === "issue" ? i.type : k === "prop" ? i.property : k === "owner" ? i.owner
-    : k === "status" ? (i.id ? STATUS_LABEL[i.status] : "Property") : k === "over" ? i.overdue : k === "back" ? i.rejections : null);
+    : k === "status" ? (i.id ? STATUS_LABEL[i.status] : "Property") : k === "over" ? i.overdue : k === "back" ? i.rejections
+    : k === "sched" ? (i.date ?? null) && `${i.date} ${i.win}` : k === "last" ? i.lastAt ?? null : null);
   const pg = clampPage(page, sorted.length, size);
   const view = sorted.slice(pg * size, pg * size + size);
   const chips: ActiveChip[] = [
@@ -47,6 +51,14 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
       <button type="button" className="sortbtn" onClick={() => { setSort(nextSort(sort, k)); setPage(0); }}>{label}<span className="sorti">{sort?.key === k ? (sort.dir === 1 ? "▲" : "▼") : "↕"}</span></button>
     </th>
   );
+  const [hidden, toggleCol] = useHiddenCols("Open issues");
+  const on = (k: string) => !hidden.has(k);
+  const header = ["Severity", "Issue", "Task", ...(on("prop") ? ["Property", "Cluster", "City"] : []), ...(on("owner") ? ["Responsible", "Role"] : []), ...(on("sched") ? ["Scheduled", "Window"] : []),
+    ...(on("last") ? ["Last action", "Last action at"] : []), ...(on("status") ? ["Status"] : []), ...(on("over") ? ["Over limit"] : []), ...(on("back") ? ["Sent back"] : []), ...(on("cmt") ? ["Latest comment"] : []), "Acknowledged / escalated"];
+  const cells = (l: Issue[]) => l.map((i) => [i.sev, i.type, i.task, ...(on("prop") ? [i.property, i.cluster, i.city] : []), ...(on("owner") ? [i.owner, i.ownerRole] : []),
+    ...(on("sched") ? [i.date ? fmtDate(i.date) : "", i.win ?? ""] : []), ...(on("last") ? [i.lastL ?? "", i.lastAt ? fmtDateTime(i.lastAt) : ""] : []),
+    ...(on("status") ? [i.id ? STATUS_LABEL[i.status] : "Property"] : []), ...(on("over") ? [i.overdue ? dur(i.overdue) : ""] : []), ...(on("back") ? [i.rejections || 0] : []),
+    ...(on("cmt") ? [i.comment ?? ""] : []), i.esc ? i.esc.detail : i.ack ? `Acknowledged by ${i.ack.by}` : ""]);
   const selIssues = issues.filter((i) => sel.has(i.key) && i.id);
   const run = async (p: Promise<{ ok: boolean; msg?: string; error?: string }>) => { const r = await p; toast(r.ok ? r.msg ?? "Done" : r.error ?? "Failed"); setSel(new Set()); if (r.ok) router.refresh(); };
 
@@ -90,12 +102,16 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
         <button type="button" className="btn sm" onClick={() => run(acknowledgeIssues(selIssues.map((i) => i.id!)))}>Acknowledge</button>
         <button type="button" className="link small" onClick={() => setSel(new Set())}>Clear</button>
       </div>}
+      <div className="ttool"><span className="small muted">{sorted.length} issue{sorted.length === 1 ? "" : "s"}</span><span className="spacer" />
+        <ColumnsMenu cols={COLS} hidden={hidden} toggle={toggleCol} />
+        <ExportMenu name="Open issues" header={header} rows={() => cells(sorted)} page={sorted.length > view.length ? () => cells(view) : undefined} /></div>
       {!list.length ? <div className="empty"><b>{issues.length ? "Nothing matches these filters" : "Nothing needs action"}</b>{issues.length ? "Try another type or owner." : "No overdue tasks, late reviews or repeat rejections right now."}</div> : (
         <div className="tbl"><table className="aq">
           <thead><tr>
             <th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={view.filter((i) => i.id).every((i) => sel.has(i.key)) && view.some((i) => i.id)}
               onChange={(e) => setSel(e.target.checked ? new Set(view.filter((i) => i.id).map((i) => i.key)) : new Set())} /></th>
-            <Th k="sev" label="Severity" /><Th k="issue" label="Issue" /><Th k="prop" label="Property" /><Th k="owner" label="Responsible" /><Th k="status" label="Status" /><Th k="over" label="Over limit" n /><Th k="back" label="Sent back" n /><th>Latest comment</th><th />
+            <Th k="sev" label="Severity" /><Th k="issue" label="Issue" />{on("prop") && <Th k="prop" label="Property" />}{on("owner") && <Th k="owner" label="Responsible" />}{on("sched") && <Th k="sched" label="Scheduled" />}
+            {on("last") && <Th k="last" label="Last action" />}{on("status") && <Th k="status" label="Status" />}{on("over") && <Th k="over" label="Over limit" n />}{on("back") && <Th k="back" label="Sent back" n />}{on("cmt") && <th>Latest comment</th>}<th style={{ width: 44 }} aria-label="Actions" />
           </tr></thead>
           <tbody>{view.map((i) => (
             <tr key={i.key}>
@@ -106,19 +122,20 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
                 {i.esc ? <div className="small warn" style={{ fontWeight: 600 }}>{i.esc.detail.split(" · ")[0]} · {ago(now, i.esc.at)}</div>
                   : i.ack ? <div className="small muted">✓ Acknowledged by {i.ack.by} · {ago(now, i.ack.at)}</div> : null}
               </td>
-              <td><div>{i.property}</div><div className="tsub">{i.cluster}, {i.city}</div></td>
-              <td><div>{i.owner}</div><div className="tsub">{i.ownerRole}</div></td>
-              <td>{i.id ? <span className={`pill ${STATUS_PILL[i.status]}`}>{STATUS_LABEL[i.status]}</span> : <span className="pill">Property</span>}</td>
-              <td className="n">{i.overdue ? <span className={i.overdue > 24 * 3600_000 ? "warn" : ""}>{dur(i.overdue)}</span> : "—"}</td>
-              <td className="n">{i.rejections || "—"}</td>
-              <td className="cmt" title={i.comment ?? ""}>{i.comment ?? <span className="muted">—</span>}</td>
-              <td><div className="acts">
-                {i.id ? <>
-                  <button type="button" className="btn sm" onClick={() => onIssue(i)}>View</button>
-                  <button type="button" className="btn sm" onClick={() => run(remindTasks([i.id!]))}>Remind</button>
-                  {canEscalate && !i.esc && <button type="button" className="btn sm danger" onClick={() => onIssue(i)} title="Open the task to escalate with a note">Escalate</button>}
-                </> : <button type="button" className="btn sm" onClick={() => open({ title: `${i.property}: missed tasks`, ids: i.ids })}>View tasks</button>}
-              </div></td>
+              {on("prop") && <td><div>{i.property}</div><div className="tsub">{i.cluster}, {i.city}</div></td>}
+              {on("owner") && <td><Person name={i.owner} sub={i.ownerRole} /></td>}
+              {on("sched") && <td>{i.date ? <><div>{fmtDate(i.date)}</div><div className="tsub">{i.win}</div></> : <span className="muted">—</span>}</td>}
+              {on("last") && <td>{i.lastL ? <><div>{i.lastL}</div><div className="tsub">{fmtDateTime(i.lastAt!)}</div></> : <span className="muted">—</span>}</td>}
+              {on("status") && <td>{i.id ? <span className={`pill ${STATUS_PILL[i.status]}`}>{STATUS_LABEL[i.status]}</span> : <span className="pill">Property</span>}</td>}
+              {on("over") && <td className="n">{i.overdue ? <span className={i.overdue > 24 * 3600_000 ? "warn" : ""}>{dur(i.overdue)}</span> : "—"}</td>}
+              {on("back") && <td className="n">{i.rejections || "—"}</td>}
+              {on("cmt") && <td className="cmt" title={i.comment ?? ""}>{i.comment ?? <span className="muted">—</span>}</td>}
+              <td className="tdact"><RowMenu label={`Actions for ${i.task}`} actions={i.id ? [
+                { label: "View task", onClick: () => onIssue(i) },
+                { label: `Remind ${i.owner.split(" ")[0]}`, onClick: () => run(remindTasks([i.id!])) },
+                { label: "Acknowledge", hidden: !!i.ack, onClick: () => run(acknowledgeIssues([i.id!])) },
+                { label: "Escalate…", danger: true, hidden: !canEscalate || !!i.esc, onClick: () => onIssue(i) },
+              ] : [{ label: "View tasks", onClick: () => open({ title: `${i.property}: missed tasks`, ids: i.ids }) }]} /></td>
             </tr>
           ))}</tbody>
         </table></div>

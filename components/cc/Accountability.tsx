@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { CC, Issue } from "@/lib/command";
 import { InfoTip, N, Sec, Spark, Table, dur, fmtP, rag } from "./parts";
 import { Field, FilterBar, SearchPick } from "@/components/ui/Filters";
+import { Avatar } from "@/components/ui/TableKit";
 
 type Prop = CC["properties"][number];
 const W0 = { late: 30, missed: 25, repeat: 15, sla: 15, critical: 15 };
@@ -52,7 +53,7 @@ export function Properties({ d, cbm, setCbm, issues }: { d: CC; cbm: string; set
         cols={[
           { key: "name", label: "Property", sticky: true, value: (p) => p.name, render: (p) => <b>{p.name}</b> },
           { key: "geo", label: "City · Cluster", hidden: true, value: (p) => `${p.city} · ${p.cluster}`, render: (p) => <span className="muted">{p.city} · {p.cluster}</span> },
-          { key: "cbm", label: "CBM", value: (p) => p.cbm },
+          { key: "cbm", label: "CBM", person: true, value: (p) => p.cbm },
           { key: "risk", label: "Risk", num: true, value: (p) => riskOf(p, w), csv: (p) => riskOf(p, w),
             tip: <InfoTip title="Risk score (indicative)" rows={(Object.keys(W0) as (keyof typeof W0)[]).map((k) => [WL[k], `weight ${w[k]}`] as [string, string])} note="A pointer for where to look first, not a verdict on the property. Change the weights with Risk weights." />,
             render: (p) => { const v = riskOf(p, w); return v === null ? <span className="small muted" title="Fewer than 3 tasks past deadline">Not enough data</span> : <span className={`pill ${LV[level(v)]}`}>{v} · {level(v)}</span>; } },
@@ -77,7 +78,7 @@ export function Reviewers({ d }: { d: CC }) {
   return (
     <Sec title="Reviewers" tip={<InfoTip title="Reviewers" rows={[["Counts", "Every column counts tasks, each task once"], ["Wait", "Per task, from submission to the reviewer's decision"], ["Send-back %", "Tasks sent back ÷ tasks reviewed"]]} note="A high send-back rate can mean a careful reviewer. Compare it with audit results before judging." />}>
       <Table<R> name="Reviewers" rows={d.reviewers} rowKey={(r) => r.name} search={(r) => r.name} cols={[
-        { key: "name", label: "Reviewer", sticky: true, value: (r) => r.name, render: (r) => <b>{r.name}</b> },
+        { key: "name", label: "Reviewer", sticky: true, person: true, value: (r) => r.name },
         { key: "props", label: "Properties", num: true, value: (r) => r.props },
         { key: "req", label: "Reviewed + waiting", num: true, value: (r) => r.requiring.length, render: (r) => <N ids={r.requiring} title={`${r.name}: tasks needing review`} /> },
         { key: "rev", label: "Reviewed", num: true, value: (r) => r.reviewed.length, render: (r) => <N ids={r.reviewed} title={`${r.name}: tasks reviewed`} /> },
@@ -100,7 +101,7 @@ export function Cbms({ d, onPick }: { d: CC; onPick: (name: string) => void }) {
   return (
     <Sec title="CBMs" tip={<InfoTip title="CBMs" rows={[["Owner", "Each property counts for one CBM, so rows add up to the total"], ["Open issues", "Tasks at their properties in Action required"], ["Fix time", "Median time from send-back to resubmission"], ["Name", "Click to filter Properties to that CBM"]]} />}>
       <Table<C> name="CBMs" rows={d.cbms} rowKey={(c) => c.name} search={(c) => c.name} cols={[
-        { key: "name", label: "CBM", sticky: true, value: (c) => c.name, render: (c) => <button type="button" className="link" style={{ padding: 0 }} onClick={() => onPick(c.name)}>{c.name}</button> },
+        { key: "name", label: "CBM", sticky: true, value: (c) => c.name, render: (c) => <span className="person"><Avatar name={c.name} /><button type="button" className="link" style={{ padding: 0 }} onClick={() => onPick(c.name)}>{c.name}</button></span> },
         { key: "props", label: "Properties", num: true, value: (c) => c.props },
         { key: "due", label: "Deadline passed", num: true, value: (c) => c.due.length, render: (c) => <N ids={c.due} title={`${c.name}: tasks past deadline`} /> },
         { key: "on", label: "Done on time", num: true, tip: <InfoTip title="Done on time" rows={[["Means", "Tasks submitted by their deadline"], ["Formula", "On time ÷ tasks past deadline"]]} />, value: (c) => c.onTime, render: (c) => <span className={`pill ${rag(c.onTime, 85, 70)}`}>{fmtP(c.onTime)}</span> },

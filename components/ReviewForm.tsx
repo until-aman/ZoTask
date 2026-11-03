@@ -5,7 +5,7 @@ import { auditTask, closeFlags, reopenTask, reviewTask, waiveTask } from "@/app/
 import Photo from "./Photo";
 
 const REASONS = ["Photo missing", "Photo unclear", "Wrong location", "Count mismatch", "Item not done", "Other"];
-type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; count_of?: string | null };
+type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; count_of?: string | null; guide?: string | null };
 type Ans = { checked: number; value: string | null; note: string | null; photos: string[]; reply: string | null };
 type Flag = { id: number; item_id: number; reason: string; comment: string | null; answer: string | null };
 
@@ -65,6 +65,7 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
         <span className="spacer" />
         {actOn && <span className="small muted">Mark each item OK or flag it with a reason.</span>}
       </div>
+      <div className="items">
       {items.map((it) => {
         const f = flags[it.id];
         const pf = prevFlags.find((x) => x.item_id === it.id);
@@ -73,15 +74,16 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
           <div key={it.id} className={`item${f || af ? " flagged" : ""}`}>
             <div className="row2">
               <b>{it.label}</b>
-              {missing.includes(it.id) && <span className="pill r">Missing evidence</span>}
+              {missing.includes(it.id) && (f ? <span className="pill r">Missing evidence</span> : actOn ? <span className="pill a">Missing evidence · accepted</span> : <span className="pill r">Missing evidence</span>)}
               <span className="spacer" />
               {actOn && (
                 <div className="seg">
-                  <button type="button" aria-pressed={!f} onClick={() => setFlags({ ...flags, [it.id]: undefined })} disabled={missing.includes(it.id)}>OK</button>
+                  <button type="button" aria-pressed={!f} onClick={() => setFlags({ ...flags, [it.id]: undefined })} title={missing.includes(it.id) ? "Accept this item even though its evidence is missing" : undefined}>OK</button>
                   <button type="button" aria-pressed={!!f} onClick={() => setFlags({ ...flags, [it.id]: f ?? { reason: REASONS[1], comment: "" } })}>Flag</button>
                 </div>
               )}
             </div>
+            {it.guide && <details className="guide"><summary>How to check</summary><div className="guide-b">{it.guide}</div></details>}
             {previous && pf ? (
               <div className="cmp">
                 <div><div className="small muted">Previous attempt · flagged “{pf.reason}”</div><Shown it={it} a={previous[it.id]} ideal={ideal} /></div>
@@ -100,6 +102,7 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
           </div>
         );
       })}
+      </div>
       {actOn && <input type="text" placeholder="Overall comment (optional)" value={comment} onChange={(e) => setComment(e.target.value)} />}
       {err && <div className="err">{err}</div>}
       <div className="row2">

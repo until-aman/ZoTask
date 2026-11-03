@@ -4,7 +4,7 @@ import { HOUR, addDays, isoDate } from "./time";
 import { geo, rows, Row } from "./queries";
 import { User, scopeProps } from "./auth";
 import * as M from "./metrics";
-import { Rv, dayStart, ground, pct, quant, reviewing, uniq, REVIEW_ST } from "./command";
+import { Rv, dayStart, ground, pct, quant, reviewing, uniq, REVIEW_ST, toT } from "./command";
 
 export type Kind = "property" | "cluster" | "city" | "cbm" | "assignee" | "reviewer";
 export const KINDS: [Kind, string][] = [["property", "Properties"], ["cluster", "Clusters"], ["city", "Cities"], ["cbm", "CBMs"], ["assignee", "Assignees"], ["reviewer", "Reviewers"]];
@@ -159,9 +159,6 @@ export async function compareData(u: User, sp: Record<string, string | undefined
     const vals = S.map((x) => (x.metrics as unknown as Record<string, MV>)[key]);
     return { key, label, means, fmt, better, vals };
   });
-  const toT = (r: Row) => ({ id: r.id, pid: r.property_id, property: r.property, city: r.city, cluster: r.cluster, task: r.task, tid: r.template_id, category: r.category,
-    crit: r.criticality === "high", assignee: r.assignee, reviewer: r.reviewer, cbm: r.cbm, status: r.status, date: r.task_date, start: r.window_start_at, due: r.window_end_at,
-    lateUntil: r.late_until_at, sub: r.first_submitted_at, attempt: r.attempt, max: r.attempts_allowed, since: r.status_since, reason: r.last_reason });
   return {
     ...base, metrics, tasks: Object.fromEntries([...tasks].map(([id, r]) => [id, toT(r)])),
     series: { days, lines: S.map((x) => x.series), label: kind === "reviewer" ? "Reviewed on time" : "Done on time" },

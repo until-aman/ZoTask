@@ -4,7 +4,8 @@ import {
   AnswerInput, Instance, Item, Template, auditDecision, answerAuditFlags, closeFlagAnswers, createInstance,
   itemsFor, list, missingEvidence, latestSubmission, logEvent, reviewDecision, submit, waive, REASONS,
 } from "./engine";
-import { DAY, HOUR, addDays, atTime, isoDate, weekday } from "./time";
+import { DAY, HOUR, addDays, atTime, isoDate } from "./time";
+import { insertTaskList } from "./cbm-tasks";
 
 const GEO: Record<string, Record<string, [string, number, number][]>> = {
   Bangalore: {
@@ -336,8 +337,8 @@ export async function seed() {
     // Saved filters, as in the Review Queue mockup.
     const blr = { city: ["Bangalore"], cluster: [], prop: [], role: [], asg: [], mine: false };
     await run("INSERT INTO saved_views (user_id, name, filters, is_default) VALUES (?,?,?,1)", ids["Vankadara Lakshmi Kavya"], "Bangalore", JSON.stringify(blr));
-    await run("INSERT INTO saved_views (user_id, name, filters, is_default) VALUES (?,?,?,0)", ids["Vankadara Lakshmi Kavya"], "Koramangala · HK",
-      JSON.stringify({ ...blr, cluster: ["Koramangala"], role: ["HK"] }));
+    await run("INSERT INTO saved_views (user_id, name, filters, is_default) VALUES (?,?,?,0)", ids["Vankadara Lakshmi Kavya"], "Koramangala",
+      JSON.stringify({ ...blr, cluster: ["Koramangala"] }));
   });
   void DAY;
 }

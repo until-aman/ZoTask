@@ -96,7 +96,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     return { ...DEFAULTS, ...rest, description: rest.description ?? "" };
   });
   const [items, setItems] = useState<It[]>(() => initialItems.length
-    ? initialItems.map((i) => ({ label: i.label, kind: i.kind, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, count_of: i.count_of }))
+    ? initialItems.map((i) => ({ label: i.label, kind: i.kind, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, count_of: i.count_of, guide: i.guide ?? "" }))
     : [blank()]);
   const [props, setProps] = useState<number[]>(selected.length || id ? selected : geo.map((g) => g.id));
   const [step, setStep] = useState(0);

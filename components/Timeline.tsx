@@ -1,13 +1,7 @@
 import { fmtDateTime, fmtDur } from "@/lib/time";
+import { EVENT_LABEL } from "@/lib/statuses";
 
-const LABEL: Record<string, [string, string]> = {
-  created: ["Task created", ""], started: ["Started", "b"], triggered: ["Triggered", "b"], window_closed: ["Window closed", "a"], missed: ["Missed", "r"],
-  submitted: ["Submitted", "b"], resubmitted: ["Resubmitted", "b"], changes_requested: ["Changes requested", "r"], passed: ["Passed", "g"],
-  audit_passed: ["Audit passed", "g"], audit_failed: ["Audit failed", "r"], flags_answered: ["Audit flags answered", "b"],
-  flags_closed: ["Audit flags closed", "g"], flags_reopened: ["Flag answers sent back", "r"], reopened: ["Reopened", "a"],
-  waived: ["Waived", ""], reminder: ["Reminder", "a"], reassigned: ["Reassigned", ""], location_warning: ["Location warning", "r"],
-  acknowledged: ["Acknowledged", ""], escalated: ["Escalated", "r"], escalation_raised: ["Escalation raised", "r"],
-};
+const LABEL = EVENT_LABEL;
 
 /** Task history with the time spent between each step. */
 export default function Timeline({ events }: { events: { id: number; at: number; type: string; detail: string; actor: string | null }[] }) {

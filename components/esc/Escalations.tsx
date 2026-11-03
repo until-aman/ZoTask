@@ -6,6 +6,7 @@ import { uploadPhoto } from "../upload";
 import { useRouter } from "next/navigation";
 import type { Esc, EscData } from "@/lib/escalations";
 import { raiseEscalation, updateEscalation } from "@/app/actions";
+import { Person } from "@/components/ui/TableKit";
 import { CopyModal, InfoTip, Sec, Table, type Col } from "@/components/cc/parts";
 import { ActiveChip, DateRow, Field, FilterBar, SavedView, SearchPick, Stats, sameFilters } from "@/components/ui/Filters";
 import Photo from "@/components/Photo";
@@ -122,8 +123,8 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
     { key: "prop", label: "Property", value: (r) => r.props.map((p) => p.name).join(", "), render: (r) => <span className="wrapcell">{r.props.map((p) => p.name.replace(/^Zolo /, "")).join(", ")}</span> },
     { key: "cluster", label: "Cluster", value: (r) => [...new Set(r.props.map((p) => p.cluster))].join(", "), hidden: true },
     { key: "title", label: "Issue", value: (r) => r.title, render: (r) => <button type="button" className="esc-title" onClick={() => setOpen(r.id)} title={r.detail}>{r.priority === "high" && <span className="pill r">High</span>} {r.title}</button> },
-    { key: "by", label: "Raised by", value: (r) => r.raisedBy },
-    { key: "owner", label: "Raised to", value: (r) => r.owner, render: (r) => <span>{r.owner}{r.mailSentAt ? <span className="small muted" title={`Email sent ${when(r.mailSentAt)}`}> · ✉</span> : <span className="small t-a" title="Email not marked as sent"> · no email</span>}</span>, csv: (r) => `${r.owner}${r.ownerEmail ? ` <${r.ownerEmail}>` : ""}` },
+    { key: "by", label: "Raised by", person: true, value: (r) => r.raisedBy },
+    { key: "owner", label: "Raised to", value: (r) => r.owner, render: (r) => <Person name={r.owner} sub={r.mailSentAt ? <span title={`Email sent ${when(r.mailSentAt)}`}>✉ Email sent</span> : <span className="t-a" title="Email not marked as sent">No email yet</span>} />, csv: (r) => `${r.owner}${r.ownerEmail ? ` <${r.ownerEmail}>` : ""}` },
     { key: "due", label: "Expected closure", value: (r) => r.due, render: (r) => !r.due ? "—" : <span className={r.overdue ? "t-r" : ""} style={{ fontWeight: r.overdue ? 800 : 400 }}>{dayIso(r.due)}{r.overdue ? ` · ${daysBetween(r.due, d.today)}d late` : isOpen(r.status) && r.due <= soon ? " · due soon" : ""}</span> },
     { key: "status", label: "Status", value: (r) => STATUS[r.status], render: (r) => <span className={`pill ${PILL[r.status]}`}>{STATUS[r.status]}</span> },
     { key: "age", label: "Days open", num: true, value: (r) => Math.floor(((r.closed ?? d.now) - r.created) / DAY), hidden: true },
@@ -154,6 +155,11 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
           active: !focus && quick === k, onClick: () => { setQuick(k); setFocus(null); },
         }))} />
         <Table name="Escalations" rows={list} cols={cols} rowKey={(r) => r.id} query={q} initialSort={{ key: quick === "closed" ? "updated" : "due", dir: quick === "closed" ? -1 : 1 }}
+          actions={(r) => [
+            { label: "Open and update", onClick: () => setOpen(r.id) },
+            { label: "Open the task", hidden: !r.instanceId, onClick: () => router.push(`/review/${r.instanceId}`) },
+            { label: "Copy reference", onClick: () => navigator.clipboard?.writeText(r.ref) },
+          ]}
           search={(r) => `${r.ref} ${r.title} ${r.detail} ${r.owner} ${r.raisedBy} ${r.department} ${r.props.map((p) => `${p.name} ${p.cluster} ${p.city}`).join(" ")} ${r.mailSubject}`}
           empty={d.rows.length ? "No escalations match these filters." : "No escalations yet. Raise the first one."} />
       </> : <Summary d={d} rows={scoped} period={period} show={show} bar={bar(true)} />}

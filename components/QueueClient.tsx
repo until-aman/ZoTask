@@ -6,11 +6,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getHistory, reassignReviewer, remindTasks, ViewFilters } from "@/app/actions";
+import { ColumnsMenu, ExportMenu, Person, RowMenu, useHiddenCols } from "@/components/ui/TableKit";
 import { ActiveChip, DateRow, Field, FilterBar, SearchPick, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
 
 export type QItem = {
   id: number; t: string; p: string; cluster: string; city: string; a: string; r: string; s: string; h: number; sla: number; att: string;
   last: boolean; rv: string; au: string; cbm: string; date: string; why: string; win: string; crit: boolean; next: string; mine: boolean;
+  /** When it was scheduled for, and its last step (submitted, reviewed...) with the time. */
+  schedAt: number; lastL: string; lastAt: number;
 };
 type Geo = { city: string; cluster: string; property: string; id: number };
 type Ev = { id: number; at: number; type: string; detail: string; actor: string | null };
@@ -26,6 +29,14 @@ const tabName = (k: string) => grpOf(k).tabs.find((t) => t[0] === k)![1];
 const ROLES = ["CBM", "HK", "CC", "Reception", "Short stays"];
 const RNAME: Record<string, string> = { CBM: "Cluster Business Manager", HK: "Housekeeping Supervisor (HK)", CC: "Customer Care Executive (CC)", Reception: "Front Office / Reception Executive", "Short stays": "Short Stays Operations Executive" };
 
+// Columns after Task, with their widths. Task always shows.
+const QCOLS = [
+  { key: "asg", label: "Assignee", w: "minmax(0,1.2fr)" },
+  { key: "sched", label: "Scheduled", w: "minmax(0,1fr)" },
+  { key: "last", label: "Last action", w: "minmax(0,1.2fr)" },
+  { key: "next", label: "Next step", w: "minmax(0,1.5fr)" },
+  { key: "wait", label: "Waiting", w: "150px" },
+];
 const nice = (s: string) => fmtDate(s);
 const fmtH = (h: number) => (h >= 48 ? Math.round(h / 24) + " days" : h + "h");
 const over = (t: QItem) => t.sla > 0 && t.h > t.sla;
@@ -100,11 +111,20 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   const cnt = { all: all.length, r: 0, a: 0, g: 0, over: all.filter(over).length } as Record<string, number>;
   all.forEach((t) => cnt[bucket(t)]++);
   let list = g.open && bk !== "all" ? all.filter((t) => (bk === "over" ? over(t) : bucket(t) === bk)) : all;
-  list = sort ? sortRows(list, sort, (t, k) => k === "task" ? t.t : k === "asg" ? t.a : k === "next" ? t.next || nextStep(t).what : k === "wait" ? (g.open ? t.h : t.date) : null)
+  list = sort ? sortRows(list, sort, (t, k) => k === "task" ? t.t : k === "asg" ? t.a : k === "next" ? t.next || nextStep(t).what : k === "sched" ? t.schedAt : k === "last" ? t.lastAt : k === "wait" ? (g.open ? t.h : t.date) : null)
     : [...list].sort((a, b) => (g.open ? b.h - a.h : b.date.localeCompare(a.date)));
   const [size, setSize] = usePageSize();
   const pg = clampPage(page, list.length, size);
   const shown = list.slice(pg * size, pg * size + size);
+  const [hidden, toggleCol] = useHiddenCols("Review Queue");
+  const on = (k: string) => !hidden.has(k);
+  const vis = QCOLS.filter((c) => on(c.key));
+  const grid = { "--qcols": ["28px", "minmax(0,2fr)", ...vis.map((c) => c.w), "36px"].join(" ") } as React.CSSProperties;
+  const header = ["Task", "Property", "City", "Cluster", "Critical", "Attempt", ...(on("asg") ? ["Assignee", "Role"] : []), ...(on("sched") ? ["Scheduled", "Window"] : []),
+    ...(on("last") ? ["Last action", "Last action at"] : []), ...(on("next") ? ["Next step"] : []), ...(on("wait") ? [g.open ? "Waiting (hours)" : "Date"] : [])];
+  const cells = (l: QItem[]) => l.map((t) => { const n = nextStep(t); return [t.t, t.p, t.city, t.cluster, t.crit ? "Yes" : "", t.att,
+    ...(on("asg") ? [t.a, t.r] : []), ...(on("sched") ? [fmtDate(t.date), t.win] : []), ...(on("last") ? [t.lastL, t.lastAt ? fmtDateTime(t.lastAt) : ""] : []),
+    ...(on("next") ? [`${n.who ? n.who + " " : ""}${n.what}`] : []), ...(on("wait") ? [g.open ? t.h : fmtDate(t.date)] : [])]; });
   const hiddenByDate = items.filter((t) => t.s === tab && inScope(t) && !inDates(t)).length;
   const hiddenByFilter = items.filter((t) => t.s === tab && inDates(t)).length - all.length;
   const oldest = list.length && g.open ? Math.max(...list.map((t) => t.h)) : 0;
@@ -205,7 +225,10 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
             { key: "props", label: "Properties", value: new Set(all.map((t) => t.p)).size },
           ]} />
 
-          <section className="listcard" aria-label="Tasks">
+          <section className="listcard" aria-label="Tasks" style={grid}>
+            <div className="ttool"><span className="small muted">{list.length} task{list.length === 1 ? "" : "s"}</span><span className="spacer" />
+              <ColumnsMenu cols={[{ key: "task", label: "Task", fixed: true }, ...QCOLS.map((c) => c.key === "wait" && !g.open ? { ...c, label: "Date" } : c)]} hidden={hidden} toggle={toggleCol} />
+              <ExportMenu name={`Review Queue ${tabName(tab)}`} header={header} rows={() => cells(list)} page={list.length > shown.length ? () => cells(shown) : undefined} /></div>
             {sel.size > 0 && (
               <div className="bulk">
                 <span>{sel.size} selected</span><span className="spacer" />
@@ -217,8 +240,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
             <div className="lhead">
               <span><input type="checkbox" aria-label="Select all" checked={shown.length > 0 && shown.every((t) => sel.has(t.id))}
                 onChange={(e) => setSel(e.target.checked ? new Set(shown.map((t) => t.id)) : new Set())} /></span>
-              <SortHead k="task" label="Task" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><SortHead k="asg" label="Assignee" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} />
-              <SortHead k="next" label="Next step" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><SortHead k="wait" label={g.open ? "Waiting" : "Date"} sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><span />
+              <SortHead k="task" label="Task" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} />
+              {vis.map((c) => <SortHead key={c.key} k={c.key} label={c.key === "wait" && !g.open ? "Date" : c.label} sort={sort} setSort={(x) => { setSort(x); setPage(0); }} />)}<span />
             </div>
             {!list.length ? (
               <div className="empty">
@@ -233,16 +256,23 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               return (
                 <div key={t.id}>
                   <div className="qrow" role="group" tabIndex={0} aria-label={`${t.t}, ${t.p}: press Enter for details`} data-open={open === t.id || undefined} style={{ ["--sev" as string]: sev }}
-                    onClick={(e) => { if ((e.target as HTMLElement).closest("input")) return; setOpen(t.id); }} onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") setOpen(t.id); }}>
+                    onClick={(e) => { if ((e.target as HTMLElement).closest("input,.rowmenu")) return; setOpen(t.id); }} onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") setOpen(t.id); }}>
                     <span><input type="checkbox" aria-label="Select" checked={sel.has(t.id)} onChange={(e) => { const s = new Set(sel); if (e.target.checked) s.add(t.id); else s.delete(t.id); setSel(s); }} /></span>
                     <div style={{ minWidth: 0 }}>
                       <div className="tname">{t.t}{t.crit && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}</div>
                       <div className="tsub">{t.p} · {t.city}{t.att ? ` · Attempt ${t.att}` : ""}</div>
                     </div>
-                    <div className="who">{t.a}<small>{t.r}</small></div>
-                    <div className="next">{n.who ? <><b>{n.who}</b> {n.what}</> : <b>{n.what}</b>}<small>{n.sub}</small></div>
-                    <Age t={t} />
-                    <span className="chev" aria-hidden="true">›</span>
+                    {on("asg") && <div className="who"><Person name={t.a} sub={t.r} /></div>}
+                    {on("sched") && <div className="sch"><span className="mtl">Scheduled </span>{fmtDate(t.date)}<small>{t.win}</small></div>}
+                    {on("last") && <div className="lst"><span className="mtl">Last action </span>{t.lastL}<small>{fmtDateTime(t.lastAt)}</small></div>}
+                    {on("next") && <div className="next">{n.who ? <><b>{n.who}</b> {n.what}</> : <b>{n.what}</b>}<small>{n.sub}</small></div>}
+                    {on("wait") && <Age t={t} />}
+                    <RowMenu label={`Actions for ${t.t}`} actions={[
+                      { label: "Show details", onClick: () => setOpen(t.id) },
+                      { label: "Open review sheet", onClick: () => router.push(`/review/${t.id}`) },
+                      { label: n.who ? `Remind ${n.who.split(" ")[0]}` : "Send reminder", hidden: !g.open, onClick: () => remind([t.id]) },
+                      { label: "Reassign reviewer", hidden: !(canReview && ["review", "resub"].includes(t.s)), onClick: () => { setSel(new Set([t.id])); setModal("reassign"); } },
+                    ]} />
                   </div>
                 </div>
               );

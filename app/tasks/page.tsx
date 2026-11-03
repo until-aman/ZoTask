@@ -1,5 +1,6 @@
 import { boot } from "@/lib/boot";
 import { rows, STATUS_LABEL, STATUS_PILL, Row } from "@/lib/queries";
+import { actionLabel } from "@/lib/statuses";
 import { viewsFor } from "@/lib/views";
 import { isoDate, fmtDate, fmtDur, fmtDateTime } from "@/lib/time";
 import TasksClient, { MyTask } from "@/components/TasksClient";
@@ -31,6 +32,7 @@ export default async function MyTasks({ searchParams }: { searchParams: Promise<
       r.status === "upcoming" ? `Opens at ${r.window_start}` : r.status === "changes" ? `Attempt ${r.attempt} of ${r.attempts_allowed} · ${r.last_reason ?? "see flags"}` : "";
     return {
       id: r.id, task: r.task, crit: r.criticality === "high", property: r.property, category: r.category, win: `${r.window_start}–${r.window_end}`, date: r.task_date, dateLabel: fmtDate(r.task_date),
+      schedAt: r.window_start_at, lastL: actionLabel(r.last_type), lastAt: r.last_at ?? r.status_since,
       status: r.status, label: STATUS_LABEL[r.status], pill: STATUS_PILL[r.status], due, dueAt: r.status === "notsub" ? r.late_until_at : r.window_end_at,
       warn: r.status === "notsub" || r.status === "changes", cta: open ? (r.status === "changes" ? "Fix and resubmit" : r.status === "auditflag" ? "Answer flags" : "Start") : null,
     };

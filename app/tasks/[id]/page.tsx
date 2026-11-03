@@ -1,3 +1,4 @@
+import { actionLabel } from "@/lib/statuses";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { boot } from "@/lib/boot";
@@ -5,7 +6,7 @@ import { taskInScope } from "@/lib/auth";
 import { all, one } from "@/lib/db";
 import { itemsFor, latestSubmission } from "@/lib/engine";
 import { rows, eventsFor, STATUS_LABEL, STATUS_PILL } from "@/lib/queries";
-import { fmtDate } from "@/lib/time";
+import { fmtDate, fmtDateTime } from "@/lib/time";
 import TaskForm from "@/components/TaskForm";
 import FlagAnswerForm from "@/components/FlagAnswerForm";
 import Timeline from "@/components/Timeline";
@@ -30,12 +31,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const canAnswer = r.status === "auditflag" && (r.cbm_id === u.id || u.access_role === "admin");
 
   return (
-    <div className="page narrow">
+    <div className="page">
       <Link href="/tasks" className="crumb">‹ My Tasks</Link>
       <div className="phead">
         <div>
           <h1>{r.task}</h1>
-          <p className="phead-sub">{r.property} · {r.cluster}, {r.city} · {fmtDate(r.task_date)} · {r.window_start}–{r.window_end}</p>
+          <p className="phead-sub">{r.property} · {r.cluster}, {r.city}</p>
+          <p className="phead-sub">Scheduled for <b>{fmtDate(r.task_date)}, {r.window_start}–{r.window_end}</b> · Last action: <b>{actionLabel(r.last_type)}</b>, {fmtDateTime(r.last_at ?? r.status_since)}</p>
         </div>
         <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
       </div>

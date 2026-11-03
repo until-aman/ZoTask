@@ -7,6 +7,7 @@ import path from "node:path";
 import { TASKS_VERSION, replaceTasks, seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
 import { seedLibraries } from "./libraries";
+import { TASK_LIST_VERSION, taskListDone, taskListStatements } from "./cbm-tasks";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -40,7 +41,7 @@ async function init(): Promise<Client> {
     ["templates", "ideal_minutes", "INTEGER"], ["templates", "review_required", "INTEGER NOT NULL DEFAULT 1"], ["templates", "assignees", "TEXT NOT NULL DEFAULT '[]'"],
     ["template_items", "photo_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "note_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "count_of", "TEXT"],
     ["clusters", "reviewer_id", "INTEGER"], ["clusters", "auditor_id", "INTEGER"], ["clusters", "archived", "INTEGER NOT NULL DEFAULT 0"],
-    ["map_sites", "gender", "TEXT"], ["map_sites", "details", "TEXT"], ["submissions", "location_src", "TEXT"],
+    ["map_sites", "gender", "TEXT"], ["map_sites", "details", "TEXT"], ["submissions", "location_src", "TEXT"], ["template_items", "guide", "TEXT"],
   ];
   const have = new Map<string, string[]>();
   for (const [table, col, type] of added) {
@@ -57,6 +58,15 @@ async function init(): Promise<Client> {
     if (!(await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n) await seedEscalations();
     if (!(await one<{ n: number }>("SELECT count(*) n FROM task_categories"))!.n) await seedLibraries();
   });
+  // Task list changes go as one batch: a single round trip that the database applies atomically, so a slow or
+  // busy start can't leave half a list, and two servers starting at once still end with one copy of each task.
+  // If it fails, the app still opens and the next start tries again.
+  try {
+    if (!(await scope.run(c, taskListDone))) {
+      const stmts = await scope.run(c, taskListStatements);
+      if (stmts.length) await c.batch(["PRAGMA defer_foreign_keys = ON", ...stmts], "write");
+    }
+  } catch (e) { console.error("Task list update failed; will retry on the next start", e); }
   return c;
 }
 

@@ -1,6 +1,7 @@
 // Operations command center: every number on the dashboard comes from here, with the task ids behind it,
 // so each figure can be opened as a list. Every figure counts tasks, each task once.
 import { all } from "./db";
+import { actionLabel } from "./statuses";
 import { HOUR, addDays, isoDate, dayStart } from "./time";
 import { geo, rows, Row } from "./queries";
 import { User, scopeProps } from "./auth";
@@ -12,6 +13,7 @@ export type T = {
   id: number; pid: number; property: string; city: string; cluster: string; task: string; tid: number; category: string; crit: boolean;
   assignee: string | null; reviewer: string | null; cbm: string | null; status: string; date: string;
   start: number; due: number; lateUntil: number; sub: number | null; attempt: number; max: number; since: number; reason: string | null;
+  win: string; lastL: string; lastAt: number;
 };
 /** A figure with the tasks behind it. `of` is the denominator when the figure is a rate. */
 export type K = { n: number; of?: number; rate?: number | null; prev?: number | null; ids: number[] };
@@ -20,6 +22,8 @@ export type Issue = {
   sev: "Critical" | "High" | "Medium" | "Low"; property: string; pid: number; city: string; cluster: string; task: string;
   owner: string; ownerRole: string; status: string; overdue: number | null; rejections: number; comment: string | null;
   ack: { by: string; at: number } | null; esc: { detail: string; by: string; at: number } | null; critical: boolean;
+  /** For a task: the day and window it was scheduled for, and its last step with the time. */
+  date?: string; win?: string; lastL?: string; lastAt?: number;
 };
 export type Rv = { id: number; instance_id: number; reviewer_id: number; reviewer: string; kind: string; decision: string; decided_at: number;
   due_at: number | null; submitted_at: number; attempt: number; property_id: number; category: string; i_reviewer: number | null; comment: string | null };
@@ -40,11 +44,12 @@ export const REASON_GROUP: Record<string, string> = {
   "Count mismatch": "Data quality", "Wrong location": "Data quality", Other: "Other",
 };
 
-const toT = (r: Row): T => ({
+export const toT = (r: Row): T => ({
   id: r.id, pid: r.property_id, property: r.property, city: r.city, cluster: r.cluster, task: r.task, tid: r.template_id, category: r.category,
   crit: r.criticality === "high", assignee: r.assignee, reviewer: r.reviewer, cbm: r.cbm, status: r.status, date: r.task_date,
   start: r.window_start_at, due: r.window_end_at, lateUntil: r.late_until_at, sub: r.first_submitted_at, attempt: r.attempt,
   max: r.attempts_allowed, since: r.status_since, reason: r.last_reason,
+  win: `${r.window_start}–${r.window_end}`, lastL: actionLabel(r.last_type), lastAt: r.last_at ?? r.status_since,
 });
 
 /** Ground team figures for a set of tasks. `sentBack` counts send-backs per task. */
@@ -190,6 +195,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
     const age = now - r.status_since, crit = r.criticality === "high";
     const base = { key: `i${r.id}`, id: r.id, ids: [r.id], property: r.property, pid: r.property_id, city: r.city, cluster: r.cluster, task: r.task,
       status: r.status, rejections: rejOf.get(r.id) ?? 0, comment: commentOf.get(r.id) ?? null, critical: crit,
+      date: r.task_date, win: `${r.window_start}–${r.window_end}`, lastL: actionLabel(r.last_type), lastAt: r.last_at ?? r.status_since,
       ack: null as Issue["ack"], esc: null as Issue["esc"] };
     const reviewSla = r.review_sla_h * HOUR, auditSla = r.audit_sla_h * HOUR;
     let it: Pick<Issue, "cat" | "type" | "sev" | "owner" | "ownerRole" | "overdue"> | null = null;
