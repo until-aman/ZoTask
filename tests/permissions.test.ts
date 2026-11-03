@@ -2,7 +2,7 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import * as A from "@/app/actions";
-import { signInAs, ready, at, one, all, eventTemplate, ADMIN, REVIEWER } from "./helpers";
+import { signInAs, ready, at, one, all, handTask, ADMIN, REVIEWER } from "./helpers";
 import { taskInScope } from "@/lib/auth";
 
 let p1: Awaited<ReturnType<typeof at>>, p14: Awaited<ReturnType<typeof at>>;
@@ -33,7 +33,7 @@ test("P0-3: a CBM can't waive or create tasks at another CBM's property", async 
   no(await A.waiveTask(open14!.id, "test"));
   assert.notEqual((await one<{ status: string }>("SELECT status FROM instances WHERE id=?", open14!.id))!.status, "waived");
   yes(await A.waiveTask(open1!.id, "Property closed for repairs"));
-  const ev = { id: await eventTemplate() };
+  const ev = { id: await handTask([14]) };
   no(await A.triggerTask(ev!.id, 14));
   const sched = await one<{ id: number }>("SELECT id FROM templates WHERE trigger='scheduled' LIMIT 1");
   signInAs(ADMIN);
