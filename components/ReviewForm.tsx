@@ -73,11 +73,11 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
           <div key={it.id} className={`item${f || af ? " flagged" : ""}`}>
             <div className="row2">
               <b>{it.label}</b>
-              {missing.includes(it.id) && <span className="pill r">Missing evidence</span>}
+              {missing.includes(it.id) && (f ? <span className="pill r">Missing evidence</span> : actOn ? <span className="pill a">Missing evidence · accepted</span> : <span className="pill r">Missing evidence</span>)}
               <span className="spacer" />
               {actOn && (
                 <div className="seg">
-                  <button type="button" aria-pressed={!f} onClick={() => setFlags({ ...flags, [it.id]: undefined })} disabled={missing.includes(it.id)}>OK</button>
+                  <button type="button" aria-pressed={!f} onClick={() => setFlags({ ...flags, [it.id]: undefined })} title={missing.includes(it.id) ? "Accept this item even though its evidence is missing" : undefined}>OK</button>
                   <button type="button" aria-pressed={!!f} onClick={() => setFlags({ ...flags, [it.id]: f ?? { reason: REASONS[1], comment: "" } })}>Flag</button>
                 </div>
               )}

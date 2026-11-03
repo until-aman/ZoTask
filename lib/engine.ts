@@ -213,10 +213,9 @@ export async function reviewDecision(instanceId: number, reviewerId: number, dec
     if (!["review", "resub"].includes(i.status)) throw new Error("This task is not waiting for review.");
     const sub = (await latestSubmission(instanceId))!;
     if (sub.submitted_by === reviewerId) throw new Error("You submitted this task, so someone else must review it.");
-    if (decision === "pass") {
-      const missing = await missingEvidence(sub.id, t.id);
-      if (missing.length) throw new Error(`Can't pass: "${missing[0].label}" has no evidence recorded. Flag it instead.`);
-    } else if (!flags.length) throw new Error("Flag at least one item, with a reason, to request changes.");
+    // A reviewer may pass items that are missing evidence (their call); the history records which ones.
+    const accepted = decision === "pass" ? (await missingEvidence(sub.id, t.id)).map((m) => m.label) : [];
+    if (decision === "changes" && !flags.length) throw new Error("Flag at least one item, with a reason, to request changes.");
     const r = await run("INSERT INTO reviews (instance_id, submission_id, reviewer_id, kind, decision, opened_at, decided_at, due_at, comment) VALUES (?,?,?,?,?,?,?,?,?)",
       instanceId, sub.id, reviewerId, "review", decision, openedAt ?? null, at, (i.last_submitted_at ?? at) + t.review_sla_h * HOUR, comment || null);
     const rid = Number(r.lastInsertRowid);
@@ -228,14 +227,15 @@ export async function reviewDecision(instanceId: number, reviewerId: number, dec
       await setStatus(instanceId, exhausted ? "notrect" : "changes", at, exhausted ? ", closed_at=?" : "", ...(exhausted ? [at] : []));
       await logEvent(instanceId, at, reviewerId, "changes_requested", flags.map((f) => f.reason).join(", ") + (exhausted ? " · attempts used up, not rectified" : ""));
     } else {
+      const noEvidence = accepted.length ? ` · accepted without evidence: ${accepted.join("; ")}` : "";
       const sampled = hash(instanceId) < t.audit_rate;
       if (sampled) {
         const aud = await pickAuditor(i, reviewerId, at);
         await setStatus(instanceId, "audit", at, ", auditor_id=?", aud);
-        await logEvent(instanceId, at, reviewerId, "passed", "Selected for audit");
+        await logEvent(instanceId, at, reviewerId, "passed", "Selected for audit" + noEvidence);
       } else {
         await setStatus(instanceId, "done", at, ", closed_at=?", at);
-        await logEvent(instanceId, at, reviewerId, "passed", "Verified");
+        await logEvent(instanceId, at, reviewerId, "passed", "Verified" + noEvidence);
       }
     }
   });
