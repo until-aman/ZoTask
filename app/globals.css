@@ -77,6 +77,15 @@ a.logo:hover,a.brand:hover{text-decoration:none}
   .shell.sidemin .brand,.shell.sidemin .nav a span,.shell.sidemin .me{display:none}
   .shell.sidemin .nav{width:100%}
   .shell.sidemin .nav a{justify-content:center;padding:9px 0}
+  /* Collapsed menu opens over the page while the pointer (or keyboard focus) is on it, and folds back when it leaves. */
+  .shell.sidemin .side{width:64px;transition:width .18s var(--ease),box-shadow .18s var(--ease)}
+  .shell.sidemin .side:hover,.shell.sidemin .side:has(:focus-visible){width:232px;padding:20px 12px 16px;align-items:stretch;box-shadow:var(--shadow);transition-delay:.12s}
+  .shell.sidemin .side:hover .side-brand,.shell.sidemin .side:has(:focus-visible) .side-brand{flex-direction:row;padding:0 8px 4px}
+  .shell.sidemin .side:hover .sidetog,.shell.sidemin .side:has(:focus-visible) .sidetog{margin-left:auto}
+  .shell.sidemin .side:hover .brand,.shell.sidemin .side:has(:focus-visible) .brand,
+  .shell.sidemin .side:hover .nav a span,.shell.sidemin .side:has(:focus-visible) .nav a span{display:inline}
+  .shell.sidemin .side:hover .me,.shell.sidemin .side:has(:focus-visible) .me{display:grid}
+  .shell.sidemin .side:hover .nav a,.shell.sidemin .side:has(:focus-visible) .nav a{justify-content:flex-start;padding:7px 10px}
 }
 @media (max-width:900px){
   .shell{display:block;--toph:var(--sideh,104px)}
