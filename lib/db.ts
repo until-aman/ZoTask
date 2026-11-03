@@ -7,7 +7,7 @@ import path from "node:path";
 import { seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
 import { seedLibraries } from "./libraries";
-import { TASK_LIST_VERSION, applyTaskList, taskListDone } from "./cbm-tasks";
+import { TASK_LIST_VERSION, taskListDone, taskListStatements } from "./cbm-tasks";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -55,14 +55,15 @@ async function init(): Promise<Client> {
     if (!(await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n) await seedEscalations();
     if (!(await one<{ n: number }>("SELECT count(*) n FROM task_categories"))!.n) await seedLibraries();
   });
-  // Replacing the task list runs in one real write transaction: when two servers start at once, the second
-  // waits for the first and then finds the work done, instead of both adding the list.
-  if (!(await scope.run(c, taskListDone))) {
-    const t = await c.transaction("write");
-    try { await scope.run(t, applyTaskList); await t.commit(); }
-    catch (e) { await t.rollback().catch(() => {}); throw e; }
-    finally { t.close(); }
-  }
+  // Task list changes go as one batch: a single round trip that the database applies atomically, so a slow or
+  // busy start can't leave half a list, and two servers starting at once still end with one copy of each task.
+  // If it fails, the app still opens and the next start tries again.
+  try {
+    if (!(await scope.run(c, taskListDone))) {
+      const stmts = await scope.run(c, taskListStatements);
+      if (stmts.length) await c.batch(["PRAGMA defer_foreign_keys = ON", ...stmts], "write");
+    }
+  } catch (e) { console.error("Task list update failed; will retry on the next start", e); }
   return c;
 }
 
