@@ -1,12 +1,14 @@
 "use client";
 // My Tasks for the ground team and CBMs: counts per list on top, then search and filters, then the tasks, 20 a page.
-import { fmtDate } from "@/lib/time";
+import { fmtDate, fmtDateTime } from "@/lib/time";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ActiveChip, DateRow, Field, FilterBar, SearchPick, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sameFilters, sortRows } from "@/components/ui/Filters";
 
 export type MyTask = { id: number; task: string; crit: boolean; property: string; category: string; win: string; date: string; dateLabel: string;
+  /** When it was scheduled for, and its last step (submitted, reviewed...) with the time. */
+  schedAt: number; lastL: string; lastAt: number;
   status: string; label: string; pill: string; due: string; dueAt: number; warn: boolean; cta: string | null };
 const TABS: [string, string][] = [["now", "Current and upcoming"], ["overdue", "Overdue"], ["changes", "Changes required"], ["flags", "Audit flags"], ["done", "Completed"]];
 
@@ -29,7 +31,7 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
   const props = [...new Set(everything.map((t) => t.property))].sort(), cats = [...new Set(everything.map((t) => t.category))].sort();
   const keep = (t: MyTask) => (!prop || t.property === prop) && (!cat || t.category === cat) && (!crit || t.crit)
     && (!q || `${t.task} ${t.property} ${t.category}`.toLowerCase().includes(q.toLowerCase()));
-  const list = sortRows((lists[tab] ?? []).filter(keep), sort, (t, k) => k === "task" ? t.task : k === "prop" ? t.property : k === "due" ? t.dueAt : k === "status" ? t.label : null);
+  const list = sortRows((lists[tab] ?? []).filter(keep), sort, (t, k) => k === "task" ? t.task : k === "prop" ? t.property : k === "due" ? t.dueAt : k === "status" ? t.label : k === "sched" ? t.schedAt : k === "last" ? t.lastAt : null);
   const [size, setSize] = usePageSize();
   const pg = clampPage(page, list.length, size);
   const shown = list.slice(pg * size, pg * size + size);
@@ -68,15 +70,17 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
           sub: k === "now" || k === "done" ? span : undefined };
       })} />
       <section className="listcard" aria-label="Tasks">
-        <div className="mthead">{sortHead("task", "Task")}{sortHead("prop", "Property")}{sortHead("due", "Due")}{sortHead("status", "Status")}</div>
+        <div className="mthead">{sortHead("task", "Task")}{sortHead("prop", "Property")}{sortHead("sched", "Scheduled")}{sortHead("last", "Last action")}{sortHead("due", "Due")}{sortHead("status", "Status")}</div>
         {!shown.length ? <div className="empty"><b>Nothing here</b>{chips.length || q ? "No tasks match these filters." : tab === "now" ? `No open tasks for ${span}.` : "You're all caught up."}</div>
           : shown.map((r) => (
             <Link key={r.id} href={`/tasks/${r.id}`} className="mtrow">
               <div style={{ minWidth: 0 }}>
                 <div className="tname">{r.task}{r.crit && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}</div>
-                <div className="tsub">{r.win} · {r.dateLabel}</div>
+                <div className="tsub">{r.category}</div>
               </div>
               <div className="small">{r.property}</div>
+              <div className="small"><span className="mtl">Scheduled </span>{r.dateLabel}<div className="tsub">{r.win}</div></div>
+              <div className="small"><span className="mtl">Last action </span>{r.lastL}<div className="tsub">{fmtDateTime(r.lastAt)}</div></div>
               <div className={`small ${r.warn ? "warn" : "muted"}`}>{r.due || "—"}</div>
               <div className="mtst"><span className={`pill ${r.pill}`}>{r.label}</span>{r.cta && <span className="btn sm primary">{r.cta}</span>}</div>
             </Link>

@@ -1,3 +1,4 @@
+import { actionLabel } from "@/lib/statuses";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { boot } from "@/lib/boot";
@@ -45,7 +46,8 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
       <div className="phead">
         <div>
           <h1>{r.task}</h1>
-          <p className="phead-sub">{r.property} · {r.cluster}, {r.city} · {fmtDate(r.task_date)} · window {r.window_start}–{r.window_end}</p>
+          <p className="phead-sub">{r.property} · {r.cluster}, {r.city}</p>
+          <p className="phead-sub">Scheduled for <b>{fmtDate(r.task_date)}, {r.window_start}–{r.window_end}</b> · Last action: <b>{actionLabel(r.last_type)}</b>, {fmtDateTime(r.last_at ?? r.status_since)}</p>
         </div>
         <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
       </div>

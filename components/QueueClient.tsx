@@ -11,6 +11,8 @@ import { ActiveChip, DateRow, Field, FilterBar, SearchPick, Pager, clampPage, us
 export type QItem = {
   id: number; t: string; p: string; cluster: string; city: string; a: string; r: string; s: string; h: number; sla: number; att: string;
   last: boolean; rv: string; au: string; cbm: string; date: string; why: string; win: string; crit: boolean; next: string; mine: boolean;
+  /** When it was scheduled for, and its last step (submitted, reviewed...) with the time. */
+  schedAt: number; lastL: string; lastAt: number;
 };
 type Geo = { city: string; cluster: string; property: string; id: number };
 type Ev = { id: number; at: number; type: string; detail: string; actor: string | null };
@@ -100,7 +102,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   const cnt = { all: all.length, r: 0, a: 0, g: 0, over: all.filter(over).length } as Record<string, number>;
   all.forEach((t) => cnt[bucket(t)]++);
   let list = g.open && bk !== "all" ? all.filter((t) => (bk === "over" ? over(t) : bucket(t) === bk)) : all;
-  list = sort ? sortRows(list, sort, (t, k) => k === "task" ? t.t : k === "asg" ? t.a : k === "next" ? t.next || nextStep(t).what : k === "wait" ? (g.open ? t.h : t.date) : null)
+  list = sort ? sortRows(list, sort, (t, k) => k === "task" ? t.t : k === "asg" ? t.a : k === "next" ? t.next || nextStep(t).what : k === "sched" ? t.schedAt : k === "last" ? t.lastAt : k === "wait" ? (g.open ? t.h : t.date) : null)
     : [...list].sort((a, b) => (g.open ? b.h - a.h : b.date.localeCompare(a.date)));
   const [size, setSize] = usePageSize();
   const pg = clampPage(page, list.length, size);
@@ -218,6 +220,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               <span><input type="checkbox" aria-label="Select all" checked={shown.length > 0 && shown.every((t) => sel.has(t.id))}
                 onChange={(e) => setSel(e.target.checked ? new Set(shown.map((t) => t.id)) : new Set())} /></span>
               <SortHead k="task" label="Task" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><SortHead k="asg" label="Assignee" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} />
+              <SortHead k="sched" label="Scheduled" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><SortHead k="last" label="Last action" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} />
               <SortHead k="next" label="Next step" sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><SortHead k="wait" label={g.open ? "Waiting" : "Date"} sort={sort} setSort={(x) => { setSort(x); setPage(0); }} /><span />
             </div>
             {!list.length ? (
@@ -240,6 +243,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                       <div className="tsub">{t.p} · {t.city}{t.att ? ` · Attempt ${t.att}` : ""}</div>
                     </div>
                     <div className="who">{t.a}<small>{t.r}</small></div>
+                    <div className="sch"><span className="mtl">Scheduled </span>{fmtDate(t.date)}<small>{t.win}</small></div>
+                    <div className="lst"><span className="mtl">Last action </span>{t.lastL}<small>{fmtDateTime(t.lastAt)}</small></div>
                     <div className="next">{n.who ? <><b>{n.who}</b> {n.what}</> : <b>{n.what}</b>}<small>{n.sub}</small></div>
                     <Age t={t} />
                     <span className="chev" aria-hidden="true">›</span>

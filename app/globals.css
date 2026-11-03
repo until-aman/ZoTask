@@ -212,7 +212,7 @@ main.q{min-width:0;display:grid;gap:12px}
 .bk .r{color:var(--red)} .bk .a{color:var(--amber)} .bk .g{color:var(--green)}
 .bk button[aria-pressed="true"] span{color:#fff}
 .bulk{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--accent-soft);border-bottom:1px solid var(--line);font-weight:600;color:var(--accent-text)}
-.lhead,.qrow{display:grid;grid-template-columns:28px minmax(0,2.4fr) minmax(0,1.3fr) minmax(0,1.6fr) 170px 20px;gap:12px;align-items:center;padding:10px 12px}
+.lhead,.qrow{display:grid;grid-template-columns:28px minmax(0,2fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.5fr) 150px 20px;gap:12px;align-items:center;padding:10px 12px}
 .lhead{font-size:12px;text-transform:none;color:var(--muted);background:var(--sunken);border-bottom:1px solid var(--line);padding-block:7px}
 .qrow{border-bottom:1px solid var(--line2);cursor:pointer;position:relative}
 .qrow:last-child{border-bottom:0}
@@ -232,7 +232,7 @@ main.q{min-width:0;display:grid;gap:12px}
 .meter i.a{background:var(--amber)} .meter i.r{background:var(--red)}
 .age small{color:var(--muted)} .age small.r{color:var(--red);font-weight:600}
 .chev{color:var(--faint);font-size:18px}
-@media (max-width:860px){.lhead{display:none}.qrow{grid-template-columns:24px minmax(0,1fr) 16px;row-gap:6px}.qrow .who,.qrow .next,.qrow .age{grid-column:2}.qrow .chev{grid-row:1;grid-column:3}}
+@media (max-width:860px){.lhead{display:none}.qrow{grid-template-columns:24px minmax(0,1fr) 16px;row-gap:6px}.qrow .who,.qrow .sch,.qrow .lst,.qrow .next,.qrow .age{grid-column:2}.qrow .chev{grid-row:1;grid-column:3}}
 .ghead{display:flex;justify-content:space-between;padding:8px 12px;background:var(--sunken);border-bottom:1px solid var(--line2);font-weight:700;font-size:13px}
 .empty{padding:36px 16px;text-align:center;color:var(--muted)}
 .empty b{display:block;color:var(--fg);font-size:15px;margin-bottom:4px}
@@ -537,7 +537,7 @@ select{max-width:100%}
 .pager{flex-wrap:wrap}
 
 /* ---------- My Tasks list ---------- */
-.mthead,.mtrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.1fr) minmax(0,1.3fr) auto;gap:12px;align-items:center;padding:10px 14px}
+.mthead,.mtrow{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.3fr) 260px;gap:12px;align-items:center;padding:10px 14px}
 .mthead{font-size:12px;text-transform:none;color:var(--muted);background:var(--sunken);border-bottom:1px solid var(--line);padding-block:7px}
 .mtrow{border-bottom:1px solid var(--line2);color:var(--fg)}
 .mtrow:hover{background:var(--sunken);text-decoration:none}
@@ -1099,3 +1099,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 .ansrow>label,.ansrow>input,.ansrow>.seg{flex:none}
 .ansrow>textarea{flex:1 1 100%}
 @media (min-width:1000px){.kv{grid-template-columns:repeat(auto-fill,100px minmax(220px,1fr))}}
+.mtl{display:none;color:var(--muted)}
+@media (max-width:700px){.mtl{display:inline}}
+.qrow .sch,.qrow .lst{display:grid;font-size:13px;color:var(--fg)}
+.qrow .sch small,.qrow .lst small{color:var(--muted);font-size:12px}
+@media (max-width:860px){.qrow .mtl{display:inline}.qrow .sch,.qrow .lst{display:block}.qrow .sch small,.qrow .lst small{margin-left:6px}}
+@media (min-width:701px) and (max-width:1250px){.mthead,.mtrow{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1.1fr) 150px}}
+.mtrow .small .tsub{white-space:normal}
