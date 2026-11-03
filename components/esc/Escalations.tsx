@@ -119,7 +119,7 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
     { key: "ref", label: "Ref", value: (r) => r.id, render: (r) => <button type="button" className="link" style={{ whiteSpace: "nowrap" }} onClick={() => setOpen(r.id)}>{r.ref}</button>, csv: (r) => r.ref, sticky: true },
     { key: "created", label: "Raised on", value: (r) => r.created, render: (r) => day(r.created), csv: (r) => isoDate(r.created) },
     { key: "dept", label: "Department", value: (r) => r.department },
-    { key: "prop", label: "Property", value: (r) => r.props.map((p) => p.name).join(", "), render: (r) => <span className="ell" style={{ maxWidth: 180, display: "inline-block" }} title={r.props.map((p) => p.name).join(", ")}>{r.props.map((p) => p.name.replace(/^Zolo /, "")).join(", ")}</span> },
+    { key: "prop", label: "Property", value: (r) => r.props.map((p) => p.name).join(", "), render: (r) => <span className="wrapcell">{r.props.map((p) => p.name.replace(/^Zolo /, "")).join(", ")}</span> },
     { key: "cluster", label: "Cluster", value: (r) => [...new Set(r.props.map((p) => p.cluster))].join(", "), hidden: true },
     { key: "title", label: "Issue", value: (r) => r.title, render: (r) => <button type="button" className="esc-title" onClick={() => setOpen(r.id)} title={r.detail}>{r.priority === "high" && <span className="pill r">High</span>} {r.title}</button> },
     { key: "by", label: "Raised by", value: (r) => r.raisedBy },
@@ -127,7 +127,7 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
     { key: "due", label: "Expected closure", value: (r) => r.due, render: (r) => !r.due ? "—" : <span className={r.overdue ? "t-r" : ""} style={{ fontWeight: r.overdue ? 800 : 400 }}>{dayIso(r.due)}{r.overdue ? ` · ${daysBetween(r.due, d.today)}d late` : isOpen(r.status) && r.due <= soon ? " · due soon" : ""}</span> },
     { key: "status", label: "Status", value: (r) => STATUS[r.status], render: (r) => <span className={`pill ${PILL[r.status]}`}>{STATUS[r.status]}</span> },
     { key: "age", label: "Days open", num: true, value: (r) => Math.floor(((r.closed ?? d.now) - r.created) / DAY), hidden: true },
-    { key: "updated", label: "Last update", value: (r) => r.updated, render: (r) => { const u = r.updates[r.updates.length - 1]; return <div className="small esc-upd"><span>{ago(r.updated, d.now)}</span>{u?.note ? <span className="muted ell" title={u.note}>{u.note}</span> : null}</div>; }, csv: (r) => r.updates[r.updates.length - 1]?.note ?? "" },
+    { key: "updated", label: "Last update", value: (r) => r.updated, render: (r) => { const u = r.updates[r.updates.length - 1]; return <div className="small esc-upd"><span>{ago(r.updated, d.now)}</span>{u?.note ? <span className="muted">{u.note}</span> : null}</div>; }, csv: (r) => r.updates[r.updates.length - 1]?.note ?? "" },
     { key: "prio", label: "Priority", value: (r) => PRIO[r.priority], hidden: true },
     { key: "mail", label: "Email subject", value: (r) => r.mailSubject || null, hidden: true },
   ];

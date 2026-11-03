@@ -1,7 +1,7 @@
 "use client";
 // Task setup in steps: Basics → Type & trigger → Checklist → Schedule & properties → Review & audit → Summary.
-// The summary on the right updates as you type; on a phone it is the last step.
-import { useMemo, useState } from "react";
+// The preview on the right updates as you type; the last step replays every step read-only, with links back to edit.
+import { ReactNode, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveTemplate, TemplateInput, TemplateItemInput } from "@/app/actions";
 import { saveChecklistPreset } from "@/app/admin-actions";
@@ -17,6 +17,7 @@ export const EVENTS = ["Tenant onboarded", "Tenant exited", "Tenant exited by ag
 export const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const ROLES = ["HK", "Reception", "CC", "CBM", "Short stays"];
 const KINDS: [string, string][] = [["check", "Tick box"], ["number", "Number"], ["text", "Text"], ["count", "Staff count"]];
+const TYPES = { scheduled: ["Scheduled", "Runs at set times"], event: ["Event-triggered", "Created when something happens"], on_demand: ["On demand", "Created by hand when needed"] } as const;
 const STEPS = ["Basics", "Type & trigger", "Checklist", "Schedule & properties", "Review & audit", "Summary"];
 const DEFAULTS: T = {
   name: "", category: "", op_role: "HK", trigger: "scheduled", event_name: null, frequency: "daily", weekday: 1,
@@ -24,6 +25,8 @@ const DEFAULTS: T = {
   criticality: "normal", audit_rate: 0.2, geofence: 0, reviewer_id: null, auditor_id: null, active: 1,
   description: "", events: "[]", days: "[]", once_date: null, start_stop: 1, geofence_m: 200, ideal_minutes: null, review_required: 1, assignees: "[]",
 };
+// Grow a one-line textarea to fit its text, so long checklist items are never cut off.
+const fit = (el: HTMLTextAreaElement | null) => { if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight + 2}px`; } };
 const blank = (): It => ({ label: "", kind: "check", photo_allowed: true, photo_required: false, note_allowed: true, note_required: false, count_of: null });
 const parse = <X,>(s: string | null | undefined, d: X): X => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 const rule = (allowed: boolean, required: boolean) => (required ? "required" : allowed ? "optional" : "off");
@@ -39,6 +42,44 @@ export function describeWhen(t: Pick<T, "trigger" | "frequency" | "days" | "once
   if (t.frequency === "weekly") return `Weekly on ${d.length ? d.map((x) => DAYS[x]).join(", ") : "?"}, ${time}`;
   if (t.frequency === "monthly") return `Monthly on the ${d.length ? d.map(ord).join(", ") : "?"}, ${time}`;
   return `Daily ${time}`;
+}
+
+/** One checklist item: the question on top, then how it is answered, photo and note rules. Shared with the admin checklist library. */
+export function ItemCard({ ix, it, last, onChange, onMove, onRemove }: {
+  ix: number; it: It; last: boolean; onChange: (patch: Partial<It>) => void; onMove?: (d: number) => void; onRemove: () => void;
+}) {
+  const rules = [["Photo", it.photo_allowed, it.photo_required, (v: string) => onChange({ photo_allowed: v !== "off", photo_required: v === "required" })],
+    ["Note", it.note_allowed, it.note_required, (v: string) => onChange({ note_allowed: v !== "off", note_required: v === "required" })]] as const;
+  return (
+    <div className="te-item">
+      <div className="te-q">
+        <span className="te-n">{ix + 1}</span>
+        <textarea className="te-label" rows={1} ref={(el) => fit(el)} value={it.label} onChange={(e) => { fit(e.target); onChange({ label: e.target.value }); }} onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }} placeholder="Type the question or check, e.g. Lobby floor mopped" aria-label={`Item ${ix + 1}`} />
+        <span className="te-act">
+          {onMove && <>
+            <button type="button" className="link" onClick={() => onMove(-1)} aria-label="Move up" title="Move up" disabled={ix === 0}>↑</button>
+            <button type="button" className="link" onClick={() => onMove(1)} aria-label="Move down" title="Move down" disabled={last}>↓</button>
+          </>}
+          <button type="button" className="link te-del" onClick={onRemove} aria-label="Remove item" title="Remove">×</button>
+        </span>
+      </div>
+      <div className="te-opts">
+        <label className="te-opt">Answer
+          <select value={it.kind === "count" ? `count:${it.count_of ?? "HK"}` : it.kind}
+            onChange={(e) => { const v = e.target.value; onChange(v.startsWith("count:") ? { kind: "count", count_of: v.slice(6) } : { kind: v, count_of: null }); }}>
+            {KINDS.filter(([k]) => k !== "count").map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            <option value="count:HK">Number of HKs</option><option value="count:SHK">Number of SHKs</option>
+          </select></label>
+        {rules.map(([name, allowed, required, change]) => (
+          <div key={name} className="te-opt">{name}
+            <div className="seg te-rules" role="group" aria-label={`${name} for item ${ix + 1}`}>
+              {RULES.map(([k, l]) => <button key={k} type="button" data-k={k} aria-pressed={rule(allowed, required) === k} onClick={() => change(k)}>{l}</button>)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function TemplateEditor({ id, initial, initialItems, selected, geo, reviewers, auditors, people, categories, checklists, schedules }: {
@@ -64,7 +105,17 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
   const set = <K extends keyof T>(k: K, v: T[K]) => setT((x) => ({ ...x, [k]: v }));
   const setItem = (ix: number, patch: Partial<It>) => setItems((xs) => xs.map((x, i) => (i === ix ? { ...x, ...patch } : x)));
   const moveItem = (ix: number, d: number) => setItems((xs) => { const ys = [...xs]; const j = ix + d; if (j < 0 || j >= ys.length) return xs; [ys[ix], ys[j]] = [ys[j], ys[ix]]; return ys; });
-  const cities = [...new Set(geo.map((g) => g.city))];
+  const cities = [...new Set(geo.map((g) => g.city))].sort();
+  // Property picker: narrow by search, city, cluster or "selected only", then tick one by one or in bulk.
+  const [pq, setPq] = useState(""), [pCity, setPCity] = useState(""), [pCluster, setPCluster] = useState(""), [pSel, setPSel] = useState(false);
+  const picked = useMemo(() => new Set(props), [props]);
+  const clusters = [...new Set(geo.filter((g) => !pCity || g.city === pCity).map((g) => g.cluster))].sort();
+  const shown = geo.filter((g) => (!pCity || g.city === pCity) && (!pCluster || g.cluster === pCluster) && (!pSel || picked.has(g.id))
+    && (!pq.trim() || `${g.property} ${g.cluster} ${g.city}`.toLowerCase().includes(pq.trim().toLowerCase())));
+  const shownIds = shown.map((g) => g.id), shownAll = shownIds.length > 0 && shownIds.every((x) => picked.has(x));
+  const addProps = (ids: number[]) => setProps([...new Set([...props, ...ids])]);
+  const dropProps = (ids: number[]) => { const d = new Set(ids); setProps(props.filter((x) => !d.has(x))); };
+  const cityCount = (c: string) => { const ids = geo.filter((g) => g.city === c).map((g) => g.id); return [ids.filter((x) => picked.has(x)).length, ids.length]; };
   const events = parse<string[]>(t.events, []), days = parse<number[]>(t.days, []), named = parse<number[]>(t.assignees, []);
   const cats = t.category && !categories.includes(t.category) ? [t.category, ...categories] : categories;
   const assignable = useMemo(() => people.filter((p) => p.access_role === "ground" || p.access_role === "cbm"), [people]);
@@ -84,13 +135,16 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     const s = schedules.find((x) => String(x.id) === sid);
     if (s) setT((x) => ({ ...x, frequency: s.frequency, days: s.days, once_date: s.once_date, window_start: s.window_start, window_end: s.window_end }));
   }
-  async function save() {
+  // An existing task saves at every step and moves on; a new one is only created from the last step.
+  async function save(next = false) {
     setBusy(true);
     const r = await saveTemplate(id, { ...t, event_name: events[0] ?? null, weekday: days[0] ?? null, items: items.filter((i) => i.label.trim()), properties: props });
     setBusy(false);
     setMsg(r.ok ? { ok: true, text: r.msg ?? "Saved" } : { ok: false, text: r.error });
+    if (r.ok && next) setStep((s) => Math.min(s + 1, STEPS.length - 1));
     router.refresh();
   }
+  const last = step === STEPS.length - 1;
   async function savePreset(title: string) {
     const r = await saveChecklistPreset(null, title, items);
     setMsg(r.ok ? { ok: true, text: r.msg ?? "Saved" } : { ok: false, text: r.error });
@@ -101,6 +155,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     set(k, JSON.stringify(cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v].sort((a, b) => (typeof a === "number" && typeof b === "number" ? a - b : 0))));
   };
 
+  const filled = items.filter((i) => i.label.trim());
   const summary = (
     <aside className="card te-sum" aria-label="Summary">
       <div className="small muted">Preview</div>
@@ -112,7 +167,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
         <dt>When</dt><dd>{describeWhen(t)}{timed && ` · ${hours}h to finish`}</dd>
         <dt>Late</dt><dd>{t.late_window_days === 0 ? "Same day, then Missed" : `Up to ${t.late_window_days} day${t.late_window_days > 1 ? "s" : ""}, then Missed`}</dd>
         <dt>On site</dt><dd>{[t.start_stop ? "Start/Stop button" : "", t.geofence ? `within ${t.geofence_m} m` : "no location check", t.ideal_minutes ? `ideal ${t.ideal_minutes} min` : ""].filter(Boolean).join(" · ")}</dd>
-        <dt>Checklist</dt><dd>{items.filter((i) => i.label.trim()).length} items · {items.filter((i) => i.photo_required).length} need a photo</dd>
+        <dt>Checklist</dt><dd>{filled.length} items · {items.filter((i) => i.photo_required).length} need a photo</dd>
         <dt>Properties</dt><dd>{props.length} of {geo.length}</dd>
         <dt>Review</dt><dd>{t.review_required ? `${reviewers.find((r) => r.id === t.reviewer_id)?.name ?? "Cluster reviewer"} within ${t.review_sla_h}h · ${t.attempts_allowed} attempt${t.attempts_allowed > 1 ? "s" : ""}` : "None, done on submit"}</dd>
         {!!t.review_required && <><dt>Audit</dt><dd>{auditors.find((r) => r.id === t.auditor_id)?.name ?? "Any auditor"} · {Math.round(t.audit_rate * 100)}% within {t.audit_sla_h}h</dd></>}
@@ -120,12 +175,112 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     </aside>
   );
 
+  // The last step: every earlier step again, read-only, drawn with the same controls.
+  const gaps = [
+    !t.name.trim() && "Give the task a name",
+    !filled.length && "Add at least one checklist item",
+    !props.length && "Pick at least one property",
+    t.trigger === "event" && !events.length && "Pick the events that create this task",
+    t.trigger === "scheduled" && (t.frequency === "weekly" || t.frequency === "monthly") && !days.length && `Pick the ${t.frequency === "weekly" ? "days" : "dates"} it repeats on`,
+    t.trigger === "scheduled" && t.frequency === "once" && !t.once_date && "Pick the date it runs on",
+  ].filter(Boolean) as string[];
+  const head = (i: number) => <div className="te-rvh"><span className="te-rvn">{i + 1}</span><h3>{STEPS[i]}</h3><span className="spacer" /><button type="button" className="link small" onClick={() => setStep(i)}>Edit</button></div>;
+  const fv = (label: string, value: ReactNode) => <div className="te-fv"><span>{label}</span><div>{value}</div></div>;
+  const on = (checked: boolean, label: ReactNode) => <label className="switch"><input type="checkbox" checked={checked} readOnly tabIndex={-1} />{label}</label>;
+  const rulePill = (allowed: boolean, required: boolean) => required ? <span className="pill a">Compulsory</span> : allowed ? <span className="pill b">Optional</span> : <span className="pill">No</span>;
+  const review = (
+    <div className="te-rv">
+      <div className={gaps.length ? "te-gaps warn" : "te-gaps ready"}>
+        {gaps.length ? <><b>Before you save</b><ul>{gaps.map((g) => <li key={g}>{g}</li>)}</ul></> : <b>Everything is filled in. Ready to {id ? "save" : "create"}.</b>}
+      </div>
+
+      <section className="card grid">
+        {head(0)}
+        <div className="te-rvtitle"><b>{t.name || <span className="muted">Untitled task</span>}</b>
+          <span className={t.criticality === "high" ? "pill r" : "pill"}>{t.criticality === "high" ? "Critical" : "Normal"}</span>
+          <span className={t.active ? "pill g" : "pill"}>{t.active ? "Active" : "Paused"}</span></div>
+        {t.description && <p className="small" style={{ margin: 0 }}>{t.description}</p>}
+        <div className="te-fvs">
+          {fv("Category", t.category || "Uncategorised")}
+          {fv("Done by role", t.op_role)}
+          {fv("Specific people", named.length ? <div className="chips">{named.map((n) => <span key={n} className="chipn">{people.find((p) => p.id === n)?.name}</span>)}</div> : <span className="muted">Whoever has the role at each property</span>)}
+        </div>
+      </section>
+
+      <section className="card grid">
+        {head(1)}
+        {(() => { const [l, sub] = TYPES[t.trigger as keyof typeof TYPES] ?? TYPES.scheduled; return <div className="te-type"><b>{l}</b><small>{sub}</small></div>; })()}
+        {t.trigger === "event" && fv("Events that create this task", events.length ? <div className="chips">{events.map((e) => <span key={e} className="chipn">{e}</span>)}</div> : <span className="muted">None picked</span>)}
+        {timed && <div className="te-fvs">{fv("Time to finish", hours === 23 ? "Same day" : `${hours} hour${hours > 1 ? "s" : ""}`)}</div>}
+        <div className="te-ons">
+          {on(!!t.start_stop, "Start and Stop button")}
+          {on(!!t.geofence, <>Location check{!!t.geofence && <span className="pill b">within {t.geofence_m} m</span>}</>)}
+          {on(!!t.ideal_minutes, <>Ideal completion time{!!t.ideal_minutes && <span className="pill b">{t.ideal_minutes} min</span>}</>)}
+        </div>
+      </section>
+
+      <section className="card grid">
+        {head(2)}
+        {filled.length ? <div className="te-rvitems">
+          <div className="te-rvrow te-rvhead"><span>#</span><span>Item</span><span>Answer</span><span>Photo</span><span>Note</span></div>
+          {filled.map((i, ix) => (
+            <div key={ix} className="te-rvrow">
+              <span className="te-n">{ix + 1}</span>
+              <span>{i.label}</span>
+              <span><span className="chipn">{i.kind === "count" ? `Number of ${i.count_of ?? "HK"}s` : KINDS.find(([k]) => k === i.kind)?.[1]}</span></span>
+              <span>{rulePill(i.photo_allowed, i.photo_required)}</span>
+              <span>{rulePill(i.note_allowed, i.note_required)}</span>
+            </div>
+          ))}
+        </div> : <p className="small muted" style={{ margin: 0 }}>No checklist items yet.</p>}
+      </section>
+
+      <section className="card grid">
+        {head(3)}
+        {t.trigger === "scheduled" ? <>
+          <div className="te-fvs">
+            {fv("Start time", t.window_start)}
+            {fv("End time", t.window_end)}
+            {t.frequency === "once" && fv("Date", t.once_date ?? <span className="muted">Not picked</span>)}
+          </div>
+          <div className="seg te-ro" role="group" aria-label="Repeats">
+            {([["once", "Once"], ["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"]] as const).map(([k, l]) => <button key={k} type="button" tabIndex={-1} aria-pressed={t.frequency === k}>{l}</button>)}
+          </div>
+          {t.frequency === "weekly" && <div className="te-days te-ro">{DAYS.map((d, i) => <button key={d} type="button" tabIndex={-1} aria-pressed={days.includes(i)}>{d}</button>)}</div>}
+          {t.frequency === "monthly" && <div className="te-days te-month te-ro">{Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <button key={d} type="button" tabIndex={-1} aria-pressed={days.includes(d)}>{d}</button>)}</div>}
+        </> : <p className="small muted" style={{ margin: 0 }}>{t.trigger === "event" ? "Event-triggered" : "On-demand"} tasks have no schedule.</p>}
+        <div className="row2"><h3 className="te-h" style={{ margin: 0 }}>Properties</h3><span className="spacer" /><span className={props.length ? "pill b" : "pill r"}>{props.length === geo.length ? "All" : props.length} of {geo.length}</span></div>
+        {props.length > 0 && <div className="te-rvprops">
+          {cities.map((c) => {
+            const [n, of] = cityCount(c), ps = geo.filter((g) => g.city === c && picked.has(g.id));
+            return n ? <div key={c} className="te-rvcity"><b>{c}</b><span className={n === of ? "pill g" : "pill b"}>{n === of ? `All ${of}` : `${n} of ${of}`}</span>
+              {n < of && <span className="small muted">{ps.slice(0, 4).map((g) => g.property).join(", ")}{n > 4 && ` +${n - 4} more`}</span>}</div> : null;
+          })}
+        </div>}
+      </section>
+
+      <section className="card grid">
+        {head(4)}
+        {on(!!t.review_required, "Needs review before it counts as done")}
+        {t.review_required ? <div className="te-fvs">
+          {fv("Reviewer", reviewers.find((r) => r.id === t.reviewer_id)?.name ?? "Cluster's reviewer")}
+          {fv("Review within", `${t.review_sla_h} hours`)}
+          {fv("Attempts allowed", t.attempts_allowed === 1 ? "1 (no fixes)" : t.attempts_allowed)}
+          {fv("Auditor", auditors.find((r) => r.id === t.auditor_id)?.name ?? "Any auditor")}
+          {fv("Audit within", `${t.audit_sla_h} hours`)}
+          {fv("Audit sample", `${Math.round(t.audit_rate * 100)}% of passes`)}
+        </div> : <p className="small muted" style={{ margin: 0 }}>Counts as done as soon as it is submitted.</p>}
+        <div className="te-fvs">{fv("Late submission allowed", t.late_window_days === 0 ? "Same day" : `${t.late_window_days} day${t.late_window_days > 1 ? "s" : ""}`)}</div>
+      </section>
+    </div>
+  );
+
   return (
     <div className="te">
       <nav className="te-steps" aria-label="Steps">
         {STEPS.map((s, i) => <button key={s} type="button" className={i === step ? "on" : ""} aria-current={i === step ? "step" : undefined} onClick={() => setStep(i)}><span>{i + 1}</span>{s}</button>)}
       </nav>
-      <div className="te-body">
+      <div className={step === 5 ? "te-body te-full" : "te-body"}>
         <div className="grid">
           {step === 0 && <section className="card grid">
             <label className="f">Task name<input type="text" value={t.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Lobby deep cleaning" /></label>
@@ -146,7 +301,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
 
           {step === 1 && <section className="card grid">
             <div className="seg te-seg" role="group" aria-label="Task type">
-              {([["scheduled", "Scheduled", "Runs at set times"], ["event", "Event-triggered", "Created when something happens"], ["on_demand", "On demand", "Created by hand when needed"]] as const).map(([k, l, sub]) => (
+              {(Object.entries(TYPES) as [keyof typeof TYPES, readonly [string, string]][]).map(([k, [l, sub]]) => (
                 <button key={k} type="button" aria-pressed={t.trigger === k} onClick={() => set("trigger", k)}><b>{l}</b><small>{sub}</small></button>
               ))}
             </div>
@@ -178,22 +333,8 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
               <button type="button" className="btn primary sm" onClick={() => loadChecklist(String(pending.id), true)}>Replace</button><button type="button" className="btn sm" onClick={() => setPending(null)}>Cancel</button></div>}
             <div className="te-items">
               {items.map((it, ix) => (
-                <div key={ix} className="te-item">
-                  <span className="te-n">{ix + 1}</span>
-                  <input type="text" value={it.label} onChange={(e) => setItem(ix, { label: e.target.value })} placeholder="Add a checklist item" aria-label={`Item ${ix + 1}`} />
-                  <select value={it.kind === "count" ? `count:${it.count_of ?? "HK"}` : it.kind} aria-label="Answer"
-                    onChange={(e) => { const v = e.target.value; setItem(ix, v.startsWith("count:") ? { kind: "count", count_of: v.slice(6) } : { kind: v, count_of: null }); }}>
-                    {KINDS.filter(([k]) => k !== "count").map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-                    <option value="count:HK">Number of HKs</option><option value="count:SHK">Number of SHKs</option>
-                  </select>
-                  <label className="te-rule">Photo<select value={rule(it.photo_allowed, it.photo_required)} onChange={(e) => setItem(ix, { photo_allowed: e.target.value !== "off", photo_required: e.target.value === "required" })}>{RULES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-                  <label className="te-rule">Note<select value={rule(it.note_allowed, it.note_required)} onChange={(e) => setItem(ix, { note_allowed: e.target.value !== "off", note_required: e.target.value === "required" })}>{RULES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-                  <span className="te-act">
-                    <button type="button" className="link" onClick={() => moveItem(ix, -1)} aria-label="Move up" disabled={ix === 0}>↑</button>
-                    <button type="button" className="link" onClick={() => moveItem(ix, 1)} aria-label="Move down" disabled={ix === items.length - 1}>↓</button>
-                    <button type="button" className="link" onClick={() => setItems(items.filter((_, i) => i !== ix))} aria-label="Remove item">×</button>
-                  </span>
-                </div>
+                <ItemCard key={ix} ix={ix} it={it} last={ix === items.length - 1} onChange={(patch) => setItem(ix, patch)}
+                  onMove={(d) => moveItem(ix, d)} onRemove={() => setItems(items.filter((_, i) => i !== ix))} />
               ))}
             </div>
             <div><button type="button" className="btn sm" onClick={() => setItems([...items, blank()])}>+ Add item</button></div>
@@ -217,17 +358,35 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
                 <span className="small muted" style={{ fontWeight: 400 }}>Months without that date (like the 31st) are skipped.</span></div>}
             </section> : <p className="card small muted" style={{ margin: 0 }}>{t.trigger === "event" ? "Event-triggered" : "On-demand"} tasks have no schedule. They open when created and run for the time to finish set in step 2.</p>}
             <section className="card grid">
-              <div className="row2"><h3 className="te-h" style={{ margin: 0 }}>Properties</h3><span className="spacer" /><span className="small muted">{props.length} of {geo.length}</span>
+              <div className="row2"><h3 className="te-h" style={{ margin: 0 }}>Properties</h3><span className="spacer" /><span className={props.length ? "pill b" : "pill r"}>{props.length} of {geo.length} selected</span>
                 <button type="button" className="link small" onClick={() => setProps(geo.map((g) => g.id))}>All</button><button type="button" className="link small" onClick={() => setProps([])}>None</button></div>
-              <div className="grid g3" style={{ gap: 4 }}>
-                {cities.map((c) => {
-                  const ids = geo.filter((g) => g.city === c).map((g) => g.id), all = ids.every((x) => props.includes(x));
+              <div className="te-cities" role="group" aria-label="Cities">
+                {cities.map((c) => { const [n, of] = cityCount(c); return (
+                  <button key={c} type="button" aria-pressed={pCity === c} className={n === of ? "full" : n ? "part" : ""} onClick={() => { setPCity(pCity === c ? "" : c); setPCluster(""); }}>{c}<small>{n}/{of}</small></button>
+                ); })}
+              </div>
+              <div className="te-pfilt">
+                <input type="search" value={pq} onChange={(e) => setPq(e.target.value)} placeholder="Search property, cluster or city" aria-label="Search properties" />
+                <select value={pCity} onChange={(e) => { setPCity(e.target.value); setPCluster(""); }} aria-label="City"><option value="">All cities</option>{cities.map((c) => <option key={c}>{c}</option>)}</select>
+                <select value={pCluster} onChange={(e) => setPCluster(e.target.value)} aria-label="Cluster"><option value="">All clusters</option>{clusters.map((c) => <option key={c}>{c}</option>)}</select>
+                <label className="switch"><input type="checkbox" checked={pSel} onChange={(e) => setPSel(e.target.checked)} />Selected only</label>
+              </div>
+              <div className="te-pbar">
+                <label className="opt"><input type="checkbox" checked={shownAll} disabled={!shown.length} onChange={() => (shownAll ? dropProps(shownIds) : addProps(shownIds))} />
+                  <b>{shownAll ? "Clear" : "Select"} all {shown.length} shown</b></label>
+                <span className="spacer" />
+                {(pq || pCity || pCluster || pSel) && <button type="button" className="link small" onClick={() => { setPq(""); setPCity(""); setPCluster(""); setPSel(false); }}>Reset filters</button>}
+              </div>
+              <div className="te-plist">
+                {!shown.length && <p className="small muted" style={{ margin: 8 }}>No properties match.</p>}
+                {[...new Set(shown.map((g) => `${g.city} · ${g.cluster}`))].sort().map((k) => {
+                  const grp = shown.filter((g) => `${g.city} · ${g.cluster}` === k), ids = grp.map((g) => g.id), all = ids.every((x) => picked.has(x));
                   return (
-                    <div key={c}>
-                      <label className="opt" style={{ fontWeight: 700 }}><input type="checkbox" checked={all} onChange={() => setProps(all ? props.filter((x) => !ids.includes(x)) : [...new Set([...props, ...ids])])} />{c}</label>
-                      {geo.filter((g) => g.city === c).map((g) => (
-                        <label key={g.id} className="opt"><input type="checkbox" checked={props.includes(g.id)} onChange={(e) => setProps(e.target.checked ? [...props, g.id] : props.filter((x) => x !== g.id))} /> {g.property}<small>{g.cluster}</small></label>
-                      ))}
+                    <div key={k} className="te-pgrp">
+                      <label className="te-pgh"><input type="checkbox" checked={all} onChange={() => (all ? dropProps(ids) : addProps(ids))} />{k}<small>{ids.filter((x) => picked.has(x)).length}/{ids.length}</small></label>
+                      <div className="te-popts">
+                        {grp.map((g) => <label key={g.id} className="opt"><input type="checkbox" checked={picked.has(g.id)} onChange={(e) => (e.target.checked ? addProps([g.id]) : dropProps([g.id]))} />{g.property}</label>)}
+                      </div>
                     </div>
                   );
                 })}
@@ -255,14 +414,15 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
             <p className="small muted" style={{ margin: 0 }}>After that the task becomes Missed. An admin can reopen it.</p>
           </section>}
 
-          {step === 5 && <div className="te-sumstep">{summary}</div>}
+          {step === 5 && review}
 
           {msg && <div className={msg.ok ? "ok" : "err"}>{msg.text}</div>}
           <div className="row2">
             {step > 0 && <button type="button" className="btn" onClick={() => setStep(step - 1)}>‹ Back</button>}
             <span className="spacer" />
-            {step < STEPS.length - 1 && <button type="button" className="btn" onClick={() => setStep(step + 1)}>Next ›</button>}
-            <button type="button" className="btn primary" onClick={save} disabled={busy}>{busy ? "Saving…" : id ? "Save changes" : "Create task"}</button>
+            {last ? <button type="button" className="btn primary" onClick={() => save()} disabled={busy}>{busy ? "Saving…" : id ? "Save changes" : "Create task"}</button>
+              : id ? <button type="button" className="btn primary" onClick={() => save(true)} disabled={busy}>{busy ? "Saving…" : "Save & next ›"}</button>
+              : <button type="button" className="btn primary" onClick={() => { setMsg(null); setStep(step + 1); }}>Next ›</button>}
           </div>
         </div>
         {step < 5 && <div className="te-side">{summary}</div>}

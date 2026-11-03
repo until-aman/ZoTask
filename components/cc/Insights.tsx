@@ -134,7 +134,7 @@ export function Reasons({ d }: { d: CC }) {
               <span className="small n"><N ids={r.ids} title={`Sent back: ${r.reason}`} /></span>
               <span className="small muted n">{fmtP(r.share)}</span>
               {d.prevHasData ? <span className={`small n ${r.ids.length > r.prev ? "t-r" : r.ids.length < r.prev ? "t-g" : "muted"}`} title={`${r.prev} in the previous period`}>{r.ids.length === r.prev ? "=" : `${r.ids.length > r.prev ? "+" : ""}${r.ids.length - r.prev}`}</span> : <span className="small muted n" title="No records for the previous period">—</span>}
-              <span className="small muted ell">{r.topProperty ? `${r.topProperty[0]} (${r.topProperty[1]})` : ""}</span>
+              <span className="small muted">{r.topProperty ? `${r.topProperty[0]} (${r.topProperty[1]})` : ""}</span>
             </div>
           ))}
         </div>
