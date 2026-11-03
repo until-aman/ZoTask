@@ -13,6 +13,11 @@ export async function POST(req: Request) {
   // Vercel caps a request body at 4.5 MB.
   if (file.size > 4 * 1024 * 1024) return new Response("Max 4 MB", { status: 413 });
   const name = `${crypto.randomUUID()}.${ext}`;
-  await saveFile(name, await file.arrayBuffer(), file.type);
+  try {
+    await saveFile(name, await file.arrayBuffer(), file.type);
+  } catch (e) {
+    console.error("Photo upload failed", e);
+    return new Response("Could not store the photo", { status: 500 });
+  }
   return Response.json({ name });
 }

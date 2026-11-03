@@ -1,6 +1,6 @@
 "use client";
 // Action required: every open problem once, most severe first, with the person who must act and what to do.
-import { fmtAt } from "@/lib/time";
+import { fmtAt, fmtDate, fmtDateTime } from "@/lib/time";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Issue, T } from "@/lib/command";
@@ -34,7 +34,8 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
   const list = issues.filter((i) => (cat === "all" || i.cat === cat) && (!owner || i.owner === owner) && (!sev || i.sev === sev) && (!hideAck || (!i.ack && !i.esc))
     && (!q || `${i.task} ${i.property} ${i.owner} ${i.type} ${i.city} ${i.cluster}`.toLowerCase().includes(q.toLowerCase())));
   const sorted = sortRows(list, sort, (i, k) => k === "sev" ? SEVN[i.sev] : k === "issue" ? i.type : k === "prop" ? i.property : k === "owner" ? i.owner
-    : k === "status" ? (i.id ? STATUS_LABEL[i.status] : "Property") : k === "over" ? i.overdue : k === "back" ? i.rejections : null);
+    : k === "status" ? (i.id ? STATUS_LABEL[i.status] : "Property") : k === "over" ? i.overdue : k === "back" ? i.rejections
+    : k === "sched" ? (i.date ?? null) && `${i.date} ${i.win}` : k === "last" ? i.lastAt ?? null : null);
   const pg = clampPage(page, sorted.length, size);
   const view = sorted.slice(pg * size, pg * size + size);
   const chips: ActiveChip[] = [
@@ -95,7 +96,7 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
           <thead><tr>
             <th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={view.filter((i) => i.id).every((i) => sel.has(i.key)) && view.some((i) => i.id)}
               onChange={(e) => setSel(e.target.checked ? new Set(view.filter((i) => i.id).map((i) => i.key)) : new Set())} /></th>
-            <Th k="sev" label="Severity" /><Th k="issue" label="Issue" /><Th k="prop" label="Property" /><Th k="owner" label="Responsible" /><Th k="status" label="Status" /><Th k="over" label="Over limit" n /><Th k="back" label="Sent back" n /><th>Latest comment</th><th />
+            <Th k="sev" label="Severity" /><Th k="issue" label="Issue" /><Th k="prop" label="Property" /><Th k="owner" label="Responsible" /><Th k="sched" label="Scheduled" /><Th k="last" label="Last action" /><Th k="status" label="Status" /><Th k="over" label="Over limit" n /><Th k="back" label="Sent back" n /><th>Latest comment</th><th />
           </tr></thead>
           <tbody>{view.map((i) => (
             <tr key={i.key}>
@@ -108,6 +109,8 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
               </td>
               <td><div>{i.property}</div><div className="tsub">{i.cluster}, {i.city}</div></td>
               <td><div>{i.owner}</div><div className="tsub">{i.ownerRole}</div></td>
+              <td>{i.date ? <><div>{fmtDate(i.date)}</div><div className="tsub">{i.win}</div></> : <span className="muted">—</span>}</td>
+              <td>{i.lastL ? <><div>{i.lastL}</div><div className="tsub">{fmtDateTime(i.lastAt!)}</div></> : <span className="muted">—</span>}</td>
               <td>{i.id ? <span className={`pill ${STATUS_PILL[i.status]}`}>{STATUS_LABEL[i.status]}</span> : <span className="pill">Property</span>}</td>
               <td className="n">{i.overdue ? <span className={i.overdue > 24 * 3600_000 ? "warn" : ""}>{dur(i.overdue)}</span> : "—"}</td>
               <td className="n">{i.rejections || "—"}</td>

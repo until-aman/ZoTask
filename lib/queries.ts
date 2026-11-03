@@ -1,4 +1,7 @@
 import { all } from "./db";
+import { ACTION_EVENTS } from "./statuses";
+
+const ACTION_IN = ACTION_EVENTS.map((t) => `'${t}'`).join(",");
 
 export type Row = {
   id: number; template_id: number; property_id: number; task_date: string; window_start_at: number; window_end_at: number; late_until_at: number;
@@ -10,6 +13,8 @@ export type Row = {
   assignee_id: number | null; assignee: string | null; reviewer_id: number | null; reviewer: string | null;
   auditor_id: number | null; auditor: string | null; cbm_id: number | null; cbm: string | null;
   last_reason: string | null;
+  /** The latest step that moved the task (submitted, reviewed, resubmitted...) and when. */
+  last_type: string | null; last_at: number | null;
 };
 
 export const ROW_SQL = `
@@ -17,7 +22,9 @@ export const ROW_SQL = `
     t.window_start, t.window_end,
     p.name property, cl.name cluster, c.name city, p.cbm_id,
     ua.name assignee, ur.name reviewer, uu.name auditor, uc.name cbm,
-    (SELECT f.reason FROM review_flags f JOIN reviews r ON r.id=f.review_id WHERE r.instance_id=i.id ORDER BY r.decided_at DESC LIMIT 1) last_reason
+    (SELECT f.reason FROM review_flags f JOIN reviews r ON r.id=f.review_id WHERE r.instance_id=i.id ORDER BY r.decided_at DESC LIMIT 1) last_reason,
+    (SELECT e.type FROM events e WHERE e.instance_id=i.id AND e.type IN (${ACTION_IN}) ORDER BY e.at DESC, e.id DESC LIMIT 1) last_type,
+    (SELECT max(e.at) FROM events e WHERE e.instance_id=i.id AND e.type IN (${ACTION_IN})) last_at
   FROM instances i
   JOIN templates t ON t.id=i.template_id
   JOIN properties p ON p.id=i.property_id

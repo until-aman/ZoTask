@@ -6,6 +6,7 @@ import { nextActor } from "@/lib/engine";
 import { rows, geo } from "@/lib/queries";
 import { viewsFor } from "@/lib/views";
 import { HOUR, isoDate } from "@/lib/time";
+import { actionLabel } from "@/lib/statuses";
 import QueueClient, { QItem } from "@/components/QueueClient";
 
 // Hours the next actor has before a state counts as over SLA (0 = no SLA, shown against the window instead).
@@ -29,6 +30,7 @@ export default async function Queue({ searchParams }: { searchParams: Promise<Re
       last: r.attempt >= r.attempts_allowed, rv: r.reviewer ?? "", au: r.auditor ?? "", cbm: r.cbm ?? "", date: r.task_date,
       why: r.last_reason ?? "", win: `${r.window_start}–${r.window_end}`, crit: r.criticality === "high",
       next: next ? names.get(next) ?? "" : "", mine: next === u.id,
+      schedAt: r.window_start_at, lastL: actionLabel(r.last_type), lastAt: r.last_at ?? r.status_since,
     };
   });
   const views = await viewsFor(u.id, "queue");

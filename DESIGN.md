@@ -70,7 +70,7 @@ Titles never use uppercase. Table headers use sentence case.
 ## Layout
 
 - Left menu 232 px (64 px when collapsed), white, with a hairline on its right.
-- Content max width 1280 px, 32 px side padding on desktop, 16 px on phones.
+- Content max width 1600 px, 32 px side padding on desktop, 16 px on phones.
 - A 12-column grid; dashboard blocks take 4 columns (three across), wide charts take 8, tables take 12.
 - Every page starts with a **page header**: title on the left, primary actions on the right, an optional gray subtitle, and a 1 px rule underneath (`.phead`).
 
