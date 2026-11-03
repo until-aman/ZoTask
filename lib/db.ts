@@ -4,7 +4,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import Database from "libsql";
 import fs from "node:fs";
 import path from "node:path";
-import { seed, seedStaffing } from "./seed";
+import { TASKS_VERSION, replaceTasks, seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
 import { seedLibraries } from "./libraries";
 
@@ -48,6 +48,9 @@ async function init(): Promise<Client> {
     if (!have.get(table)!.includes(col)) await c.execute(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
   }
   if (!(await c.execute("SELECT v FROM meta WHERE k='seeded'")).rows.length) await seedInto(c);
+  // Databases made with an older task list have every task removed and the current list added (lib/seed.ts TEMPLATES).
+  const tasks = (await c.execute("SELECT v FROM meta WHERE k='tasks'")).rows[0]?.[0];
+  if (tasks !== TASKS_VERSION) await scope.run(c, replaceTasks);
   // Databases created before headcounts or escalations existed get sample rows too.
   await scope.run(c, async () => {
     if (!(await one<{ n: number }>("SELECT count(*) n FROM staffing"))!.n) await seedStaffing();
@@ -93,6 +96,7 @@ async function seedInto(target: Client) {
   // Sent in parts to keep each request small. Rows keep their ids and "seeded" goes in last,
   // so if a part fails the next start finishes the job instead of duplicating it.
   for (let i = 0; i < stmts.length; i += 25) await target.batch(["PRAGMA defer_foreign_keys = ON", ...stmts.slice(i, i + 25)], "write");
+  await target.execute({ sql: "INSERT OR REPLACE INTO meta (k, v) VALUES ('tasks', ?)", args: [TASKS_VERSION] });
   await target.execute({ sql: "INSERT OR IGNORE INTO meta (k, v) VALUES ('seeded', ?)", args: [String(Date.now())] });
 }
 

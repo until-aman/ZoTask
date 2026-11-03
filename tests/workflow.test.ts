@@ -3,7 +3,7 @@ import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import * as A from "@/app/actions";
 import * as E from "@/lib/engine";
-import { signInAs, ready, one, all, ADMIN, REVIEWER, AUDITOR } from "./helpers";
+import { signInAs, ready, one, all, eventTemplate, ADMIN, REVIEWER, AUDITOR } from "./helpers";
 
 before(ready);
 const yes = (r: { ok: boolean }) => assert.equal(r.ok, true, JSON.stringify(r));
@@ -11,7 +11,7 @@ const status = async (id: number) => (await one<{ status: string }>("SELECT stat
 
 async function freshTask() {
   // An event task at property 1 starts now, assigned to someone at the property.
-  const t = (await one<{ id: number }>("SELECT t.id FROM templates t JOIN template_properties tp ON tp.template_id=t.id WHERE t.trigger<>'scheduled' AND t.active=1 AND tp.property_id=1 AND t.review_required=1 LIMIT 1"))!;
+  const t = { id: await eventTemplate() };
   await one("UPDATE templates SET audit_rate=1, attempts_allowed=3 WHERE id=? RETURNING id", t.id);
   signInAs(ADMIN);
   yes(await A.triggerTask(t.id, 1));
