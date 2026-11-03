@@ -5,7 +5,7 @@ import { auditTask, closeFlags, reopenTask, reviewTask, waiveTask } from "@/app/
 import Photo from "./Photo";
 
 const REASONS = ["Photo missing", "Photo unclear", "Wrong location", "Count mismatch", "Item not done", "Other"];
-type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; count_of?: string | null };
+type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; count_of?: string | null; guide?: string | null };
 type Ans = { checked: number; value: string | null; note: string | null; photos: string[]; reply: string | null };
 type Flag = { id: number; item_id: number; reason: string; comment: string | null; answer: string | null };
 
@@ -82,6 +82,7 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
                 </div>
               )}
             </div>
+            {it.guide && <details className="guide"><summary>How to check</summary><div className="guide-b">{it.guide}</div></details>}
             {previous && pf ? (
               <div className="cmp">
                 <div><div className="small muted">Previous attempt · flagged “{pf.reason}”</div><Shown it={it} a={previous[it.id]} ideal={ideal} /></div>
