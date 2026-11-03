@@ -83,6 +83,7 @@ Titles never use uppercase. Table headers use sentence case.
 - **Filters**: white bordered button with a chevron; when a value is set the text turns purple. Segmented ranges (`.seg`) are a row of white buttons; the selected one has purple text on `--accent-soft`.
 - **Badges** `.pill`: 4 px radius, 12 px / 600, tinted background with matching text. Deltas use the same badge (`+12.4%` green, `−3 pts` red).
 - **Tables and lists**: no outer box; sentence-case gray header on `--sunken`; rows separated by `--line2`; hover `--sunken`; selected `--accent-soft`; numbers right aligned in tabular figures.
+- **Table tools** (`components/ui/TableKit.tsx`): every table and list has the same toolbar on the right: **Columns** (tick columns on or off, remembered per table in this browser) and **Export ▾** (Excel or CSV, for every matching row or this page only, using the columns on screen). Rows per page: 10, 20, 50, 100 or 200. People show as an initials avatar (same name, same colour) with the name and a gray second line. Row actions live in a `⋯` menu at the end of the row; destructive ones are red and ask Yes/No inside the menu.
 - **Legend rows**: color square (12 px, 3 px radius), label, right-aligned bold value, divider.
 - **Inputs**: white, 1 px `--line`, 6 px radius, 32 px tall, purple focus ring.
 - **Insight panel** `.insight`: `--sunken` background, 12 px radius, centered text, dismiss `×`.

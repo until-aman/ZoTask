@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { addCategory, archiveCategory, archiveCluster, deleteChecklistPreset, deleteSchedulePreset, moveCategory, PresetItem, saveChecklistPreset, saveCluster, saveCounts, saveSchedulePreset } from "@/app/admin-actions";
 import { DAYS, describeWhen } from "@/components/TemplateEditor";
 import { Table } from "@/components/cc/parts";
-import { RowActions } from "@/components/ui/RowActions";
 
 type R = { ok: true; msg?: string } | { ok: false; error: string };
 const parse = <X,>(s: string, d: X): X => { try { return JSON.parse(s); } catch { return d; } };
@@ -45,8 +44,9 @@ export function Checklists({ rows, notify }: { rows: Checklist[]; notify: (m: st
         { key: "title", label: "Checklist", value: (c) => c.title, sticky: true, render: (c) => <b>{c.title}</b> },
         { key: "n", label: "Items", num: true, value: (c) => parse<unknown[]>(c.items, []).length },
         { key: "ph", label: "Photo compulsory", num: true, value: (c) => parse<PresetItem[]>(c.items, []).filter((i) => i.photo_required).length },
-        { key: "act", label: "", value: () => null, csv: () => "", render: (c) => <RowActions name={c.title}
-          onEdit={() => setEdit({ id: c.id, title: c.title, items: parse<PresetItem[]>(c.items, []).map((i) => ({ ...blank, ...i })) })} onDelete={() => run(deleteChecklistPreset(c.id))} /> },
+      ]} actions={(c) => [
+        { label: "Edit", onClick: () => setEdit({ id: c.id, title: c.title, items: parse<PresetItem[]>(c.items, []).map((i) => ({ ...blank, ...i })) }) },
+        { label: "Delete", danger: true, confirm: `Delete ${c.title}?`, onClick: () => run(deleteChecklistPreset(c.id)) },
       ]} />
     </section>
   );
@@ -78,8 +78,9 @@ export function Schedules({ rows, notify }: { rows: Schedule[]; notify: (m: stri
       <Table<Schedule> name="Predefined schedules" rows={rows} rowKey={(s) => s.id} cols={[
         { key: "name", label: "Schedule", value: (s) => s.name, sticky: true, render: (s) => <b>{s.name}</b> },
         { key: "when", label: "Runs", value: (s) => describeWhen({ ...s, trigger: "scheduled", events: "[]", event_name: null }) },
-        { key: "act", label: "", value: () => null, csv: () => "", render: (s) => <RowActions name={s.name}
-          onEdit={() => setEdit({ ...s, days: parse<number[]>(s.days, []) })} onDelete={() => run(deleteSchedulePreset(s.id))} /> },
+      ]} actions={(s) => [
+        { label: "Edit", onClick: () => setEdit({ ...s, days: parse<number[]>(s.days, []) }) },
+        { label: "Delete", danger: true, confirm: `Delete ${s.name}?`, onClick: () => run(deleteSchedulePreset(s.id)) },
       ]} />
     </section>
   );
@@ -102,11 +103,10 @@ export function Categories({ rows, notify }: { rows: Category[]; notify: (m: str
           { key: "n", label: "#", value: (c) => c.n },
           { key: "name", label: "Category", value: (c) => c.name, render: (c) => <b>{c.name}</b>, sticky: true },
           { key: "used", label: "Tasks", num: true, value: (c) => c.used },
-          { key: "act", label: "", value: () => null, csv: () => "", render: (c) => <span className="rowact">
-            <button type="button" className="iconbtn" aria-label={`Move ${c.name} up`} title="Move up" disabled={c.n === 1} onClick={() => run(moveCategory(c.id, -1))}>↑</button>
-            <button type="button" className="iconbtn" aria-label={`Move ${c.name} down`} title="Move down" disabled={c.n === live.length} onClick={() => run(moveCategory(c.id, 1))}>↓</button>
-            <button type="button" className="btn sm" onClick={() => run(archiveCategory(c.id, true))}>Archive</button>
-          </span> },
+        ]} actions={(c) => [
+          { label: "Move up", hidden: c.n === 1, onClick: () => run(moveCategory(c.id, -1)) },
+          { label: "Move down", hidden: c.n === live.length, onClick: () => run(moveCategory(c.id, 1)) },
+          { label: "Archive", danger: true, onClick: () => run(archiveCategory(c.id, true)) },
         ]} />
       {old.length > 0 && <details><summary className="small">Archived ({old.length})</summary>
         <div className="card lib-list" style={{ marginTop: 8 }}>{old.map((c) => <div key={c.id} className="lib-row"><span>{c.name}</span><span className="spacer" /><button type="button" className="link" onClick={() => run(archiveCategory(c.id, false))}>Restore</button></div>)}</div>
@@ -206,11 +206,11 @@ export function Clusters({ rows, cities, props, reviewers, auditors, notify }: {
         { key: "name", label: "Cluster", value: (c) => c.name, sticky: true, render: (c) => <b>{c.name}</b> },
         { key: "city", label: "City", value: (c) => c.city },
         { key: "n", label: "Properties", num: true, value: (c) => c.n, render: (c) => <span title={c.props ?? ""}>{c.n}</span> },
-        { key: "rv", label: "Reviewer", value: (c) => name(reviewers, c.reviewer_id) },
-        { key: "au", label: "Auditor", value: (c) => name(auditors, c.auditor_id) },
-        { key: "act", label: "", value: () => null, csv: () => "", render: (c) => <span className="row2" style={{ gap: 10, justifyContent: "flex-end" }}>
-          {!c.archived && <button type="button" className="link" onClick={() => setEdit({ id: c.id, name: c.name, city_id: c.city_id, reviewer_id: c.reviewer_id, auditor_id: c.auditor_id, properties: props.filter((p) => p.cluster_id === c.id).map((p) => p.id) })}>Edit</button>}
-          <button type="button" className="link" onClick={() => run(archiveCluster(c.id, !c.archived))}>{c.archived ? "Restore" : "Archive"}</button></span> },
+        { key: "rv", label: "Reviewer", person: true, value: (c) => name(reviewers, c.reviewer_id) },
+        { key: "au", label: "Auditor", person: true, value: (c) => name(auditors, c.auditor_id) },
+      ]} actions={(c) => [
+        { label: "Edit", hidden: !!c.archived, onClick: () => setEdit({ id: c.id, name: c.name, city_id: c.city_id, reviewer_id: c.reviewer_id, auditor_id: c.auditor_id, properties: props.filter((p) => p.cluster_id === c.id).map((p) => p.id) }) },
+        { label: c.archived ? "Restore" : "Archive", danger: !c.archived, onClick: () => run(archiveCluster(c.id, !c.archived)) },
       ]} />
     </section>
   );
