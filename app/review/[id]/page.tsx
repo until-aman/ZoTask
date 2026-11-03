@@ -40,7 +40,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
   const lastAudit = [...reviews].reverse().find((x) => x.kind === "audit");
 
   return (
-    <div className="page narrow">
+    <div className="page">
       <Link href="/queue" className="crumb">‹ Review Queue</Link>
       <div className="phead">
         <div>

@@ -65,6 +65,7 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
         <span className="spacer" />
         {actOn && <span className="small muted">Mark each item OK or flag it with a reason.</span>}
       </div>
+      <div className="items">
       {items.map((it) => {
         const f = flags[it.id];
         const pf = prevFlags.find((x) => x.item_id === it.id);
@@ -101,6 +102,7 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
           </div>
         );
       })}
+      </div>
       {actOn && <input type="text" placeholder="Overall comment (optional)" value={comment} onChange={(e) => setComment(e.target.value)} />}
       {err && <div className="err">{err}</div>}
       <div className="row2">

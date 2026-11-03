@@ -46,7 +46,7 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
   const late = lists.overdue.length + lists.changes.length + lists.flags.length;
 
   return (
-    <div className="page narrow">
+    <div className="page">
       <div className="phead">
         <div><h1>My Tasks</h1>
         <p className="phead-sub">{late ? <b style={{ color: "var(--red)" }}>{lists.overdue.length} overdue · {lists.changes.length} to fix{lists.flags.length ? ` · ${lists.flags.length} audit flags to answer` : ""}</b> : "Nothing overdue. Nice."}</p></div>

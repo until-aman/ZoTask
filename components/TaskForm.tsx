@@ -132,6 +132,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
         <div className="err" style={{ fontWeight: 600 }}>The reviewer sent this back. Fix the flagged items and reply to each flag. This will be attempt {attempt + 1} of {attemptsAllowed}{attempt + 1 === attemptsAllowed ? ", your last one" : ""}.</div>
       )}
       {status === "notsub" && <div className="err" style={{ fontWeight: 600 }}>The window has closed. You can still submit, but it will count as late.</div>}
+      <div className="items">
       {items.map((it) => {
         const a = ans[it.id];
         const flag = flags.find((f) => f.item_id === it.id);
@@ -149,6 +150,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
               {it.note_required ? <span className="pill">Note needed</span> : null}
             </div>
             {flag && <div className="small warn">Flagged: {flag.reason}{flag.comment ? ` · “${flag.comment}”` : ""}</div>}
+            <div className="ansrow">
             {it.kind === "count" && <label className="small muted">Number of {it.count_of === "SHK" ? "SHKs" : "HKs"} present<input type="number" min={0} value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} style={{ width: 140, display: "block" }} aria-label={it.label} /></label>}
             {it.kind === "yesno" && <div className="seg" role="group" aria-label={it.label}>
               {["Yes", "No"].map((v) => <button key={v} type="button" aria-pressed={a.value === v} onClick={() => set(it.id, { value: v })}>{v}</button>)}
@@ -171,12 +173,14 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
                 </label>
               )}
             </div>}
+            </div>
             {failed[it.id] && <div className="small warn" role="alert">{failed[it.id]}</div>}
             {!!(it.note_allowed || it.note_required) && <input type="text" placeholder={it.note_required ? "Note (required)" : "Note (optional)"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />}
             {flag && <input type="text" placeholder="Reply to the reviewer" value={a.reply} onChange={(e) => set(it.id, { reply: e.target.value })} />}
           </div>
         );
       })}
+      </div>
       {property.geofence && (
         <div className="row2">
           <button type="button" className="btn" onClick={checkLocation}>Validate location</button>

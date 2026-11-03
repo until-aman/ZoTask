@@ -30,7 +30,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const canAnswer = r.status === "auditflag" && (r.cbm_id === u.id || u.access_role === "admin");
 
   return (
-    <div className="page narrow">
+    <div className="page">
       <Link href="/tasks" className="crumb">‹ My Tasks</Link>
       <div className="phead">
         <div>
