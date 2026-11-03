@@ -69,7 +69,7 @@ Titles never use uppercase. Table headers use sentence case.
 
 ## Layout
 
-- Left menu 232 px (64 px when collapsed), white, with a hairline on its right.
+- Left menu 248 px (64 px when collapsed; hovering the rail opens it over the page), on `--sunken` grey with a hairline on its right. Brand row with a divider, a "Search menu…" box, then 15 px items with 20 px icons. Groups (Analytics, Admin) fold open to sub-items on an indented guide line.
 - Content max width 1600 px, 32 px side padding on desktop, 16 px on phones.
 - A 12-column grid; dashboard blocks take 4 columns (three across), wide charts take 8, tables take 12.
 - Every page starts with a **page header**: title on the left, primary actions on the right, an optional gray subtitle, and a 1 px rule underneath (`.phead`).
