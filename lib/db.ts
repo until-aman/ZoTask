@@ -7,7 +7,7 @@ import path from "node:path";
 import { seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
 import { seedLibraries } from "./libraries";
-import { TASK_LIST_VERSION, applyTaskList } from "./cbm-tasks";
+import { TASK_LIST_VERSION, applyTaskList, taskListDone } from "./cbm-tasks";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -54,8 +54,15 @@ async function init(): Promise<Client> {
     if (!(await one<{ n: number }>("SELECT count(*) n FROM staffing"))!.n) await seedStaffing();
     if (!(await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n) await seedEscalations();
     if (!(await one<{ n: number }>("SELECT count(*) n FROM task_categories"))!.n) await seedLibraries();
-    await applyTaskList();
   });
+  // Replacing the task list runs in one real write transaction: when two servers start at once, the second
+  // waits for the first and then finds the work done, instead of both adding the list.
+  if (!(await scope.run(c, taskListDone))) {
+    const t = await c.transaction("write");
+    try { await scope.run(t, applyTaskList); await t.commit(); }
+    catch (e) { await t.rollback().catch(() => {}); throw e; }
+    finally { t.close(); }
+  }
   return c;
 }
 
@@ -95,7 +102,10 @@ async function seedInto(target: Client) {
   // Sent in parts to keep each request small. Rows keep their ids and "seeded" goes in last,
   // so if a part fails the next start finishes the job instead of duplicating it.
   for (let i = 0; i < stmts.length; i += 25) await target.batch(["PRAGMA defer_foreign_keys = ON", ...stmts.slice(i, i + 25)], "write");
-  await target.execute({ sql: "INSERT OR REPLACE INTO meta (k, v) VALUES ('task_list', ?)", args: [TASK_LIST_VERSION] });
+  await target.batch([
+    { sql: "INSERT OR REPLACE INTO meta (k, v) VALUES ('task_list', ?)", args: [TASK_LIST_VERSION] },
+    { sql: "INSERT OR REPLACE INTO meta (k, v) VALUES ('task_list_clean', ?)", args: [TASK_LIST_VERSION] },
+  ], "write");
   await target.execute({ sql: "INSERT OR IGNORE INTO meta (k, v) VALUES ('seeded', ?)", args: [String(Date.now())] });
 }
 
