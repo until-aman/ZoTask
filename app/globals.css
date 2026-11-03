@@ -49,7 +49,7 @@ h3{margin:0 0 6px;font-size:16px;line-height:24px;font-weight:600;color:var(--fg
 .crumb{font-size:13px;font-weight:500}
 
 /* app frame: menu on the left */
-.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;--toph:0px}
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh;--toph:0px}
 .shell.bare{grid-template-columns:minmax(0,1fr)}
 .shell.bare .side{display:none}
 .main{min-width:0}
@@ -79,7 +79,7 @@ a.logo:hover,a.brand:hover{text-decoration:none}
   .shell.sidemin .nav a{justify-content:center;padding:9px 0}
   /* Collapsed menu opens over the page while the pointer (or keyboard focus) is on it, and folds back when it leaves. */
   .shell.sidemin .side{width:64px;transition:width .18s var(--ease),box-shadow .18s var(--ease)}
-  .shell.sidemin .side:hover,.shell.sidemin .side:has(:focus-visible){width:232px;padding:20px 12px 16px;align-items:stretch;box-shadow:var(--shadow);transition-delay:.12s}
+  .shell.sidemin .side:hover,.shell.sidemin .side:has(:focus-visible){width:248px;padding:20px 12px 16px;align-items:stretch;box-shadow:var(--shadow);transition-delay:.12s}
   .shell.sidemin .side:hover .side-brand,.shell.sidemin .side:has(:focus-visible) .side-brand{flex-direction:row;padding:0 8px 4px}
   .shell.sidemin .side:hover .sidetog,.shell.sidemin .side:has(:focus-visible) .sidetog{margin-left:auto}
   .shell.sidemin .side:hover .brand,.shell.sidemin .side:has(:focus-visible) .brand,
@@ -1106,3 +1106,86 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 @media (max-width:860px){.qrow .mtl{display:inline}.qrow .sch,.qrow .lst{display:block}.qrow .sch small,.qrow .lst small{margin-left:6px}}
 @media (min-width:701px) and (max-width:1250px){.mthead,.mtrow{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1.1fr) 150px}}
 .mtrow .small .tsub{white-space:normal}
+
+/* ---------- Left menu (panel, search, folding groups) ---------- */
+.side{background:var(--sunken);border-right:1px solid var(--line);padding:0 12px 16px;gap:12px}
+.side-brand{margin:0 -12px;padding:16px 16px 14px 20px;border-bottom:1px solid var(--line)}
+.sidetog{width:32px;height:32px;border:0;border-radius:var(--r-md);background:#e9edf2;box-shadow:none;color:var(--text)}
+.sidetog:hover{background:#dfe4ea;color:var(--fg)}
+.nsearch{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card);color:var(--muted);margin-top:4px}
+.nsearch:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.nsearch input{border:0;outline:0;background:none;padding:0;height:100%;min-width:0;flex:1;font:inherit;font-size:14px;color:var(--fg);box-shadow:none}
+.nsearch input::-webkit-search-cancel-button{cursor:pointer}
+.nav{gap:4px;flex:1 1 auto;min-height:0}
+.nav a,.nav .nhead{display:flex;align-items:center;gap:12px;border-radius:var(--r-md);padding:9px 12px;font-size:15px;font-weight:500;color:var(--text);white-space:nowrap;transition:background .12s var(--ease),color .12s var(--ease)}
+.nav svg{width:20px;height:20px;color:#4f566b;flex:none}
+.nav a:hover,.nav .nhead:hover{background:#eceff3;color:var(--fg);text-decoration:none}
+.nav a.on{background:var(--accent-soft);color:var(--accent-text);font-weight:600}
+.nav a.on svg{color:var(--accent)}
+.nhead{width:100%;border:0;background:none;cursor:pointer;font:inherit;text-align:left}
+.nhead.in{color:var(--fg);font-weight:600}
+.nhead .nchev{width:14px;height:14px;margin-left:auto;color:var(--muted)}
+.ngrp .nlink{display:none}
+.nsub{display:grid;gap:2px;margin:2px 0 4px 21px;padding-left:16px;border-left:1px solid var(--line)}
+.nav .nsub a{font-size:14px;padding:7px 10px;color:var(--text)}
+.nav .nsub a.on{background:var(--accent-soft);color:var(--accent-text)}
+.nnone{font-size:13px;color:var(--muted);padding:8px 12px}
+.me{border-top-color:var(--line)}
+@media (min-width:901px){
+  .shell.sidemin .nsearch,.shell.sidemin .nhead,.shell.sidemin .nsub{display:none}
+  .shell.sidemin .ngrp .nlink{display:flex}
+  .shell.sidemin .side-brand{margin:0 -8px;padding:16px 0 14px}
+  .shell.sidemin .side{padding:0 8px 16px}
+  .shell.sidemin .side:hover,.shell.sidemin .side:has(:focus-visible){padding:0 12px 16px}
+  .shell.sidemin .side:hover .side-brand,.shell.sidemin .side:has(:focus-visible) .side-brand{margin:0 -12px;padding:16px 16px 14px 20px}
+  .shell.sidemin .side:hover .nsearch,.shell.sidemin .side:has(:focus-visible) .nsearch{display:flex}
+  .shell.sidemin .side:hover .nhead,.shell.sidemin .side:has(:focus-visible) .nhead{display:flex}
+  .shell.sidemin .side:hover .nsub,.shell.sidemin .side:has(:focus-visible) .nsub{display:grid}
+  .shell.sidemin .side:hover .ngrp .nlink,.shell.sidemin .side:has(:focus-visible) .ngrp .nlink{display:none}
+  .shell.sidemin .nav svg{margin:0}
+}
+@media (max-width:900px){
+  .side{padding:10px 16px;background:var(--card);border-right:0}
+  .side-brand{margin:0;padding:0;border:0}
+  .nsearch,.nav .nhead,.nav .nsub{display:none}
+  .ngrp .nlink{display:flex}
+  .nav{flex:1 1 100%}
+  .nav a{font-size:14px;padding:6px 10px}
+  .nav svg{width:18px;height:18px}
+}
+
+/* Shared table tools: Columns, Export, avatars and the ⋯ row menu (components/ui/TableKit.tsx). */
+.tkwrap{position:relative;display:inline-flex}
+.tkbtn{display:inline-flex;align-items:center;gap:6px;height:36px;box-sizing:border-box}
+.tkpop{width:230px;padding:6px}
+.tkmenu{display:grid;gap:1px}
+.tkmenu>button{all:unset;box-sizing:border-box;display:block;width:100%;padding:8px 10px;border-radius:var(--r);font-size:14px;cursor:pointer;color:var(--fg)}
+.tkmenu>button:hover,.tkmenu>button:focus-visible{background:var(--sunken)}
+.tkmenu>button.t-r{color:var(--red)}
+.tkh{font-size:12px;color:var(--muted);padding:6px 10px 2px;font-weight:500}
+.av{display:inline-grid;place-items:center;flex:none;border-radius:50%;color:#fff;font-weight:600;line-height:1;letter-spacing:.02em}
+.av.none{background:var(--line);color:var(--muted);font-size:12px}
+.person{display:inline-flex;align-items:center;gap:8px;min-width:0;vertical-align:middle}
+.person-t{display:grid;min-width:0}
+.person-t>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.person-t small{color:var(--muted);font-size:12px}
+.dots{all:unset;box-sizing:border-box;display:grid;place-items:center;width:32px;height:32px;border-radius:var(--r);cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
+.dots:hover,.dots[aria-expanded=true]{background:var(--sunken);color:var(--fg)}
+.dots:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+td.tdact{text-align:right;width:44px;padding-right:6px}
+.rowmenu{justify-self:end}
+.listcard>.ttool{padding:8px 12px;border-bottom:1px solid var(--line2)}
+.card.sec>.ttool{margin-top:4px}
+.mthead,.mtrow{grid-template-columns:var(--mtcols,minmax(0,1.8fr) minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.3fr) 260px 36px)}
+@media (min-width:701px) and (max-width:1250px){.mthead,.mtrow{grid-template-columns:var(--mtcols-m,minmax(0,1.5fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1.1fr) 150px 36px)}}
+@media (max-width:700px){.mthead,.mtrow{grid-template-columns:minmax(0,1fr) 36px}.mtrow>*:not(.rowmenu){grid-column:1}.mtrow>.rowmenu{grid-column:2;grid-row:1}}
+.mtrow{cursor:pointer}
+.mtrow .tlink{color:inherit;text-decoration:none}
+.mtrow .tlink:hover{text-decoration:underline}
+.lhead,.qrow{grid-template-columns:var(--qcols,28px minmax(0,2fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.2fr) minmax(0,1.5fr) 150px 36px)}
+@media (max-width:860px){.qrow{grid-template-columns:24px minmax(0,1fr) 36px}.qrow>.rowmenu{grid-row:1;grid-column:3}}
+.qrow .who .person-t small{display:block}
+.tkmenu{text-align:left}
+.tkpop.fixed{position:fixed;z-index:80;top:auto;left:auto}
+td .person,td .person-t{min-width:max-content}
+td .person-t>span,td .person-t small{overflow:visible;white-space:nowrap}

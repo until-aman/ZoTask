@@ -185,7 +185,7 @@ export function Stats({ items, compact }: { items: Stat[]; compact?: boolean }) 
 }
 
 export const PAGE = 20;
-export const PAGE_SIZES = [10, 20, 25, 50];
+export const PAGE_SIZES = [10, 20, 50, 100, 200];
 const SIZE_KEY = "zotask.rows";
 /** Rows per page, one choice for the whole app, remembered in this browser. */
 export function usePageSize(): [number, (n: number) => void] {

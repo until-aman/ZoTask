@@ -1,6 +1,7 @@
 "use client";
 // Shared pieces of the command center: the drill-down context, clickable figures, a sortable table and small charts.
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { ColumnsMenu, ExportMenu, Person, RowMenu, useHiddenCols, type RowAction } from "@/components/ui/TableKit";
 import type { K, T } from "@/lib/command";
 import InfoTip from "@/components/InfoTip";
 import { Pager, clampPage, nextSort, usePageSize } from "@/components/ui/Filters";
@@ -91,24 +92,26 @@ export function Sec({ title, tip, right, children, id }: { title: string; tip?: 
   );
 }
 
-export type Col<R> = { key: string; label: string; num?: boolean; value: (r: R) => number | string | null; render?: (r: R) => ReactNode; csv?: (r: R) => string | number | null; hidden?: boolean; tip?: ReactNode; sticky?: boolean };
+export type Col<R> = { key: string; label: string; num?: boolean; value: (r: R) => number | string | null; render?: (r: R) => ReactNode; csv?: (r: R) => string | number | null; hidden?: boolean; tip?: ReactNode; sticky?: boolean;
+  /** The value is a person's name: shown with their initials avatar. */
+  person?: boolean };
 
 /** Sortable, searchable table with column picker, paging, CSV export and optional row expansion.
  *  Pass `query` when the page has its own search box; the table then hides its own. */
-export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, toolbar, initialSort, name, empty = "Nothing to show for these filters.", query }: {
+export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, toolbar, initialSort, name, empty = "Nothing to show for these filters.", query, actions }: {
   cols: Col<R>[]; rows: R[]; rowKey: (r: R) => string | number; search?: (r: R) => string; expand?: (r: R) => ReactNode;
   pageSize?: number; toolbar?: ReactNode; initialSort?: { key: string; dir: 1 | -1 }; name: string; empty?: string; query?: string;
+  /** The row's ⋯ menu. */
+  actions?: (r: R) => RowAction[];
 }) {
   const [own, setQ] = useState("");
   const q = query ?? own;
   const [sort, setSort] = useState(initialSort ?? null);
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set(cols.filter((c) => c.hidden).map((c) => c.key)));
+  const [hidden, toggleCol] = useHiddenCols(name, cols.filter((c) => c.hidden).map((c) => c.key));
   const [page, setPage] = useState(0);
   const [chosen, setSize] = usePageSize();
   const pageSize = fixed ?? chosen;
   const [openRows, setOpenRows] = useState<Set<string | number>>(new Set());
-  const [pick, setPick] = useState(false);
-  const [csv, setCsv] = useState<string | null>(null);
   const shown = cols.filter((c) => !hidden.has(c.key));
   const list = useMemo(() => {
     const text = search ?? ((r: R) => cols.map((c) => String(c.value(r) ?? "")).join(" "));
@@ -128,26 +131,17 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, 
   useEffect(() => setPage(0), [query]);
   const pg = clampPage(page, list.length, pageSize);
   const view = list.slice(pg * pageSize, pg * pageSize + pageSize);
-  const toCsv = () => {
-    const esc = (v: unknown) => { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    return [cols.map((c) => esc(c.label)).join(","), ...list.map((r) => cols.map((c) => esc(c.csv ? c.csv(r) : c.value(r))).join(","))].join("\n");
-  };
+  // Exports carry the columns on screen, as plain values.
+  const out = shown.filter((c) => c.label);
+  const cells = (l: R[]) => l.map((r) => out.map((c) => (c.csv ? c.csv(r) : c.value(r))));
   return (
     <div className="ttable">
       <div className="ttool">
         {query === undefined && <input type="search" placeholder="Search" value={own} onChange={(e) => { setQ(e.target.value); setPage(0); }} aria-label={`Search ${name}`} className="search" />}
         {toolbar}
         <span className="spacer" />
-        <span className="pickwrap">
-          <button type="button" className="btn sm" onClick={() => setPick(!pick)} aria-expanded={pick}>Columns</button>
-          {pick && <div className="pop right" onMouseLeave={() => setPick(false)}>
-            {cols.map((c) => (
-              <label key={c.key} className="opt"><input type="checkbox" checked={!hidden.has(c.key)} disabled={c.sticky}
-                onChange={() => { const n = new Set(hidden); if (n.has(c.key)) n.delete(c.key); else n.add(c.key); setHidden(n); }} />{c.label}</label>
-            ))}
-          </div>}
-        </span>
-        <button type="button" className="btn sm" onClick={() => setCsv(toCsv())}>Export CSV</button>
+        <ColumnsMenu cols={cols.map((c) => ({ key: c.key, label: c.label, fixed: c.sticky }))} hidden={hidden} toggle={toggleCol} />
+        <ExportMenu name={name} header={out.map((c) => c.label)} rows={() => cells(list)} page={list.length > view.length ? () => cells(view) : undefined} />
       </div>
       <div className="tbl"><table className="tt">
         <thead><tr>
@@ -159,24 +153,25 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, 
               </button> : null}{c.tip}
             </th>
           ))}
+          {actions && <th style={{ width: 44 }} aria-label="Actions" />}
         </tr></thead>
         <tbody>
-          {!view.length && <tr><td colSpan={shown.length + (expand ? 1 : 0)} className="muted" style={{ textAlign: "center", padding: 20 }}>{empty}</td></tr>}
+          {!view.length && <tr><td colSpan={shown.length + (expand ? 1 : 0) + (actions ? 1 : 0)} className="muted" style={{ textAlign: "center", padding: 20 }}>{empty}</td></tr>}
           {view.map((r) => {
             const key = rowKey(r), isOpen = openRows.has(key);
             return [
               <tr key={key} className={isOpen ? "open" : ""}>
                 {expand && <td><button type="button" className="exp" aria-expanded={isOpen} aria-label="Show details"
                   onClick={() => { const n = new Set(openRows); if (isOpen) n.delete(key); else n.add(key); setOpenRows(n); }}>{isOpen ? "▾" : "▸"}</button></td>}
-                {shown.map((c) => <td key={c.key} className={c.num ? "n" : ""}>{c.render ? c.render(r) : c.value(r) ?? "—"}</td>)}
+                {shown.map((c) => <td key={c.key} className={c.num ? "n" : ""}>{c.render ? c.render(r) : c.person ? <Person name={String(c.value(r) ?? "")} /> : c.value(r) ?? "—"}</td>)}
+                {actions && <td className="tdact"><RowMenu actions={actions(r)} /></td>}
               </tr>,
-              isOpen && expand ? <tr key={`${key}-x`} className="xrow"><td colSpan={shown.length + 1}>{expand(r)}</td></tr> : null,
+              isOpen && expand ? <tr key={`${key}-x`} className="xrow"><td colSpan={shown.length + 1 + (actions ? 1 : 0)}>{expand(r)}</td></tr> : null,
             ];
           })}
         </tbody>
       </table></div>
       <Pager page={pg} total={list.length} size={pageSize} setPage={setPage} setSize={fixed ? undefined : setSize} />
-      {csv !== null && <CopyModal title={`Export ${name}`} text={csv} file={`${name.toLowerCase().replace(/\W+/g, "-")}.csv`} close={() => setCsv(null)} />}
     </div>
   );
 }

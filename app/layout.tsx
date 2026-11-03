@@ -3,21 +3,26 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "./globals.css";
 import { currentUser, can } from "@/lib/auth";
 import Shell from "@/components/Shell";
+import type { NavItem } from "@/components/Nav";
 
 export const metadata = { title: "ZoTask", description: "Recurring operations tasks for Zolo properties" };
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const u = await currentUser();
-  const links: [string, string][] = [];
+  // The menu: single screens, and groups that fold open to show their screens.
+  const links: NavItem[] = [];
   if (u) {
-    if (can.tasks(u)) links.push(["/tasks", "My Tasks"]);
-    if (can.queue(u)) links.push(["/queue", "Review Queue"]);
-    if (can.dashboard(u)) links.push(["/dashboard", "Review Dashboard"]);
-    if (can.dashboard(u)) links.push(["/compare", "Compare"]);
-    if (can.dashboard(u)) links.push(["/escalations", "Escalations"]);
-    if (can.dashboard(u)) links.push(["/map", "Map"]);
-    if (can.admin(u)) links.push(["/admin", "Admin"]);
+    if (can.tasks(u)) links.push({ href: "/tasks", label: "My Tasks" });
+    if (can.queue(u)) links.push({ href: "/queue", label: "Review Queue" });
+    if (can.dashboard(u)) links.push({ href: "/dashboard", label: "Analytics", icon: "/dashboard", children: [
+      { href: "/dashboard", label: "Review Dashboard" }, { href: "/compare", label: "Compare" }] });
+    if (can.dashboard(u)) links.push({ href: "/escalations", label: "Escalations" });
+    if (can.dashboard(u)) links.push({ href: "/map", label: "Map" });
+    if (can.admin(u)) links.push({ href: "/admin", label: "Admin", children: [
+      ["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"],
+      ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"],
+    ].map(([k, l]) => ({ href: k === "tasks" ? "/admin" : `/admin?tab=${k}`, label: l })) });
   }
   return (
     <html lang="en">

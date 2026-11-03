@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { copyTasksTo, deleteTasks, setTasksActive } from "@/app/admin-actions";
 import { describeWhen } from "@/components/TemplateEditor";
-import { RowActions } from "@/components/ui/RowActions";
 import { Categories, Category, Checklist, Checklists, Cluster, Clusters, Count, Counts, Schedule, Schedules } from "./Libraries";
 import { Table, type Col } from "@/components/cc/parts";
 import { ActiveChip, Field, FilterBar, SavedView, Stats, sameFilters } from "@/components/ui/Filters";
@@ -68,13 +67,12 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
     { key: "audit", label: "Audit sample", num: true, value: (t) => t.audit_rate, render: (t) => `${Math.round(t.audit_rate * 100)}%` },
     { key: "rv", label: "Reviewer / auditor", value: (t) => t.reviewer, render: (t) => <span className="small">{t.reviewer ?? "Cluster reviewer"} <span className="muted">/ {t.auditor ?? "Any auditor"}</span></span>, csv: (t) => `${t.reviewer ?? ""} / ${t.auditor ?? ""}` },
     { key: "props", label: "Properties", num: true, value: (t) => t.props },
-    { key: "edit", label: "", value: () => null, csv: () => "", render: (t) => <RowActions name={t.name} onEdit={() => router.push(`/admin/templates/${t.id}`)} onDelete={() => bulk(deleteTasks([t.id]))} /> },
   ];
   const pcols: Col<Prop>[] = [
     { key: "name", label: "Property", value: (p) => p.name, sticky: true },
     { key: "cluster", label: "Cluster", value: (p) => p.cluster },
     { key: "city", label: "City", value: (p) => p.city },
-    { key: "cbm", label: "CBM", value: (p) => p.cbm },
+    { key: "cbm", label: "CBM", person: true, value: (p) => p.cbm },
     { key: "staff", label: "Ground staff", num: true, value: (p) => p.staff },
   ];
   const total = people.reduce((a, p) => a + p.n, 0);
@@ -111,7 +109,12 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
           <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={() => setCopying(null)}>Cancel</button>
             <button type="button" className="btn primary sm" disabled={!copying.length} onClick={async () => { if (await bulk(copyTasksTo(sel, copying))) setCopying(null); }}>Add to {copying.length} propert{copying.length === 1 ? "y" : "ies"}</button></div>
         </div>}
-        <Table name="Task setup" rows={tpl} cols={cols} rowKey={(t) => t.id} query={q} empty="No task types match these filters." toolbar={<span className="bulkbar">
+        <Table name="Task setup" rows={tpl} cols={cols} rowKey={(t) => t.id} actions={(t) => [
+          { label: "Edit", onClick: () => router.push(`/admin/templates/${t.id}`) },
+          { label: t.active ? "Pause" : "Resume", onClick: () => bulk(setTasksActive([t.id], !t.active)) },
+          { label: "Add to properties", onClick: () => { setSel([t.id]); setCopying([]); } },
+          { label: "Delete", danger: true, confirm: `Delete ${t.name}? If it already ran it is paused instead.`, onClick: () => bulk(deleteTasks([t.id])) },
+        ]} query={q} empty="No task types match these filters." toolbar={<span className="bulkbar">
           {sel.length ? <>
             <b>{sel.length} selected</b>
             <button type="button" className="btn sm" onClick={() => bulk(setTasksActive(sel, false))}>Pause</button>
