@@ -134,3 +134,4 @@ CREATE TABLE IF NOT EXISTS map_sites (
   address TEXT, status TEXT NOT NULL DEFAULT 'Live', beds INTEGER, property_id INTEGER, updated_at INTEGER,
   gender TEXT, details TEXT
 );
+CREATE TABLE IF NOT EXISTS photos (name TEXT PRIMARY KEY, type TEXT NOT NULL, data BLOB NOT NULL, at INTEGER NOT NULL);
