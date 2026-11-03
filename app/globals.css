@@ -471,8 +471,9 @@ select{max-width:100%}
 .filtbtn:hover,.filtbtn[aria-expanded="true"]{border-color:var(--accent)}
 .filtbtn.set{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-text)}
 .fcount{min-width:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:#fff;font-size:12px;line-height:18px;text-align:center}
-.fpanel{position:absolute;z-index:60;top:calc(100% + 6px);left:0;width:min(640px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);display:grid}
-.fpanel-b{padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px 14px;max-height:min(70vh,560px);overflow:auto}
+.fpanel{position:absolute;z-index:60;top:calc(100% + 6px);left:0;width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 32px);background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);display:flex;flex-direction:column}
+.fpanel-b{padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));align-content:start;gap:12px 14px;flex:1 1 auto;min-height:0;overflow:auto}
+.fpanel-f{flex:none}
 .fpanel-f{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--line2);background:var(--sunken);border-radius:0 0 12px 12px}
 .ff{display:grid;gap:5px;align-content:start;min-width:0}
 .ff.wide{grid-column:1/-1}
@@ -501,8 +502,9 @@ select{max-width:100%}
   .fbrow>.search{flex:1 1 100%}
   .fwrap{position:static}
   .fbar2{position:relative}
-  .fpanel{left:0;right:0;width:auto}
+  .fpanel{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;max-height:85vh;border-radius:var(--r-md) var(--r-md) 0 0;z-index:96}
   .fpanel-b{grid-template-columns:minmax(0,1fr)}
+  .fpanel-f{border-radius:0;padding-bottom:max(10px,env(safe-area-inset-bottom))}
 }
 
 /* ---------- Stat cards above a list ---------- */

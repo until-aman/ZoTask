@@ -50,6 +50,27 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
   const [open, setOpen] = useState(false);
   const close = useMemo(() => () => setOpen(false), []);
   const ref = useOutside(open, close);
+  // The panel is fixed to the screen and kept inside it: moved left or up when it would spill over, and its
+  // filter list scrolls when there are more filters than fit. On phones it is a sheet from the bottom (CSS).
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  useEffect(() => {
+    if (!open) { setPos(null); return; }
+    const place = () => {
+      const b = ref.current?.querySelector("button")?.getBoundingClientRect(), el = panelRef.current;
+      if (!b || !el || innerWidth <= 640) { setPos(null); return; }
+      const width = Math.min(640, innerWidth - 32), maxHeight = innerHeight - 32;
+      const h = Math.min(el.scrollHeight, maxHeight);
+      // Opens under the button; when that would run off the right edge, it lines up with the button's right side instead.
+      const left = Math.max(16, b.left + width <= innerWidth - 16 ? b.left : Math.min(b.right - width, innerWidth - width - 16));
+      const below = b.bottom + 6;
+      const top = below + h <= innerHeight - 16 ? below : Math.max(16, innerHeight - 16 - h);
+      setPos({ top, left, width, maxHeight });
+    };
+    place();
+    window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, [open, ref]);
   return (
     <section className="fbar2" aria-label="Search and filters">
       <div className="fbrow">
@@ -60,7 +81,7 @@ export function FilterBar({ search, setSearch, searchLabel = "Search", chips = [
             Filters{chips.length ? <span className="fcount">{chips.length}</span> : null}
           </button>
           {open && (
-            <div className="fpanel" role="dialog" aria-label="Filters">
+            <div className="fpanel" role="dialog" aria-label="Filters" ref={panelRef} style={pos ? { position: "fixed", ...pos } : undefined}>
               <div className="fpanel-b">{panel}</div>
               <div className="fpanel-f">
                 {onClearAll && chips.length > 0 ? <button type="button" className="link" onClick={onClearAll}>Clear all</button> : <span />}
