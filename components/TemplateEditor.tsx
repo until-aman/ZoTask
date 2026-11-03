@@ -16,7 +16,7 @@ export type SchedulePreset = { id: number; name: string; frequency: string; days
 export const EVENTS = ["Tenant onboarded", "Tenant exited", "Tenant exited by agent", "Booking confirmed", "Booking created", "Short stay tenant onboarded", "Short stay tenant exited"];
 export const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const ROLES = ["HK", "Reception", "CC", "CBM", "Short stays"];
-const KINDS: [string, string][] = [["check", "Tick box"], ["number", "Number"], ["text", "Text"], ["count", "Staff count"]];
+const KINDS: [string, string][] = [["check", "Tick box"], ["yesno", "Yes / No"], ["number", "Number"], ["text", "Text"], ["count", "Staff count"]];
 const STEPS = ["Basics", "Type & trigger", "Checklist", "Schedule & properties", "Review & audit", "Summary"];
 const DEFAULTS: T = {
   name: "", category: "", op_role: "HK", trigger: "scheduled", event_name: null, frequency: "daily", weekday: 1,
@@ -24,7 +24,7 @@ const DEFAULTS: T = {
   criticality: "normal", audit_rate: 0.2, geofence: 0, reviewer_id: null, auditor_id: null, active: 1,
   description: "", events: "[]", days: "[]", once_date: null, start_stop: 1, geofence_m: 200, ideal_minutes: null, review_required: 1, assignees: "[]",
 };
-const blank = (): It => ({ label: "", kind: "check", photo_allowed: true, photo_required: false, note_allowed: true, note_required: false, count_of: null });
+const blank = (): It => ({ label: "", kind: "check", photo_allowed: true, photo_required: false, note_allowed: true, note_required: false, count_of: null, guide: "" });
 const parse = <X,>(s: string | null | undefined, d: X): X => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 const rule = (allowed: boolean, required: boolean) => (required ? "required" : allowed ? "optional" : "off");
 const RULES: [string, string][] = [["off", "No"], ["optional", "Optional"], ["required", "Compulsory"]];
@@ -55,7 +55,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     return { ...DEFAULTS, ...rest, description: rest.description ?? "" };
   });
   const [items, setItems] = useState<It[]>(() => initialItems.length
-    ? initialItems.map((i) => ({ label: i.label, kind: i.kind, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, count_of: i.count_of }))
+    ? initialItems.map((i) => ({ label: i.label, kind: i.kind, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, count_of: i.count_of, guide: i.guide ?? "" }))
     : [blank()]);
   const [props, setProps] = useState<number[]>(selected.length || id ? selected : geo.map((g) => g.id));
   const [step, setStep] = useState(0);
@@ -193,6 +193,10 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
                     <button type="button" className="link" onClick={() => moveItem(ix, 1)} aria-label="Move down" disabled={ix === items.length - 1}>↓</button>
                     <button type="button" className="link" onClick={() => setItems(items.filter((_, i) => i !== ix))} aria-label="Remove item">×</button>
                   </span>
+                  <details className="te-guide">
+                    <summary>{it.guide ? "Reviewer notes" : "+ Reviewer notes"}</summary>
+                    <textarea value={it.guide ?? ""} onChange={(e) => setItem(ix, { guide: e.target.value })} placeholder="What the reviewer should check, and how" aria-label={`Reviewer notes for item ${ix + 1}`} />
+                  </details>
                 </div>
               ))}
             </div>

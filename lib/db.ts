@@ -7,6 +7,7 @@ import path from "node:path";
 import { seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
 import { seedLibraries } from "./libraries";
+import { TASK_LIST_VERSION, applyTaskList } from "./cbm-tasks";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -40,7 +41,7 @@ async function init(): Promise<Client> {
     ["templates", "ideal_minutes", "INTEGER"], ["templates", "review_required", "INTEGER NOT NULL DEFAULT 1"], ["templates", "assignees", "TEXT NOT NULL DEFAULT '[]'"],
     ["template_items", "photo_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "note_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "count_of", "TEXT"],
     ["clusters", "reviewer_id", "INTEGER"], ["clusters", "auditor_id", "INTEGER"], ["clusters", "archived", "INTEGER NOT NULL DEFAULT 0"],
-    ["map_sites", "gender", "TEXT"], ["map_sites", "details", "TEXT"], ["submissions", "location_src", "TEXT"],
+    ["map_sites", "gender", "TEXT"], ["map_sites", "details", "TEXT"], ["submissions", "location_src", "TEXT"], ["template_items", "guide", "TEXT"],
   ];
   const have = new Map<string, string[]>();
   for (const [table, col, type] of added) {
@@ -53,6 +54,7 @@ async function init(): Promise<Client> {
     if (!(await one<{ n: number }>("SELECT count(*) n FROM staffing"))!.n) await seedStaffing();
     if (!(await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n) await seedEscalations();
     if (!(await one<{ n: number }>("SELECT count(*) n FROM task_categories"))!.n) await seedLibraries();
+    await applyTaskList();
   });
   return c;
 }
@@ -93,6 +95,7 @@ async function seedInto(target: Client) {
   // Sent in parts to keep each request small. Rows keep their ids and "seeded" goes in last,
   // so if a part fails the next start finishes the job instead of duplicating it.
   for (let i = 0; i < stmts.length; i += 25) await target.batch(["PRAGMA defer_foreign_keys = ON", ...stmts.slice(i, i + 25)], "write");
+  await target.execute({ sql: "INSERT OR REPLACE INTO meta (k, v) VALUES ('task_list', ?)", args: [TASK_LIST_VERSION] });
   await target.execute({ sql: "INSERT OR IGNORE INTO meta (k, v) VALUES ('seeded', ?)", args: [String(Date.now())] });
 }
 

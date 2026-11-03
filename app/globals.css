@@ -1072,3 +1072,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 @media (max-width:700px){h1{font-size:24px;line-height:32px}.cc .band,h2.band{font-size:20px;line-height:28px}.phead{padding-bottom:12px}}
 .cmp-win .muted,.cmp-lose .muted{color:var(--text)}
 .num{min-height:24px;min-width:24px;line-height:24px}
+/* Reviewer notes on a checklist item ("How to check") */
+.guide summary,.te-guide summary{cursor:pointer;font-size:13px;font-weight:500;color:var(--accent-text);width:fit-content}
+.guide-b{margin-top:6px;padding:10px 12px;background:var(--sunken);border-radius:var(--r-md);font-size:13px;line-height:20px;color:var(--text);white-space:pre-line}
+.te-guide{grid-column:2/-1}
+.te-guide textarea{margin-top:6px;min-height:80px;font-size:13px}
+.item>.seg{width:fit-content}

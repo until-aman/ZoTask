@@ -1,10 +1,11 @@
 // Sample Zolo data plus 14 days of simulated task history, so every screen has something real to show.
 import { all, one, run, tx } from "./db";
 import {
-  AnswerInput, Instance, Item, Template, auditDecision, answerAuditFlags, closeFlagAnswers, createInstance,
+  AnswerInput, Instance, Item, Template, appliesOn, auditDecision, answerAuditFlags, closeFlagAnswers, createInstance,
   itemsFor, missingEvidence, latestSubmission, logEvent, reviewDecision, submit, waive, REASONS,
 } from "./engine";
-import { DAY, HOUR, addDays, atTime, isoDate, weekday } from "./time";
+import { DAY, HOUR, addDays, atTime, isoDate } from "./time";
+import { insertTaskList } from "./cbm-tasks";
 
 const GEO: Record<string, Record<string, [string, number, number][]>> = {
   Bangalore: {
@@ -25,27 +26,6 @@ const CBMS: Record<string, string> = {
 };
 const FIRST = ["Ravi", "Lakshmi", "Suresh", "Anita", "Manoj", "Deepa", "Kiran", "Pooja", "Vijay", "Sneha", "Rahul", "Divya", "Ganesh", "Kavitha", "Naveen", "Shalini", "Prakash", "Asha", "Ramesh", "Nisha", "Arjun", "Bhavna", "Mohan", "Rekha", "Sanjay", "Usha", "Tarun", "Geeta", "Imran", "Farah", "Yash", "Jyoti", "Venkat", "Meena", "Harish", "Swati", "Rajesh", "Leela", "Abhay", "Komal", "Dinesh", "Preeti", "Sunil", "Radha"];
 const LAST = ["Kumar", "Reddy", "Nair", "Shetty", "Patil", "Iyer", "Gowda", "Sharma", "Das", "Pillai", "Rao", "Joshi"];
-
-type TItem = [label: string, kind: "check" | "number" | "text", photo?: 1, note?: 1];
-type TDef = Partial<Template> & { name: string; category: string; op_role: string; items: TItem[]; shortStaysOnly?: boolean };
-const TEMPLATES: TDef[] = [
-  { name: "HK attendance, grooming and water supply", category: "Housekeeping", op_role: "HK", window_start: "10:00", window_end: "10:30", late_window_days: 0,
-    items: [["How many HKs are present?", "number", 1], ["HKs in uniform and groomed", "check", 1], ["Water supply working on all floors", "check"], ["Water tank level (%)", "number"]] },
-  { name: "Reception, lift and garbage check", category: "Facilities", op_role: "Reception", window_start: "09:00", window_end: "10:00",
-    items: [["Reception desk clean", "check", 1], ["Lift working", "check", 1], ["Garbage cleared from all floors", "check", 1], ["Visitor register updated", "check"]] },
-  { name: "Sales calls and lead updates (Morning)", category: "Sales", op_role: "CC", window_start: "10:30", window_end: "12:30", audit_rate: 0.05, geofence: 0,
-    items: [["Leads called", "number"], ["CRM updated for every call", "check"], ["Site visits scheduled", "number"]] },
-  { name: "New resident meetings", category: "Resident experience", op_role: "CC", window_start: "18:30", window_end: "19:30", audit_rate: 0.1,
-    items: [["Meetings held", "number"], ["Welcome kit handed over", "check", 1], ["Resident concerns noted", "text"]] },
-  { name: "Property visit and walk", category: "Operations", op_role: "CBM", window_start: "10:00", window_end: "19:00", criticality: "high", review_sla_h: 24, audit_rate: 0.3,
-    items: [["Common area photos", "check", 1], ["Pest control certificate checked", "check", 1], ["Resident feedback taken", "text"], ["Issues raised with maintenance", "text", undefined, 1]] },
-  { name: "Safety walk", category: "Safety", op_role: "CBM", frequency: "weekly", weekday: 1, window_start: "10:00", window_end: "18:00", criticality: "high", late_window_days: 2, audit_rate: 0.5, audit_sla_h: 72,
-    items: [["Fire extinguishers in date", "check", 1], ["Emergency exits clear", "check", 1], ["CCTV working on all floors", "check"], ["First aid kit stocked", "check", 1]] },
-  { name: "Model room or bed readiness", category: "Short stays", op_role: "Short stays", trigger: "event", event_name: "Tenant exited", window_start: "10:00", window_end: "14:00", review_sla_h: 8, shortStaysOnly: true,
-    items: [["Room cleaned", "check", 1], ["Linen changed", "check", 1], ["Inventory checked", "check"]] },
-  { name: "Z Express short-stay check-in readiness", category: "Short stays", op_role: "Short stays", trigger: "event", event_name: "Booking created", window_start: "10:00", window_end: "13:00", review_sla_h: 8, shortStaysOnly: true,
-    items: [["Room keys ready", "check"], ["Welcome note placed", "check", 1], ["AC and geyser tested", "check"]] },
-];
 
 function rng(seed: number) {
   return () => {
@@ -109,18 +89,7 @@ export async function seed() {
     await seedStaffing();
     const reviewers = [ids["Vankadara Lakshmi Kavya"], ids["Hrithik Singh"], ids["Priya Menon"]];
     const auditors = [ids["Karthick L"], ids["Neeraj"]];
-    for (const [ix, t] of TEMPLATES.entries()) {
-      const tid = Number((await run(
-        `INSERT INTO templates (name, category, op_role, trigger, event_name, frequency, weekday, window_start, window_end, review_sla_h, audit_sla_h,
-          attempts_allowed, late_window_days, criticality, audit_rate, geofence, reviewer_id, auditor_id)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        t.name, t.category, t.op_role, t.trigger ?? "scheduled", t.event_name ?? null, t.frequency ?? "daily", t.weekday ?? null,
-        t.window_start, t.window_end, t.review_sla_h ?? 24, t.audit_sla_h ?? 48, t.attempts_allowed ?? 3, t.late_window_days ?? 1,
-        t.criticality ?? "normal", t.audit_rate ?? 0.2, t.geofence ?? 1, reviewers[ix % 3], auditors[ix % 2])).lastInsertRowid);
-      for (const [pos, [label, kind, photo, note]] of t.items.entries())
-        await run("INSERT INTO template_items (template_id, pos, label, kind, photo_required, note_required) VALUES (?,?,?,?,?,?)", tid, pos, label, kind, photo ? 1 : 0, note ? 1 : 0);
-      for (const p of t.shortStaysOnly ? shortStayProps : allProps) await run("INSERT INTO template_properties VALUES (?,?)", tid, p);
-    }
+    await insertTaskList(reviewers, auditors, shortStayProps);
   });
 
   // ---- simulate history ----
@@ -139,7 +108,9 @@ export async function seed() {
     return its.map((it, ix) => ({
       itemId: it.id,
       checked: it.kind === "check" ? ix !== gap : true,
-      value: it.kind === "number" ? String(it.label.includes("%") ? 40 + Math.floor(R() * 60) : 1 + Math.floor(R() * 8))
+      value: ix === gap && it.kind !== "check" ? undefined
+        : it.kind === "yesno" ? (R() < 0.85 ? "Yes" : "No")
+        : it.kind === "number" || it.kind === "count" ? String(it.label.includes("%") ? 40 + Math.floor(R() * 60) : 1 + Math.floor(R() * 8))
         : it.kind === "text" ? pick(["All good", "Two residents asked about Wi-Fi speed", "Leaking tap on 2nd floor reported", "No issues today", "Corridor light replaced"]) : undefined,
       note: it.note_required ? "Raised with maintenance team" : undefined,
       photos: it.photo_required && ix !== gap ? [`sample:${it.label}`] : [],
@@ -214,7 +185,7 @@ export async function seed() {
         }
         continue;
       }
-      if (t.frequency === "weekly" && weekday(d) !== (t.weekday ?? 1)) continue;
+      if (!appliesOn(t, d)) continue;
       for (const p of props) {
         const ws = atTime(d, t.window_start);
         const id = await createInstance(t, p, d, "schedule", Math.min(now, ws));
@@ -273,8 +244,8 @@ export async function seed() {
     // Saved filters, as in the Review Queue mockup.
     const blr = { city: ["Bangalore"], cluster: [], prop: [], role: [], asg: [], mine: false };
     await run("INSERT INTO saved_views (user_id, name, filters, is_default) VALUES (?,?,?,1)", ids["Vankadara Lakshmi Kavya"], "Bangalore", JSON.stringify(blr));
-    await run("INSERT INTO saved_views (user_id, name, filters, is_default) VALUES (?,?,?,0)", ids["Vankadara Lakshmi Kavya"], "Koramangala · HK",
-      JSON.stringify({ ...blr, cluster: ["Koramangala"], role: ["HK"] }));
+    await run("INSERT INTO saved_views (user_id, name, filters, is_default) VALUES (?,?,?,0)", ids["Vankadara Lakshmi Kavya"], "Koramangala",
+      JSON.stringify({ ...blr, cluster: ["Koramangala"] }));
   });
   void DAY;
 }
