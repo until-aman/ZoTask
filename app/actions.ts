@@ -70,6 +70,8 @@ export async function reviewTask(instanceId: number, decision: "pass" | "changes
   const u = await requireUser();
   return guard(async () => {
     if (!["reviewer", "admin"].includes(u.access_role)) throw new Error("Only reviewers can review tasks.");
+    if (decision === "changes" && !flags.length) throw new Error("Mark at least one item as Needs change.");
+    if (decision === "changes" && flags.some((f) => !f.comment?.trim())) throw new Error("Add a comment to every flagged item so the CBM knows what to fix.");
     await E.reviewDecision(instanceId, u.id, decision, flags, comment, Date.now(), openedAt);
     return decision === "pass" ? "Passed" : "Sent back for changes";
   });
@@ -79,6 +81,7 @@ export async function auditTask(instanceId: number, decision: "pass" | "fail", f
   const u = await requireUser();
   return guard(async () => {
     if (!["auditor", "admin"].includes(u.access_role)) throw new Error("Only auditors can audit tasks.");
+    if (decision === "fail" && flags.some((f) => !f.comment?.trim())) throw new Error("Add a comment to every flagged item so the CBM knows what to fix.");
     await E.auditDecision(instanceId, u.id, decision, flags, comment, Date.now());
     return decision === "pass" ? "Audit passed" : "Audit failed, flags sent to the CBM";
   });

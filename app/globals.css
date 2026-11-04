@@ -1337,3 +1337,11 @@ table.aq .cmt{max-width:320px;overflow:visible;text-overflow:clip;white-space:no
 @media (max-width:520px){.tf-item.item{grid-template-columns:minmax(0,1fr);gap:8px;padding:14px}.tf-n{width:24px;height:24px;font-size:12px}}
 .tf-body .ansrow{border-bottom:0;padding-bottom:0}
 .tf-body .ansrow:empty{display:none}
+
+/* Review sheet: a verdict on every item, then the task-level decision. */
+.seg.rv-seg button[data-k=ok][aria-pressed=true]{background:var(--green-soft);color:var(--green-ink)}
+.seg.rv-seg button[data-k=flag][aria-pressed=true]{background:var(--red-soft);color:var(--red-ink)}
+.item.rv-ok{border-color:color-mix(in srgb,var(--green) 40%,transparent)}
+input.rv-need{border-color:var(--red)}
+.rv-decide{display:grid;gap:10px;border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;background:var(--sunken);position:sticky;bottom:8px;z-index:5;box-shadow:var(--e-btn)}
+.rv-decide.ready{background:var(--card);border-color:var(--accent)}
