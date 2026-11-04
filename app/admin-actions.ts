@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser, can } from "@/lib/auth";
 import { all, one, run, tx } from "@/lib/db";
 import { ClusterPlan, planClusters, Snapshot } from "@/lib/cluster-sheet";
-import { fillFromCluster } from "@/lib/people";
+import { fillFromCluster, setPropertyCbm } from "@/lib/people";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function admin(fn: () => Promise<string | void>): Promise<Result> {
@@ -117,8 +117,8 @@ async function snapshot(): Promise<Snapshot> {
   return {
     cities: await all("SELECT id, name FROM cities"),
     clusters: await all("SELECT id, name, city_id, reviewer_id, auditor_id, archived FROM clusters ORDER BY id"),
-    properties: await all("SELECT id, name, cluster_id FROM properties ORDER BY id"),
-    people: await all("SELECT id, name, email, access_role FROM users WHERE access_role IN ('reviewer','auditor','admin') AND archived=0 ORDER BY id"),
+    properties: await all("SELECT id, name, cluster_id, cbm_id FROM properties ORDER BY id"),
+    people: await all("SELECT id, name, email, access_role FROM users WHERE archived=0 ORDER BY id"),
   };
 }
 
@@ -143,8 +143,12 @@ export async function applyClusterSheet(rows: string[][]) {
     for (const id of [...plan.update.map((c) => c.id), ...ids.values()]) await fillFromCluster(id);
     // Safe: every property is in the sheet, so these clusters have none left.
     for (const c of plan.archive) await run("UPDATE clusters SET archived=1 WHERE id=?", c.id);
+    const cbmIds = [];
+    for (const c of plan.newCbms) cbmIds.push((await run("INSERT INTO users (name, email, access_role, op_role) VALUES (?,?,'cbm','CBM')", c.name, c.email)).lastInsertRowid);
+    for (const c of plan.cbms) await setPropertyCbm(c.property_id, typeof c.cbm === "string" ? cbmIds[Number(c.cbm.slice(4))] : c.cbm);
     const n = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
-    return `${plan.create.length} added, ${plan.update.length} updated, ${plan.archive.length} archived, ${n(plan.moves.length, "property", "properties")} moved.`;
+    const cbm = plan.cbms.length ? `, ${n(plan.cbms.length, "CBM change")}${plan.newCbms.length ? ` (${n(plan.newCbms.length, "new CBM")})` : ""}` : "";
+    return `${plan.create.length} added, ${plan.update.length} updated, ${plan.archive.length} archived, ${n(plan.moves.length, "property", "properties")} moved${cbm}.`;
   });
 }
 

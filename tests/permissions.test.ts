@@ -61,10 +61,10 @@ test("P0-5: reassigning an escalation hands it to the new owner's account", asyn
   signInAs(ADMIN);
   const r = await A.raiseEscalation({ department: "R&M", title: "Lift stuck", detail: "", priority: "high", propertyIds: [1], ownerName: "Aman Antil", ownerEmail: "", cc: "", due: "", mailSent: false, mailSubject: "", link: "", photos: [], instanceId: null });
   yes(r);
-  const rashi = (await one<{ id: number; email: string }>("SELECT id, email FROM users WHERE name='Rashi Renwal'"))!;
-  yes(await A.updateEscalation(r.id!, { ownerName: "Rashi Renwal", ownerEmail: rashi.email }));
-  assert.equal((await one<{ owner_id: number }>("SELECT owner_id FROM escalations WHERE id=?", r.id))!.owner_id, rashi.id);
-  signInAs(rashi.id);
+  const cbm = (await one<{ id: number; email: string }>("SELECT id, email FROM users WHERE name='Meghna Bose'"))!;
+  yes(await A.updateEscalation(r.id!, { ownerName: "Meghna Bose", ownerEmail: cbm.email }));
+  assert.equal((await one<{ owner_id: number }>("SELECT owner_id FROM escalations WHERE id=?", r.id))!.owner_id, cbm.id);
+  signInAs(cbm.id);
   yes(await A.updateEscalation(r.id!, { note: "Vendor booked" }));
   signInAs(7); // Aman, the old owner, raised nothing here
   no(await A.updateEscalation(r.id!, { status: "done" }));

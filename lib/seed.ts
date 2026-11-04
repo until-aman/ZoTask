@@ -21,7 +21,7 @@ export const GEO: Record<string, Record<string, [string, number, number][]>> = {
   Chennai: { OMR: [["Zolo Marina", 12.9165, 80.2296], ["Zolo Coastline", 12.8996, 80.2273]] },
 };
 const CBMS: Record<string, string> = {
-  Koramangala: "Aman Antil", "HSR Layout": "Rashi Renwal", Whitefield: "Rashi Renwal",
+  Koramangala: "Aman Antil", "HSR Layout": "Meghna Bose", Whitefield: "Meghna Bose",
   Gachibowli: "Sandeep Rao", Madhapur: "Sandeep Rao", Hinjewadi: "Meera Kulkarni", OMR: "Arun Kumar",
 };
 const FIRST = ["Ravi", "Lakshmi", "Suresh", "Anita", "Manoj", "Deepa", "Kiran", "Pooja", "Vijay", "Sneha", "Rahul", "Divya", "Ganesh", "Kavitha", "Naveen", "Shalini", "Prakash", "Asha", "Ramesh", "Nisha", "Arjun", "Bhavna", "Mohan", "Rekha", "Sanjay", "Usha", "Tarun", "Geeta", "Imran", "Farah", "Yash", "Jyoti", "Venkat", "Meena", "Harish", "Swati", "Rajesh", "Leela", "Abhay", "Komal", "Dinesh", "Preeti", "Sunil", "Radha"];

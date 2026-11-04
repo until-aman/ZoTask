@@ -15,8 +15,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
   const templates = await all<Tpl>(
     `SELECT t.*, (SELECT count(*) FROM template_properties tp WHERE tp.template_id=t.id) props, r.name reviewer, a.name auditor
      FROM templates t LEFT JOIN users r ON r.id=t.reviewer_id LEFT JOIN users a ON a.id=t.auditor_id ORDER BY t.id`);
-  const props = await all<{ id: number; name: string; cluster: string; city: string; cbm: string | null; staff: number; city_id: number; cluster_id: number }>(
-    `SELECT p.id, p.name, cl.name cluster, c.name city, u.name cbm, c.id city_id, cl.id cluster_id,
+  const props = await all<{ id: number; name: string; cluster: string; city: string; cbm: string | null; cbm_id: number | null; staff: number; city_id: number; cluster_id: number }>(
+    `SELECT p.id, p.name, cl.name cluster, c.name city, u.name cbm, p.cbm_id, c.id city_id, cl.id cluster_id,
       (SELECT count(*) FROM user_properties up JOIN users x ON x.id=up.user_id WHERE up.property_id=p.id AND x.access_role='ground') staff
      FROM properties p JOIN clusters cl ON cl.id=p.cluster_id JOIN cities c ON c.id=cl.city_id LEFT JOIN users u ON u.id=p.cbm_id ORDER BY c.name, cl.name, p.name`);
   const people = await all<{ access_role: string; n: number }>("SELECT access_role, count(*) n FROM users WHERE archived=0 GROUP BY access_role");
@@ -34,6 +34,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
        FROM clusters cl JOIN cities c ON c.id=cl.city_id ORDER BY c.name, cl.name`),
     cities: await all<{ id: number; name: string }>("SELECT id, name FROM cities ORDER BY name"),
     reviewers: staff.filter((x) => x.access_role === "reviewer"), auditors: staff.filter((x) => x.access_role === "auditor"),
+    cbms: await all<{ id: number; name: string; email: string | null }>("SELECT id, name, email FROM users WHERE access_role='cbm' AND archived=0 ORDER BY name"),
   };
   return (
     <AdminClient tab={tab} templates={templates} props={props} people={people} views={await viewsFor(u.id, "admin")} lib={lib}>

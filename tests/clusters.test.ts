@@ -13,7 +13,7 @@ async function download() {
   const s: Snapshot = {
     cities: await all("SELECT id, name FROM cities"),
     clusters: await all("SELECT id, name, city_id, reviewer_id, auditor_id, archived FROM clusters"),
-    properties: await all("SELECT id, name, cluster_id FROM properties"),
+    properties: await all("SELECT id, name, cluster_id, cbm_id FROM properties"),
     people: await all("SELECT id, name, email, access_role FROM users"),
   };
   return sheetRows(s);
@@ -24,7 +24,7 @@ async function preview(rows: string[][]) {
   assert.ok(r.ok, JSON.stringify(r));
   return r.plan;
 }
-const C = { city: 0, cluster: 1, reviewer: 2, auditor: 3, property: 4, code: 5 };
+const C = { city: 0, cluster: 1, reviewer: 2, auditor: 3, property: 4, code: 5, cbm: 6 };
 /** Two clusters in one city, each with at least two properties. */
 async function pair() {
   return (await all<{ a: string; b: string }>(`SELECT a.name a, b.name b FROM clusters a JOIN clusters b ON b.city_id=a.city_id AND b.id>a.id
@@ -69,6 +69,29 @@ test("unknown reviewer, same reviewer and auditor, and a property in the wrong c
   assert.ok(errors.some((e) => e.startsWith("Row 3:") && e.includes("same person")), errors.join("\n"));
   assert.ok(!errors.some((e) => e.startsWith("Row 4:") && /no reviewer|no auditor|not a/.test(e)), errors.join("\n"));
   assert.ok(errors.some((e) => e.startsWith(`Row ${far + 1}:`) && e.includes(`not ${other}`)), errors.join("\n"));
+});
+
+test("the CBM column adds a CBM, reuses one by name, and refuses someone who isn't a CBM", async () => {
+  const OPEN = "('upcoming','current','notsub','review','resub','changes','audit','auditflag','flagans')";
+  const reviewer = (await one<{ name: string }>("SELECT name FROM users WHERE id=?", REVIEWER))!.name;
+  const rows = await download();
+  const [a, b] = [rows[1], rows[2]];
+  const other = (await one<{ name: string }>("SELECT u.name FROM users u JOIN properties p ON p.cbm_id=u.id WHERE p.name<>? AND p.cbm_id<>(SELECT cbm_id FROM properties WHERE name=?) LIMIT 1", b[C.property], b[C.property]))!.name;
+  a[C.cbm] = "New.Cbm@zolostays.com"; b[C.cbm] = other; rows[3][C.cbm] = reviewer;
+  const bad = await preview(rows);
+  assert.ok(bad.errors.some((e) => e.startsWith("Row 4:") && e.includes("not a CBM")), bad.errors.join("\n"));
+  rows[3][C.cbm] = (await download())[3][C.cbm];
+  const plan = await preview(rows);
+  assert.deepEqual(plan.errors, []);
+  assert.deepEqual(plan.newCbms, [{ name: "New Cbm", email: "New.Cbm@zolostays.com" }]);
+  assert.deepEqual(plan.cbms.map((c) => [c.property, c.to]), [[a[C.property], "New Cbm (new)"], [b[C.property], other]]);
+  yes(await A.applyClusterSheet(rows));
+  const p = (await one<{ id: number; cbm_id: number }>("SELECT id, cbm_id FROM properties WHERE name=?", a[C.property]))!;
+  assert.equal((await one<{ access_role: string; email: string }>("SELECT access_role, email FROM users WHERE id=?", p.cbm_id))?.access_role, "cbm");
+  assert.deepEqual((await all<{ user_id: number }>("SELECT up.user_id FROM user_properties up JOIN users u ON u.id=up.user_id WHERE up.property_id=? AND u.access_role='cbm'", p.id)).map((x) => x.user_id), [p.cbm_id]);
+  assert.equal((await one<{ n: number }>(`SELECT count(*) n FROM instances i JOIN templates t ON t.id=i.template_id
+    WHERE i.property_id=? AND i.status IN ${OPEN} AND t.op_role='CBM' AND i.assignee_id IS NOT ?`, p.id, p.cbm_id))!.n, 0);
+  assert.equal((await preview(await download())).cbms.length, 0);
 });
 
 test("moving a property and renaming a cluster", async () => {
