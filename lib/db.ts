@@ -8,7 +8,7 @@ import { seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
 import { seedLibraries } from "./libraries";
 import { TASK_LIST_VERSION, taskListDone, taskListStatements } from "./cbm-tasks";
-import { removeSampleReviewers } from "./people";
+import { removeSampleEscalations, removeSampleReviewers } from "./people";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -66,10 +66,10 @@ async function init(): Promise<Client> {
       if (stmts.length) await c.batch(["PRAGMA defer_foreign_keys = ON", ...stmts], "write");
     }
   } catch (e) { console.error("Task list update failed; will retry on the next start", e); }
-  // The live database only: the sample data's reviewers give way to the real ones from the cluster sheet.
+  // The live database only: the sample data's reviewers, properties and escalations give way to the real ones.
   if (REMOTE) {
-    try { await c.batch(await scope.run(c, removeSampleReviewers), "write"); }
-    catch (e) { console.error("Removing the sample reviewers failed; will retry on the next start", e); }
+    try { await c.batch([...await scope.run(c, removeSampleReviewers), ...await scope.run(c, removeSampleEscalations)], "write"); }
+    catch (e) { console.error("Removing the sample data failed; will retry on the next start", e); }
   }
   return c;
 }

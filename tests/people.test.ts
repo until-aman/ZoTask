@@ -3,7 +3,7 @@ import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import * as A from "@/app/admin-actions";
 import { db } from "@/lib/db";
-import { removeSampleReviewers } from "@/lib/people";
+import { removeSampleEscalations, removeSampleReviewers } from "@/lib/people";
 import { signInAs, ready, one, all, ADMIN } from "./helpers";
 
 before(ready);
@@ -51,4 +51,13 @@ test("sample properties and reviewers go; a property moved to a real cluster sta
     AND id NOT IN (SELECT user_id FROM user_properties WHERE property_id=?) AND id NOT IN (SELECT cbm_id FROM properties)`, kept), []);
   assert.ok((await one<{ n: number }>("SELECT count(*) n FROM user_properties up JOIN users u ON u.id=up.user_id WHERE up.property_id=? AND u.archived=0", kept))!.n > 0);
   assert.deepEqual(await removeSampleReviewers(), []);
+});
+
+test("escalations left with no property go, with their notes; it runs once", async () => {
+  const kept = (await one<{ n: number }>("SELECT count(*) n FROM escalations e WHERE EXISTS (SELECT 1 FROM escalation_properties ep WHERE ep.escalation_id=e.id)"))!.n;
+  assert.ok((await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n > kept);
+  await (await db()).batch(await removeSampleEscalations(), "write");
+  assert.equal((await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n, kept);
+  assert.equal((await one<{ n: number }>("SELECT count(*) n FROM escalation_updates WHERE escalation_id NOT IN (SELECT id FROM escalations)"))!.n, 0);
+  assert.deepEqual(await removeSampleEscalations(), []);
 });

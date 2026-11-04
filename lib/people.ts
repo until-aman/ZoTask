@@ -67,9 +67,37 @@ export async function removeSampleReviewers(): Promise<InStatement[]> {
   ];
 }
 
+/**
+ * Makes this person the property's CBM (or none): its CBM link moves, and its open CBM tasks that had no one or the
+ * old CBM go to the new one.
+ */
+export async function setPropertyCbm(propertyId: number, cbmId: number | null) {
+  const old = (await one<{ cbm_id: number | null }>("SELECT cbm_id FROM properties WHERE id=?", propertyId))?.cbm_id ?? null;
+  await run("UPDATE properties SET cbm_id=? WHERE id=?", cbmId, propertyId);
+  await run("DELETE FROM user_properties WHERE property_id=? AND user_id IN (SELECT id FROM users WHERE access_role='cbm')", propertyId);
+  if (cbmId) await run("INSERT OR IGNORE INTO user_properties (user_id, property_id) VALUES (?,?)", cbmId, propertyId);
+  await run(`UPDATE instances SET assignee_id=? WHERE property_id=? AND status IN ${OPEN} AND (assignee_id IS NULL OR assignee_id IS ?)
+    AND template_id IN (SELECT id FROM templates WHERE op_role='CBM')`, cbmId, propertyId, old);
+}
+
 /** Open tasks at a cluster's properties that have no reviewer or auditor take the cluster's. */
 export async function fillFromCluster(clusterId: number) {
   for (const role of ["reviewer_id", "auditor_id"])
     await run(`UPDATE instances SET ${role}=(SELECT ${role} FROM clusters WHERE id=?)
       WHERE ${role} IS NULL AND status IN ${OPEN} AND property_id IN (SELECT id FROM properties WHERE cluster_id=?)`, clusterId, clusterId);
+}
+
+/**
+ * Removes escalations left with no property: the sample ones, whose properties went with the sample data.
+ * Their update notes go too, and tasks lose only their link to them. Runs once.
+ */
+export async function removeSampleEscalations(): Promise<InStatement[]> {
+  const key = "sample_escalations_removed";
+  if (await one("SELECT v FROM meta WHERE k=?", key)) return [];
+  const E = "(SELECT id FROM escalations e WHERE NOT EXISTS (SELECT 1 FROM escalation_properties ep WHERE ep.escalation_id=e.id))";
+  return [
+    `DELETE FROM escalation_updates WHERE escalation_id IN ${E}`,
+    `DELETE FROM escalations WHERE id IN ${E}`,
+    { sql: "INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)", args: [key, String(Date.now())] },
+  ];
 }

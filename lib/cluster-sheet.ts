@@ -1,11 +1,11 @@
-// The cluster sheet: one row per property naming its city, cluster, and the cluster's reviewer and auditor.
+// The cluster sheet: one row per property naming its city, cluster, the cluster's reviewer and auditor, and the property's CBM.
 // Uploading it makes the clusters match the file exactly. Pure functions, so the browser can build the download
 // and the server can plan an upload without touching the database.
 
 export type Snapshot = {
   cities: { id: number; name: string }[];
   clusters: { id: number; name: string; city_id: number; reviewer_id: number | null; auditor_id: number | null; archived: number }[];
-  properties: { id: number; name: string; cluster_id: number }[];
+  properties: { id: number; name: string; cluster_id: number; cbm_id: number | null }[];
   people: { id: number; name: string; email: string | null; access_role: string }[];
 };
 
@@ -18,34 +18,41 @@ export type ClusterPlan = {
   archive: { id: number; name: string; city: string }[];
   moves: { property_id: number; property: string; from: string; to: string; ref: ClusterRef }[];
   same: number;
+  /** CBMs the sheet adds; `cbms` points at one as `new:<index>`. */
+  newCbms: { name: string; email: string | null }[];
+  cbms: { property_id: number; property: string; from: string; to: string; cbm: number | `new:${number}` | null }[];
 };
 
-export const SHEET_COLS = ["City", "Cluster", "Reviewer", "Auditor", "Property", "Zolo Code"];
+export const SHEET_COLS = ["City", "Cluster", "Reviewer", "Auditor", "Property", "Zolo Code", "CBM"];
 export const zoloCode = (id: number) => `ZO${String(id).padStart(4, "0")}`;
 const low = (s: string) => s.trim().toLowerCase();
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const nameFromEmail = (e: string) => e.split("@")[0].split(/[._-]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
-/** The current clusters as a sheet: every active cluster and its properties, one row per property. */
+/** The current clusters as a sheet: every active cluster and its properties, one row per property. CBMs go by email when known. */
 export function sheetRows(s: Snapshot): string[][] {
   const name = (id: number | null) => s.people.find((p) => p.id === id)?.name ?? "";
+  const cbm = (id: number | null) => { const p = s.people.find((x) => x.id === id); return p ? p.email || p.name : ""; };
   const city = (id: number) => s.cities.find((c) => c.id === id)?.name ?? "";
   const out: string[][] = [];
   const active = s.clusters.filter((c) => !c.archived).sort((a, b) => city(a.city_id).localeCompare(city(b.city_id)) || a.name.localeCompare(b.name));
   for (const c of active) {
     const lead = [city(c.city_id), c.name, name(c.reviewer_id), name(c.auditor_id)];
     const props = s.properties.filter((p) => p.cluster_id === c.id).sort((a, b) => a.name.localeCompare(b.name));
-    if (!props.length) out.push([...lead, "", ""]);
-    for (const p of props) out.push([...lead, p.name, zoloCode(p.id)]);
+    if (!props.length) out.push([...lead, "", "", ""]);
+    for (const p of props) out.push([...lead, p.name, zoloCode(p.id), cbm(p.cbm_id)]);
   }
   return [SHEET_COLS, ...out];
 }
 
 const isProp = (h: string) => h.includes("property") && !h.includes("code");
+const isCbm = (h: string) => h.includes("cbm") || h.includes("business manager");
 const FIND: [keyof typeof COLS, (h: string) => boolean][] = [
-  ["city", (h) => h.includes("city")], ["cluster", (h) => h.includes("cluster")],
+  ["city", (h) => h.includes("city")], ["cluster", (h) => h.includes("cluster") && !isCbm(h)],
   ["reviewer", (h) => h.includes("reviewer")], ["auditor", (h) => h.includes("auditor")],
-  ["property", isProp], ["code", (h) => h.includes("code")],
+  ["property", isProp], ["code", (h) => h.includes("code")], ["cbm", isCbm],
 ];
-const COLS = { city: "City", cluster: "Cluster", reviewer: "Reviewer", auditor: "Auditor", property: "Property", code: "Zolo Code" };
+const COLS = { city: "City", cluster: "Cluster", reviewer: "Reviewer", auditor: "Auditor", property: "Property", code: "Zolo Code", cbm: "CBM" };
 
 /**
  * What uploading these rows (the whole table, header included) would change. Anything in `errors` blocks the upload.
@@ -53,7 +60,7 @@ const COLS = { city: "City", cluster: "Cluster", reviewer: "Reviewer", auditor: 
  * existing cluster the file no longer names is that cluster renamed. Active clusters the file leaves out are archived.
  */
 export function planClusters(table: string[][], s: Snapshot): ClusterPlan {
-  const plan: ClusterPlan = { errors: [], create: [], update: [], archive: [], moves: [], same: 0 };
+  const plan: ClusterPlan = { errors: [], create: [], update: [], archive: [], moves: [], same: 0, newCbms: [], cbms: [] };
   const err = (m: string) => { plan.errors.push(m); };
 
   // 1. Header: the first row naming both Cluster and Property. Columns go by name, in any order.
@@ -61,12 +68,13 @@ export function planClusters(table: string[][], s: Snapshot): ClusterPlan {
   if (hi < 0) { err(`The sheet needs a header row with these columns: ${SHEET_COLS.join(", ")}.`); return plan; }
   const head = table[hi].map((c) => low(c.replace(/^﻿/, "")));
   const at = Object.fromEntries(FIND.map(([k, f]) => [k, head.findIndex(f)])) as Record<keyof typeof COLS, number>;
-  const missing = (Object.keys(COLS) as (keyof typeof COLS)[]).filter((k) => at[k] < 0);
+  // CBM is optional: without the column, CBMs stay as they are.
+  const missing = (Object.keys(COLS) as (keyof typeof COLS)[]).filter((k) => k !== "cbm" && at[k] < 0);
   if (missing.length) { err(`The sheet is missing these columns: ${missing.map((k) => COLS[k]).join(", ")}.`); return plan; }
   const rows = table.slice(hi + 1).map((r, i) => {
-    const get = (k: keyof typeof COLS) => (r[at[k]] ?? "").trim();
-    return { line: hi + i + 2, city: get("city"), cluster: get("cluster"), reviewer: get("reviewer"), auditor: get("auditor"), property: get("property"), code: get("code") };
-  }).filter((r) => r.city || r.cluster || r.reviewer || r.auditor || r.property || r.code);
+    const get = (k: keyof typeof COLS) => (at[k] >= 0 ? r[at[k]] ?? "" : "").trim();
+    return { line: hi + i + 2, city: get("city"), cluster: get("cluster"), reviewer: get("reviewer"), auditor: get("auditor"), property: get("property"), code: get("code"), cbm: get("cbm") };
+  }).filter((r) => r.city || r.cluster || r.reviewer || r.auditor || r.property || r.code || r.cbm);
   if (!rows.length) { err("The sheet has no rows under the header."); return plan; }
 
   const cityName = (id: number) => s.cities.find((c) => c.id === id)?.name ?? "";
@@ -88,6 +96,7 @@ export function planClusters(table: string[][], s: Snapshot): ClusterPlan {
   type Want = { line: number; name: string; city_id: number; reviewer?: { id: number | null; line: number }; auditor?: { id: number | null; line: number }; props: number[] };
   const want = new Map<string, Want>();
   const seen = new Map<number, number>();
+  const cbmRows: { line: number; prop: Snapshot["properties"][number]; v: string }[] = [];
   for (const r of rows) {
     if (!r.city || !r.cluster) { err(`Row ${r.line}: needs both a City and a Cluster.`); continue; }
     const city = s.cities.find((c) => low(c.name) === low(r.city));
@@ -114,6 +123,30 @@ export function planClusters(table: string[][], s: Snapshot): ClusterPlan {
     const pc = clusterOf(prop.cluster_id)?.city_id;
     if (pc !== city.id) { err(`Row ${r.line}: ${prop.name} is in ${cityName(pc ?? 0) || "another city"}, not ${city.name}.`); continue; }
     w.props.push(prop.id);
+    if (at.cbm >= 0) cbmRows.push({ line: r.line, prop, v: r.cbm });
+  }
+  // Each property's CBM: an existing CBM by email or name, a new one, or none when the cell is blank.
+  const added = new Map<string, number>();
+  for (const { line, prop, v } of cbmRows) {
+    let to: number | `new:${number}` | null = null;
+    if (v) {
+      const byEmail = s.people.filter((p) => p.email && low(p.email) === low(v));
+      const found = byEmail.length ? byEmail : s.people.filter((p) => low(p.name) === low(v));
+      const right = found.filter((p) => p.access_role === "cbm");
+      if (right.length > 1) { err(`Row ${line}: more than one CBM is called "${v}". Use their email instead.`); continue; }
+      if (!right.length && found.length) { err(`Row ${line}: ${found[0].name} is a${found[0].access_role === "admin" || found[0].access_role === "auditor" ? "n" : ""} ${found[0].access_role}, not a CBM.`); continue; }
+      if (right.length) to = right[0].id;
+      else {
+        let ix = added.get(low(v));
+        if (ix === undefined) {
+          added.set(low(v), (ix = plan.newCbms.length));
+          plan.newCbms.push(EMAIL.test(v) ? { name: nameFromEmail(v), email: v } : { name: v, email: null });
+        }
+        to = `new:${ix}`;
+      }
+    }
+    if (to !== prop.cbm_id) plan.cbms.push({ property_id: prop.id, property: prop.name, from: personName(prop.cbm_id),
+      to: typeof to === "string" ? `${plan.newCbms[Number(to.slice(4))].name} (new)` : personName(to), cbm: to });
   }
   for (const w of want.values())
     if (w.reviewer?.id && w.reviewer.id === w.auditor?.id) err(`Row ${w.auditor.line}: ${w.name} has the same person as reviewer and auditor.`);

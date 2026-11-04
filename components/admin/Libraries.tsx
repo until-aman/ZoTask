@@ -167,9 +167,9 @@ export function Counts({ rows, notify }: { rows: Count[]; notify: (m: string) =>
 }
 
 export type Cluster = { id: number; name: string; city_id: number; city: string; reviewer_id: number | null; auditor_id: number | null; archived: number; props: string | null; n: number };
-export function Clusters({ rows, cities, props, reviewers, auditors, notify }: {
-  rows: Cluster[]; cities: { id: number; name: string }[]; props: { id: number; name: string; city_id: number; cluster_id: number }[];
-  reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; notify: (m: string) => void;
+export function Clusters({ rows, cities, props, reviewers, auditors, cbms, notify }: {
+  rows: Cluster[]; cities: { id: number; name: string }[]; props: { id: number; name: string; city_id: number; cluster_id: number; cbm_id: number | null }[];
+  reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; cbms: { id: number; name: string; email: string | null }[]; notify: (m: string) => void;
 }) {
   const run = useRun(notify);
   const [tab, setTab] = useState<"active" | "archived">("active");
@@ -178,7 +178,7 @@ export function Clusters({ rows, cities, props, reviewers, auditors, notify }: {
   const [edit, setEdit] = useState<{ id: number | null; name: string; city_id: number; reviewer_id: number | null; auditor_id: number | null; properties: number[] } | null>(null);
   const name = (l: { id: number; name: string }[], id: number | null) => l.find((x) => x.id === id)?.name ?? "—";
   function download() {
-    const people = [...reviewers.map((p) => ({ ...p, email: null, access_role: "reviewer" })), ...auditors.map((p) => ({ ...p, email: null, access_role: "auditor" }))];
+    const people = [...reviewers.map((p) => ({ ...p, email: null, access_role: "reviewer" })), ...auditors.map((p) => ({ ...p, email: null, access_role: "auditor" })), ...cbms.map((p) => ({ ...p, access_role: "cbm" }))];
     const data = sheetRows({ cities, clusters: rows, properties: props, people });
     const a = document.createElement("a"); a.href = URL.createObjectURL(xlsx(data, "Clusters")); a.download = "clusters.xlsx"; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -240,7 +240,7 @@ export function Clusters({ rows, cities, props, reviewers, auditors, notify }: {
         { label: "Edit", hidden: !!c.archived, onClick: () => setEdit({ id: c.id, name: c.name, city_id: c.city_id, reviewer_id: c.reviewer_id, auditor_id: c.auditor_id, properties: props.filter((p) => p.cluster_id === c.id).map((p) => p.id) }) },
         { label: c.archived ? "Restore" : "Archive", danger: !c.archived, onClick: () => run(archiveCluster(c.id, !c.archived)) },
       ]} />
-      <p className="small muted" style={{ margin: 0 }}>Sheet columns: City, Cluster, Reviewer, Auditor, Property, Zolo Code. One row per property. Every property must be in the sheet.</p>
+      <p className="small muted" style={{ margin: 0 }}>Sheet columns: City, Cluster, Reviewer, Auditor, Property, Zolo Code, CBM. One row per property. Every property must be in the sheet. CBM is a name or email; a new email adds that CBM, and a blank cell means none.</p>
     </section>
   );
 }
@@ -249,7 +249,7 @@ export function Clusters({ rows, cities, props, reviewers, auditors, notify }: {
 function SheetPreview({ file, rows, plan, notify, onDone }: { file: string; rows: string[][]; plan: ClusterPlan; notify: (m: string) => void; onDone: () => void }) {
   const run = useRun(notify);
   const [busy, setBusy] = useState(false);
-  const changes = plan.create.length + plan.update.length + plan.archive.length + plan.moves.length;
+  const changes = plan.create.length + plan.update.length + plan.archive.length + plan.moves.length + plan.cbms.length;
   const tile = (n: number, label: string, tone = "") => <div className={`cu-tile ${n ? tone : "zero"}`}><b>{n}</b><span>{label}</span></div>;
   const list = (title: string, items: string[]) => items.length > 0 && <details className="cu-list"><summary>{title} ({items.length})</summary><ul>{items.map((x, i) => <li key={i}>{x}</li>)}</ul></details>;
   return (
@@ -260,6 +260,7 @@ function SheetPreview({ file, rows, plan, notify, onDone }: { file: string; rows
         {tile(plan.update.length, "Changed", "b")}
         {tile(plan.archive.length, "Archived", "a")}
         {tile(plan.moves.length, "Properties moving", "a")}
+        {tile(plan.cbms.length, "CBM changes", "b")}
         {tile(plan.same, "Unchanged", "g")}
       </div>
       {plan.errors.length > 0 && <div className="err"><b>Fix these and upload again</b><ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>{plan.errors.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
@@ -267,6 +268,8 @@ function SheetPreview({ file, rows, plan, notify, onDone }: { file: string; rows
       {list("Changed clusters", plan.update.map((c) => `${c.name} (${c.city}): ${c.changes.join(", ")}`))}
       {list("Archived", plan.archive.map((c) => `${c.name} (${c.city})`))}
       {list("Properties moving", plan.moves.map((m) => `${m.property}: ${m.from} → ${m.to}`))}
+      {list("New CBMs", plan.newCbms.map((c) => (c.email ? `${c.name} · ${c.email}` : c.name)))}
+      {list("CBM changes", plan.cbms.map((c) => `${c.property}: ${c.from} → ${c.to}`))}
       <p className="small muted" style={{ margin: 0 }}>Clusters not in the file are archived, not deleted. Restore brings one back.</p>
       <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={onDone}>Cancel</button>
         <button type="button" className="btn primary sm" disabled={busy || plan.errors.length > 0 || !changes}
