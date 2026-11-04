@@ -141,53 +141,78 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
       )}
       {status === "notsub" && <div className="err" style={{ fontWeight: 600 }}>The window has closed. You can still submit, but it will count as late.</div>}
       {locked && <div className="info" role="status"><i>!</i><span>Tap Start task first. The checklist unlocks once the task is started.</span></div>}
+      <div className="tf-prog" aria-live="polite">
+        <span><b>{items.length - problems.length} of {items.length}</b> items complete</span>
+        <div className="tf-bar" aria-hidden="true"><i style={{ width: `${items.length ? ((items.length - problems.length) / items.length) * 100 : 0}%` }} /></div>
+      </div>
       <fieldset className="items" disabled={locked} aria-disabled={locked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, opacity: locked ? 0.55 : 1 }}>
-      {items.map((it) => {
+      {items.map((it, ix) => {
         const a = ans[it.id];
         const flag = flags.find((f) => f.item_id === it.id);
         const need = needs(it, a);
+        const done = !issues[it.id];
+        const hasPhoto = a.photos.length > 0, hasNote = !!a.note.trim();
+        const showNote = !!(it.note_allowed || need.note || (it.kind === "check" && !a.checked));
+        const show = (it.photo_allowed || need.photo);
         return (
-          <div key={it.id} id={`item-${it.id}`} className={`item${flag ? " flagged" : ""}${tried && issues[it.id] ? " missing" : ""}`}>
-            <div className="row2">
-              {it.kind === "check" ? (
-                <label className="row2" style={{ fontWeight: 700 }}>
-                  <input type="checkbox" checked={a.checked} onChange={(e) => set(it.id, { checked: e.target.checked })} style={{ width: 18, height: 18 }} />
-                  {it.label}
-                </label>
-              ) : <b>{it.label}</b>}
-              <span className="spacer" />
-              {need.photo ? <span className={`pill${tried && !a.photos.length ? " r" : ""}`}>Photo compulsory</span> : null}
-              {need.note ? <span className={`pill${tried && !a.note.trim() ? " r" : ""}`}>Note compulsory</span> : null}
-            </div>
-            {flag && <div className="small warn">Flagged: {flag.reason}{flag.comment ? ` · “${flag.comment}”` : ""}</div>}
-            <div className="ansrow">
-            {it.kind === "count" && <label className="small muted">Number of {it.count_of === "SHK" ? "SHKs" : "HKs"} present<input type="text" inputMode="numeric" pattern="[0-9]*" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value, true) })} style={{ width: 140, display: "block" }} aria-label={it.label} /></label>}
-            {choicesFor(it) && <div className="seg seg-wrap" role="group" aria-label={it.label}>
-              {choicesFor(it)!.map((v) => <button key={v} type="button" aria-pressed={a.value === v} onClick={() => set(it.id, { value: v })}>{v}</button>)}
-            </div>}
-            {it.kind === "number" && <input type="text" inputMode="decimal" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value) })} style={{ width: 140 }} aria-label={it.label} placeholder="0 or more" />}
-            {it.kind === "text" && <textarea value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} aria-label={it.label} />}
-            {!!(it.photo_allowed || need.photo) && <div className="photos">
-              {a.photos.map((p, ix) => (
-                <span key={p + ix} style={{ position: "relative" }}>
-                  <Photo name={p} />
-                  <button type="button" className="chip" style={{ position: "absolute", top: -6, right: -6, padding: 0, width: 20, height: 20, justifyContent: "center" }} aria-label="Remove photo"
-                    onClick={() => set(it.id, { photos: a.photos.filter((_, j) => j !== ix) })}>×</button>
-                </span>
-              ))}
-              {Array.from({ length: uploading[it.id] ?? 0 }, (_, k) => <span key={`up${k}`} className="ph" role="status" aria-label="Uploading photo">Uploading…</span>)}
-              {a.photos.length + (uploading[it.id] ?? 0) < 10 && (
-                <label className="ph" style={{ cursor: "pointer", borderStyle: "dashed" }}>
-                  + Photo
-                  <input type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { upload(it.id, e.target.files); e.target.value = ""; }} />
-                </label>
+          <div key={it.id} id={`item-${it.id}`} className={`item tf-item${flag ? " flagged" : ""}${tried && !done ? " missing" : ""}${done ? " done" : ""}`}>
+            <span className="tf-n" aria-label={done ? `Item ${ix + 1}, complete` : `Item ${ix + 1}`}>{done ? "✓" : ix + 1}</span>
+            <div className="tf-body">
+              <div className="tf-q">{it.label}</div>
+              {flag && <div className="tf-flag">Flagged by the reviewer: <b>{flag.reason}</b>{flag.comment ? ` · “${flag.comment}”` : ""}</div>}
+              <div className="ansrow">
+                {it.kind === "check" && (
+                  <label className={`tf-tick${a.checked ? " on" : ""}`}>
+                    <input type="checkbox" checked={a.checked} onChange={(e) => set(it.id, { checked: e.target.checked })} />
+                    {a.checked ? "Done" : "Mark as done"}
+                  </label>
+                )}
+                {it.kind === "count" && <label className="small muted">Number of {it.count_of === "SHK" ? "SHKs" : "HKs"} present<input type="text" inputMode="numeric" pattern="[0-9]*" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value, true) })} style={{ width: 140, display: "block" }} aria-label={it.label} placeholder="0 or more" /></label>}
+                {choicesFor(it) && <div className="seg seg-wrap" role="group" aria-label={it.label}>
+                  {choicesFor(it)!.map((v) => <button key={v} type="button" aria-pressed={a.value === v} onClick={() => set(it.id, { value: v })}>{v}</button>)}
+                </div>}
+                {it.kind === "number" && <input type="text" inputMode="decimal" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value) })} style={{ width: 140 }} aria-label={it.label} placeholder="0 or more" />}
+                {it.kind === "text" && <textarea value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} aria-label={it.label} placeholder="Your answer" />}
+              </div>
+              {!!show && (
+                <div className={`tf-sec${need.photo ? (hasPhoto ? " ok" : " req") : ""}`}>
+                  <div className="tf-sec-h">Photo
+                    {need.photo ? <span className={`tf-tag ${hasPhoto ? "ok" : "req"}`}>{hasPhoto ? "✓ Added" : "Compulsory"}</span> : <span className="tf-tag">Optional</span>}
+                  </div>
+                  <div className="photos">
+                    {a.photos.map((p, j) => (
+                      <span key={p + j} style={{ position: "relative" }}>
+                        <Photo name={p} />
+                        <button type="button" className="chip" style={{ position: "absolute", top: -6, right: -6, padding: 0, width: 20, height: 20, justifyContent: "center" }} aria-label="Remove photo"
+                          onClick={() => set(it.id, { photos: a.photos.filter((_, k) => k !== j) })}>×</button>
+                      </span>
+                    ))}
+                    {Array.from({ length: uploading[it.id] ?? 0 }, (_, k) => <span key={`up${k}`} className="ph" role="status" aria-label="Uploading photo">Uploading…</span>)}
+                    {a.photos.length + (uploading[it.id] ?? 0) < 10 && (
+                      <label className="ph tf-add">
+                        + Photo
+                        <input type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { upload(it.id, e.target.files); e.target.value = ""; }} />
+                      </label>
+                    )}
+                  </div>
+                  {failed[it.id] && <div className="small warn" role="alert">{failed[it.id]}</div>}
+                </div>
               )}
-            </div>}
+              {showNote && (
+                <div className={`tf-sec${need.note || (tried && it.kind === "check" && !a.checked) ? (hasNote ? " ok" : " req") : ""}`}>
+                  <div className="tf-sec-h">Note
+                    {need.note ? <span className={`tf-tag ${hasNote ? "ok" : "req"}`}>{hasNote ? "✓ Added" : "Compulsory"}</span>
+                      : it.kind === "check" && !a.checked ? <span className={`tf-tag${tried && !hasNote ? " req" : ""}`}>Needed if not done</span> : <span className="tf-tag">Optional</span>}
+                  </div>
+                  <input type="text" aria-label={`Note for ${it.label}`} placeholder={it.kind === "check" && !a.checked && !need.note ? "Not done? Say why" : "Write a note"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />
+                </div>
+              )}
+              {flag && <div className={`tf-sec ${a.reply.trim() ? "ok" : "req"}`}>
+                <div className="tf-sec-h">Reply to the reviewer<span className={`tf-tag ${a.reply.trim() ? "ok" : "req"}`}>{a.reply.trim() ? "✓ Added" : "Compulsory"}</span></div>
+                <input type="text" aria-label="Reply to the reviewer" placeholder="What did you fix?" value={a.reply} onChange={(e) => set(it.id, { reply: e.target.value })} />
+              </div>}
+              {tried && issues[it.id] && <div className="tf-issue" role="alert">{issues[it.id]}</div>}
             </div>
-            {failed[it.id] && <div className="small warn" role="alert">{failed[it.id]}</div>}
-            {tried && issues[it.id] && <div className="small t-r" role="alert">{issues[it.id]}</div>}
-            {!!(it.note_allowed || need.note || (it.kind === "check" && !a.checked)) && <input type="text" placeholder={need.note ? "Note (compulsory)" : it.kind === "check" && !a.checked ? "Not done? Say why" : "Note (optional)"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />}
-            {flag && <input type="text" placeholder="Reply to the reviewer" value={a.reply} onChange={(e) => set(it.id, { reply: e.target.value })} />}
           </div>
         );
       })}
