@@ -1288,3 +1288,6 @@ table.aq .cmt{max-width:320px;overflow:visible;text-overflow:clip;white-space:no
 /* A note across the top of a page (Week offs on the review sheet). */
 .banner{background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 14px;font-size:14px}
 .banner.warn{background:var(--amber-soft);border-color:transparent;color:var(--amber-ink)}
+/* 24-hour time picker: hour and minute side by side. */
+.time24{display:inline-flex;align-items:center;gap:4px;width:100%}
+.time24 select{flex:1 1 0;min-width:64px}

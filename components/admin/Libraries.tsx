@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addCategory, applyClusterSheet, archiveCategory, archiveCluster, deleteChecklistPreset, previewClusterSheet, deleteSchedulePreset, moveCategory, PresetItem, saveChecklistPreset, saveCluster, saveCounts, saveSchedulePreset } from "@/app/admin-actions";
-import { DAYS, describeWhen, ItemCard } from "@/components/TemplateEditor";
+import { DAYS, WindowFields, describeWhen, ItemCard } from "@/components/TemplateEditor";
 import { Table } from "@/components/cc/parts";
 import { Person } from "@/components/ui/TableKit";
 import { readWorkbook } from "@/app/map-actions";
@@ -66,8 +66,7 @@ export function Schedules({ rows, notify }: { rows: Schedule[]; notify: (m: stri
           <label className="f">Repeats<select value={edit.frequency} onChange={(e) => setEdit({ ...edit, frequency: e.target.value, days: e.target.value === "weekly" || e.target.value === "monthly" ? [1] : [] })}>
             <option value="once">Once</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
           {edit.frequency === "once" && <label className="f">Date<input type="date" value={edit.once_date ?? ""} onChange={(e) => setEdit({ ...edit, once_date: e.target.value })} /></label>}
-          <label className="f">Start time<input type="time" value={edit.window_start} onChange={(e) => setEdit({ ...edit, window_start: e.target.value })} /></label>
-          <label className="f">End time<input type="time" value={edit.window_end} onChange={(e) => setEdit({ ...edit, window_end: e.target.value })} /></label>
+          <WindowFields start={edit.window_start} end={edit.window_end} onChange={(s, e) => setEdit({ ...edit, window_start: s, window_end: e })} />
         </div>
         {edit.frequency === "weekly" && <div className="te-days">{DAYS.map((d, i) => <button key={d} type="button" aria-pressed={edit.days.includes(i)} onClick={() => toggle(i)}>{d}</button>)}</div>}
         {edit.frequency === "monthly" && <div className="te-days te-month">{Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <button key={d} type="button" aria-pressed={edit.days.includes(d)} onClick={() => toggle(d)}>{d}</button>)}</div>}

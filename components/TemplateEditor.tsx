@@ -1,6 +1,8 @@
 "use client";
 // Task setup in steps: Basics → Type & trigger → Checklist → Schedule & properties → Review & audit → Summary.
 // The preview on the right updates as you type; the last step replays every step read-only, with links back to edit.
+import { TimeInput } from "@/components/ui/TimeInput";
+import { fmtMins, fromMins, toMins, windowMins } from "@/lib/time";
 import { ReactNode, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveTemplate, TemplateInput, TemplateItemInput } from "@/app/actions";
@@ -34,10 +36,27 @@ const RULES: [string, string][] = [["off", "No"], ["optional", "Optional"], ["re
 const ord = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th"}`;
 
 /** "Daily 09:00–10:00", "Weekly on Sat, Sun …", "When Booking created, Tenant exited". */
+/** Start, end and duration of a task window, all 24-hour. Changing the start keeps the duration; changing the end or the duration updates the other. */
+export function WindowFields({ start, end, onChange }: { start: string; end: string; onChange: (start: string, end: string) => void }) {
+  const len = windowMins(start, end);
+  return <>
+    <label className="f">Start time<TimeInput label="Start time" value={start} onChange={(v) => onChange(v, fromMins(toMins(v) + (len || 60)))} /></label>
+    <label className="f">End time<TimeInput label="End time" value={end} onChange={(v) => onChange(start, v)} /></label>
+    <label className="f">Duration
+      <span className="row2" style={{ gap: 6, flexWrap: "nowrap" }}>
+        <input type="number" min={5} step={5} value={len || ""} aria-label="Duration in minutes" style={{ width: 90 }}
+          onChange={(e) => { const n = Number(e.target.value); if (n > 0) onChange(start, fromMins(toMins(start) + n)); }} />
+        <span className={len ? "small muted" : "small t-r"} style={{ fontWeight: 400, whiteSpace: "nowrap" }}>{len ? (len < 60 ? "minutes" : `min · ${fmtMins(len)}`) : "End must be after start"}</span>
+      </span>
+    </label>
+  </>;
+}
+
 export function describeWhen(t: Pick<T, "trigger" | "frequency" | "days" | "once_date" | "window_start" | "window_end" | "events" | "event_name">) {
   if (t.trigger === "event") { const e = parse<string[]>(t.events, []); return `When ${(e.length ? e : [t.event_name ?? "an event"]).join(", ")}`; }
   if (t.trigger === "on_demand") return "On demand";
-  const time = `${t.window_start}–${t.window_end}`, d = parse<number[]>(t.days, []);
+  const len = windowMins(t.window_start, t.window_end);
+  const time = `${t.window_start}–${t.window_end}${len ? ` (${fmtMins(len)})` : ""}`, d = parse<number[]>(t.days, []);
   if (t.frequency === "once") return `Once on ${t.once_date ?? "?"}, ${time}`;
   if (t.frequency === "weekly") return `Weekly on ${d.length ? d.map((x) => DAYS[x]).join(", ") : "?"}, ${time}`;
   if (t.frequency === "monthly") return `Monthly on the ${d.length ? d.map(ord).join(", ") : "?"}, ${time}`;
@@ -362,8 +381,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
                 {schedules.length > 0 && <label className="f">Use a predefined schedule<select value="" onChange={(e) => loadSchedule(e.target.value)}><option value="">Pick one</option>{schedules.map((s) => <option key={s.id} value={s.id}>{s.name} · {describeWhen({ ...s, trigger: "scheduled", events: "[]", event_name: null })}</option>)}</select></label>}
               </div>
               <div className="te-row">
-                <label className="f">Start time<input type="time" value={t.window_start} onChange={(e) => set("window_start", e.target.value)} /></label>
-                <label className="f">End time<input type="time" value={t.window_end} onChange={(e) => set("window_end", e.target.value)} /></label>
+                <WindowFields start={t.window_start} end={t.window_end} onChange={(s, e) => { set("window_start", s); set("window_end", e); }} />
                 <label className="f">Repeats<select value={t.frequency} onChange={(e) => { set("frequency", e.target.value); set("days", JSON.stringify(e.target.value === "weekly" ? [1] : e.target.value === "monthly" ? [1] : [])); }}>
                   <option value="once">Once</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
                 {t.frequency === "once" && <label className="f">Date<input type="date" value={t.once_date ?? ""} onChange={(e) => set("once_date", e.target.value)} /></label>}
