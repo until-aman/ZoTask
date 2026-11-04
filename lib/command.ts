@@ -185,7 +185,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
   const openIds = open.map((r) => r.id);
   const evs = openIds.length ? await all<{ instance_id: number; type: string; at: number; detail: string; actor: string | null }>(
     `SELECT e.instance_id, e.type, e.at, e.detail, u.name actor FROM events e LEFT JOIN users u ON u.id=e.actor_id
-     WHERE e.type IN ('acknowledged','escalated') AND e.instance_id IN (${openIds.join(",")}) ORDER BY e.at`) : [];
+     WHERE e.type IN ('acknowledged','escalated','escalation_raised') AND e.instance_id IN (${openIds.join(",")}) ORDER BY e.at`) : [];
   const lastRev = openIds.length ? await all<{ instance_id: number; comment: string | null; fl: string | null; n: number }>(
     `SELECT rv.instance_id, rv.comment, (SELECT group_concat(f.reason || COALESCE(': ' || NULLIF(f.comment,''), ''), '; ') FROM review_flags f WHERE f.review_id=rv.id) fl,
        (SELECT count(*) FROM reviews x WHERE x.instance_id=rv.instance_id AND x.kind='review' AND x.decision='changes') n
@@ -224,7 +224,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
       it = { cat: "exception", type: "Flag answers not closed", sev: "Medium", owner: r.auditor ?? "Unassigned", ownerRole: "Auditor", overdue: age - auditSla };
     if (!it) continue;
     const mineEv = evs.filter((e) => e.instance_id === r.id && e.at >= r.status_since);
-    const a = [...mineEv].reverse().find((e) => e.type === "acknowledged"), e = [...mineEv].reverse().find((e) => e.type === "escalated");
+    const a = [...mineEv].reverse().find((e) => e.type === "acknowledged"), e = [...mineEv].reverse().find((e) => e.type === "escalated" || e.type === "escalation_raised");
     issues.push({ ...base, ...it, ack: a ? { by: a.actor ?? "", at: a.at } : null, esc: e ? { detail: e.detail, by: e.actor ?? "", at: e.at } : null });
   }
 

@@ -1,5 +1,6 @@
 // Task lifecycle: instance generation, time-based sweeps, submit, review, audit.
 import { all, batch, one, run, tx } from "./db";
+import { notify, taskTitle } from "./notify";
 import { DAY, HOUR, addDays, atTime, isoDate, weekday } from "./time";
 import { addWork, autoCloseAt, awayCacheFresh, awayMap, coverFor, forPerson, isOff, normOff, offCacheFresh, offCfg, personOffWhy, setAwayCache, setOffCache, type OffCfg, type PersonOff } from "./offdays";
 
@@ -213,6 +214,7 @@ export async function coverAway(now: number, force = false): Promise<number> {
         if (cover) {
           await run("UPDATE instances SET assignee_id=? WHERE id=?", cover, i.id);
           await logEvent(i.id, now, null, "reassigned", `${name(cover)} covering for ${name(i.assignee_id!)} (${why.toLowerCase()})`);
+          if (i.task_date <= today) await notify(cover, { kind: "assigned", title: await taskTitle(i.id), body: `You're covering for ${name(i.assignee_id!)} (${why.toLowerCase()})`, link: `/tasks/${i.id}`, instanceId: i.id }, now);
         } else {
           await setStatus(i.id, "waived", now, ", closed_at=?", now);
           await logEvent(i.id, now, null, "waived", `Not counted: ${name(i.assignee_id!)} was off (${why.toLowerCase()}) and nobody could cover`);
@@ -229,6 +231,7 @@ export async function coverAway(now: number, force = false): Promise<number> {
       if (!cover) continue; // Nobody to cover: the clock pauses on their days off (see waitMs).
       await run(`UPDATE instances SET ${review ? "reviewer_id" : "auditor_id"}=? WHERE id=?`, cover, i.id);
       await logEvent(i.id, now, null, "reassigned", `${review ? "Review" : "Audit"} moved to ${name(cover)}: ${name(who)} is off (${why.toLowerCase()})`);
+      await notify(cover, { kind: "assigned", title: await taskTitle(i.id), body: `${review ? "Review" : "Audit"} moved to you: ${name(who)} is off (${why.toLowerCase()})`, link: `/review/${i.id}`, instanceId: i.id }, now);
       n++;
     }
   });
@@ -236,6 +239,7 @@ export async function coverAway(now: number, force = false): Promise<number> {
 }
 
 export async function sweep(now = Date.now()) {
+  await dropOrphans();
   await generateInstances(isoDate(now), addDays(isoDate(now), 1), now);
   await coverAway(now);
   const c = await loadOff();
@@ -275,7 +279,7 @@ export async function missingEvidence(submissionId: number, templateId: number):
   });
 }
 
-export type Loc = { ok: boolean | null; distance: number | null; source?: "gps" | "simulated" | null };
+export type Loc = { ok: boolean | null; distance: number | null; source?: "gps" | "approx" | "simulated" | null; accuracy?: number | null };
 export async function submit(instanceId: number, userId: number, answers: AnswerInput[], loc: Loc, at: number) {
   return await tx(async () => {
     const i = (await one<Instance>("SELECT * FROM instances WHERE id=?", instanceId))!;
@@ -283,8 +287,8 @@ export async function submit(instanceId: number, userId: number, answers: Answer
     if (!["current", "notsub", "changes"].includes(i.status)) throw new Error("This task can't be submitted right now.");
     const resub = i.status === "changes";
     const attempt = i.attempt + 1;
-    const s = await run("INSERT INTO submissions (instance_id, attempt, submitted_by, submitted_at, location_ok, distance_m, location_src) VALUES (?,?,?,?,?,?,?)",
-      instanceId, attempt, userId, at, loc.ok === null ? null : loc.ok ? 1 : 0, loc.distance, loc.source ?? (loc.ok === null ? null : "gps"));
+    const s = await run("INSERT INTO submissions (instance_id, attempt, submitted_by, submitted_at, location_ok, distance_m, location_src, accuracy_m) VALUES (?,?,?,?,?,?,?,?)",
+      instanceId, attempt, userId, at, loc.ok === null ? null : loc.ok ? 1 : 0, loc.distance, loc.source ?? (loc.ok === null ? null : "gps"), loc.accuracy ?? null);
     const sid = Number(s.lastInsertRowid);
     for (const a of answers) {
       await run("INSERT INTO answers (submission_id, item_id, checked, value, note, photos, reply) VALUES (?,?,?,?,?,?,?)",
@@ -305,14 +309,15 @@ export async function submit(instanceId: number, userId: number, answers: Answer
     const c = await loadOff();
     const pick = toReview && isOff(c, isoDate(at)) ? await weekendPick(c, i, t, sid, at, loc, resub) : null;
     await run("UPDATE instances SET wk=?, wk_why=? WHERE id=?", pick?.wk ?? null, pick?.why ?? null, instanceId);
-    if (t.geofence && loc.ok === false) await logEvent(instanceId, at, userId, "location_warning", `Submitted ${loc.distance ?? "?"} m from property`);
+    if (t.geofence && loc.ok === false) await logEvent(instanceId, at, userId, "location_warning", `Submitted ${loc.distance == null ? "?" : loc.distance >= 1000 ? `${(loc.distance / 1000).toFixed(1)} km` : `${loc.distance} m`} from property`);
     if (t.geofence && loc.source === "simulated") await logEvent(instanceId, at, userId, "location_warning", "Location simulated, not checked");
+    if (t.geofence && loc.source === "approx") await logEvent(instanceId, at, userId, "location_warning", `Location not verified: the device gave only a rough area (±${Math.round((loc.accuracy ?? 0) / 1000)} km)`);
     return sid;
   });
 }
 
 export async function latestSubmission(instanceId: number) {
-  return await one<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; location_src: string | null }>(
+  return await one<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; location_src: string | null; accuracy_m: number | null }>(
     "SELECT * FROM submissions WHERE instance_id=? ORDER BY attempt DESC LIMIT 1", instanceId);
 }
 
@@ -390,6 +395,7 @@ export async function reviewDecision(instanceId: number, reviewerId: number, dec
       const exhausted = i.attempt >= t.attempts_allowed;
       await setStatus(instanceId, exhausted ? "notrect" : "changes", at, exhausted ? ", closed_at=?" : "", ...(exhausted ? [at] : []));
       await logEvent(instanceId, at, reviewerId, "changes_requested", flags.map((f) => f.reason).join(", ") + (exhausted ? " · attempts used up, not rectified" : ""));
+      if (!exhausted) await notify(i.assignee_id, { kind: "changes", title: await taskTitle(instanceId), body: `Changes required: ${flags.map((f) => f.reason).join(", ")}`, link: `/tasks/${instanceId}`, instanceId, actorId: reviewerId }, at);
     } else {
       const noEvidence = accepted.length ? ` · accepted without evidence: ${accepted.join("; ")}` : "";
       await pass(i, t, reviewerId, at, noEvidence);
@@ -416,6 +422,8 @@ export async function auditDecision(instanceId: number, auditorId: number, decis
     } else {
       await setStatus(instanceId, "auditflag", at);
       await logEvent(instanceId, at, auditorId, "audit_failed", flags.map((f) => f.reason).join(", ") + " · CBM to answer");
+      const cbm = await one<{ cbm_id: number | null }>("SELECT cbm_id FROM properties WHERE id=?", i.property_id);
+      await notify(cbm?.cbm_id, { kind: "auditflag", title: await taskTitle(instanceId), body: `Audit flags to answer: ${flags.map((f) => f.reason).join(", ")}`, link: `/tasks/${instanceId}`, instanceId, actorId: auditorId }, at);
     }
   });
 }
@@ -483,9 +491,9 @@ export function nextActor(i: Pick<Instance, "status" | "assignee_id" | "reviewer
   }
 }
 
-export async function remind(instanceIds: number[], actorId: number, at: number) {
+export async function remind(instanceIds: number[], actorId: number, at: number, doersOnly = false) {
   const people = new Set<number>();
-  let skipped = 0;
+  let skipped = 0, self = 0, peers = 0;
   await tx(async () => {
     for (const id of instanceIds) {
       // Don't nag: skip a task that already got a reminder in the last 4 hours.
@@ -495,21 +503,39 @@ export async function remind(instanceIds: number[], actorId: number, at: number)
       if (!i) continue;
       const who = nextActor(i, i.cbm_id);
       if (!who) continue;
+      if (who === actorId) { self++; continue; }
+      if (doersOnly && !["upcoming", "current", "notsub", "changes", "auditflag"].includes(i.status)) { peers++; continue; }
       people.add(who);
-      const u = await one<{ name: string }>("SELECT name FROM users WHERE id=?", who);
+      const u = await one<{ name: string; access_role: string }>("SELECT name, access_role FROM users WHERE id=?", who);
       await logEvent(id, at, actorId, "reminder", `Reminder sent to ${u?.name}`);
+      const doer = ["upcoming", "current", "notsub", "changes", "auditflag"].includes(i.status);
+      const what = { current: "Please submit it before the window closes.", upcoming: "It opens soon.", notsub: "It's overdue. Please submit it now.", changes: "Changes are waiting. Please fix and resubmit.",
+        auditflag: "Audit flags are waiting for your answer.", review: "It's waiting for your review.", resub: "A resubmission is waiting for your review.", audit: "It's waiting for your audit.", flagans: "Flag answers are waiting for you to close." }[i.status] ?? "";
+      await notify(who, { kind: "reminder", title: await taskTitle(id), body: what, link: doer && u?.access_role !== "admin" ? `/tasks/${id}` : `/review/${id}`, instanceId: id, actorId }, at);
     }
   });
-  return { people: people.size, skipped };
+  return { people: people.size, skipped, self, peers };
 }
 
-/** Removes not-yet-open runs of a task at properties it no longer covers (with their "created" history). */
+// A scheduled run nobody has submitted yet: still open (or not yet open) and never sent in.
+const UNSENT = "source='schedule' AND attempt=0 AND first_submitted_at IS NULL AND status IN ('upcoming','current','notsub')";
+
+async function dropRuns(ids: number[]) {
+  if (!ids.length) return 0;
+  const iq = ids.join(",");
+  await batch([[`DELETE FROM events WHERE instance_id IN (${iq})`], [`DELETE FROM instances WHERE id IN (${iq})`]]);
+  return ids.length;
+}
+
+/** Removes runs of a task at properties it no longer covers, as long as nobody has submitted them (with their history). */
 export async function dropUpcoming(templateId: number, propertyIds: number[]) {
-  if (!propertyIds.length) return;
+  if (!propertyIds.length) return 0;
   const q = propertyIds.map(() => "?").join(",");
-  const ids = (await all<{ id: number }>(`SELECT id FROM instances WHERE template_id=? AND status='upcoming' AND attempt=0 AND property_id IN (${q})`, templateId, ...propertyIds)).map((x) => x.id);
-  if (!ids.length) return;
-  const iq = ids.map(() => "?").join(",");
-  await run(`DELETE FROM events WHERE instance_id IN (${iq})`, ...ids);
-  await run(`DELETE FROM instances WHERE id IN (${iq})`, ...ids);
+  return dropRuns((await all<{ id: number }>(`SELECT id FROM instances WHERE template_id=? AND ${UNSENT} AND property_id IN (${q})`, templateId, ...propertyIds)).map((x) => x.id));
+}
+
+/** Clears unsent runs left at properties a task was taken off before this rule existed, so they stop counting as to-do and overdue. */
+export async function dropOrphans() {
+  return dropRuns((await all<{ id: number }>(`SELECT i.id FROM instances i WHERE ${UNSENT.replace(/(source|attempt|first_submitted_at|status)/g, "i.$1")}
+    AND NOT EXISTS (SELECT 1 FROM template_properties tp WHERE tp.template_id=i.template_id AND tp.property_id=i.property_id)`)).map((x) => x.id));
 }

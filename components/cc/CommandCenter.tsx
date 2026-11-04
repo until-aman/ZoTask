@@ -114,7 +114,7 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
         <Health d={d} />
 
         <h2 className="band">Action required</h2>
-        <ActionQueue issues={d.issues} now={d.now} me={d.userName} canEscalate={d.canEscalate} toast={setToast}
+        <ActionQueue issues={d.issues} now={d.now} me={d.userName} isAdmin={d.role === "admin"} canEscalate={d.canEscalate} toast={setToast}
           onIssue={(i: Issue) => i.id && setTask({ id: i.id, fromList: false })}
           handover={{ closedToday: d.closedToday, tomorrow: d.tomorrow, tasks: d.tasks, period: span(d.R), scope }} />
 
@@ -135,7 +135,7 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
         <p className="small muted" style={{ textAlign: "center" }}>Prototype with sample data. Figures are calculated from the task records in this demo, and every number links to the tasks behind it.</p>
       </div>
       {drill && !task && <DrillDrawer drill={drill} tasks={d.tasks} now={d.now} close={() => setDrill(null)} openTask={(id) => setTask({ id, fromList: true })} />}
-      {task && <TaskDrawer id={task.id} now={d.now} canEscalate={d.canEscalate} issue={issueOf(task.id)} onDone={setToast}
+      {task && <TaskDrawer id={task.id} now={d.now} canEscalate={d.canEscalate} isAdmin={d.role === "admin"} issue={issueOf(task.id)} onDone={setToast}
         back={task.fromList && drill ? () => setTask(null) : undefined} close={() => { setTask(null); setDrill(null); }} />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </DrillCtx.Provider>

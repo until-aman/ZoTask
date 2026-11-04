@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { redirect } from "next/navigation";
 import { boot } from "@/lib/boot";
 import { can } from "@/lib/auth";
@@ -23,7 +24,7 @@ export default async function EditTemplate({ params }: { params: Promise<{ id: s
   const categories = (await all<{ name: string }>("SELECT name FROM task_categories WHERE archived=0 ORDER BY pos, id")).map((c) => c.name);
   return (
     <div className="page">
-      <Link href="/admin" className="crumb">‹ Admin</Link>
+      <BackLink href="/admin" label="Admin" />
       <div className="phead"><div><h1>{t ? `Edit “${t.name}”` : "New task"}</h1></div></div>
       <TemplateEditor id={id} initial={t ?? null} initialItems={items} selected={selected} geo={await geo()} people={people} categories={categories}
         checklists={await all<ChecklistPreset>("SELECT * FROM checklist_presets ORDER BY title")}

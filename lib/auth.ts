@@ -42,9 +42,16 @@ export async function requireTasks(u: User, ids: number[]) {
   for (const id of ids) if ((await taskInScope(u, id)) === null) throw new Error("That task isn't at one of your properties.");
 }
 
+// Which screens each role sees (the menu and the pages follow this):
+//   Ops admin:        Review Queue, Analytics, Escalations, Map, Admin (incl. Team leave)
+//   Reviewer/auditor: Review Queue, Analytics, Escalations
+//   CBM:              My Tasks, Analytics, Escalations
+//   Ground team:      My Tasks
 export const can = {
-  queue: (u: User) => u.access_role !== "ground",
-  dashboard: (u: User) => u.access_role !== "ground",
+  queue: (u: User) => ["admin", "reviewer", "auditor"].includes(u.access_role),
+  dashboard: (u: User) => ["admin", "reviewer", "auditor", "cbm"].includes(u.access_role),
+  escalations: (u: User) => ["admin", "reviewer", "auditor", "cbm"].includes(u.access_role),
+  map: (u: User) => u.access_role === "admin",
   admin: (u: User) => u.access_role === "admin",
   tasks: (u: User) => ["ground", "cbm"].includes(u.access_role),
 };

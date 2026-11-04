@@ -74,7 +74,8 @@ CREATE INDEX IF NOT EXISTS ix_inst_date ON instances(task_date);
 CREATE TABLE IF NOT EXISTS submissions (
   id INTEGER PRIMARY KEY, instance_id INTEGER NOT NULL REFERENCES instances(id), attempt INTEGER NOT NULL,
   submitted_by INTEGER REFERENCES users(id), submitted_at INTEGER NOT NULL, location_ok INTEGER, distance_m INTEGER,
-  location_src TEXT                               -- gps (checked on the server) | simulated (demo button) | null (not checked)
+  location_src TEXT,                              -- gps (checked on the server) | approx (device gave only a rough area) | simulated (demo button) | null (not checked)
+  accuracy_m INTEGER                              -- how precise the device said its reading was
 );
 CREATE TABLE IF NOT EXISTS answers (
   id INTEGER PRIMARY KEY, submission_id INTEGER NOT NULL REFERENCES submissions(id), item_id INTEGER NOT NULL REFERENCES template_items(id),
@@ -146,3 +147,9 @@ CREATE TABLE IF NOT EXISTS map_sites (
   gender TEXT, details TEXT
 );
 CREATE TABLE IF NOT EXISTS photos (name TEXT PRIMARY KEY, type TEXT NOT NULL, data BLOB NOT NULL, at INTEGER NOT NULL);
+-- In-app notifications: reminders and other things that need this person, shown under the bell.
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), at INTEGER NOT NULL, kind TEXT NOT NULL,
+  title TEXT NOT NULL, body TEXT, link TEXT, instance_id INTEGER, actor_id INTEGER REFERENCES users(id), read_at INTEGER, popped_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, id);

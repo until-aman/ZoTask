@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { T } from "@/lib/command";
 import type { Detail } from "@/lib/detail";
-import { getTaskDetail, remindTasks, acknowledgeIssues, escalateIssue } from "@/app/actions";
+import { locationLabel } from "@/lib/geo";
+import { getTaskDetail, remindTasks, acknowledgeIssues } from "@/app/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/statuses";
 import ReviewForm from "@/components/ReviewForm";
 import Timeline from "@/components/Timeline";
@@ -57,13 +58,12 @@ export function DrillDrawer({ drill, tasks, now, close, openTask }: { drill: Dri
   );
 }
 
-export function TaskDrawer({ id, now, back, close, issue, canEscalate, onDone }: {
-  id: number; now: number; back?: () => void; close: () => void; canEscalate: boolean; onDone: (msg: string) => void;
+export function TaskDrawer({ id, now, back, close, issue, canEscalate, isAdmin = false, onDone }: {
+  id: number; now: number; back?: () => void; close: () => void; canEscalate: boolean; isAdmin?: boolean; onDone: (msg: string) => void;
   issue?: { type: string; owner: string; ownerRole: string; ack: { by: string; at: number } | null; esc: { detail: string } | null };
 }) {
   const router = useRouter();
   const [d, setD] = useState<Detail | null | undefined>(undefined);
-  const [esc, setEsc] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
@@ -134,7 +134,7 @@ export function TaskDrawer({ id, now, back, close, issue, canEscalate, onDone }:
             ) : latest ? (
               <div className="grid" style={{ gap: 8 }}>
                 <h3 style={{ margin: 0 }}>Latest submission · attempt {latest.attempt}</h3>
-                <p className="small muted" style={{ margin: 0 }}>By {latest.by_name} · {when(latest.submitted_at)} · {latest.location_src === "simulated" ? <span className="warn">location simulated (demo)</span> : latest.location_ok === null ? "location not checked" : latest.location_ok ? "at the property" : <span className="warn">{latest.distance_m} m away</span>}</p>
+                <p className="small muted" style={{ margin: 0 }}>By {latest.by_name} · {when(latest.submitted_at)} · {(() => { const [t, tone] = locationLabel(latest); return <span className={tone === "g" ? "" : "warn"}>Location: {t.charAt(0).toLowerCase() + t.slice(1)}</span>; })()}</p>
                 {d.items.map((it) => {
                   const a = latest.answers[it.id];
                   return (
@@ -156,17 +156,10 @@ export function TaskDrawer({ id, now, back, close, issue, canEscalate, onDone }:
           </>}
         </div>
         {r && <div className="df">
-          {["notsub", "changes", "review", "resub", "audit", "auditflag", "flagans", "current"].includes(r.status) &&
+          {["notsub", "changes", "auditflag", "current", ...(isAdmin ? ["review", "resub", "audit", "flagans"] : [])].includes(r.status) &&
             <button type="button" className="btn sm" disabled={busy} onClick={() => act(remindTasks([id]))}>Send reminder</button>}
           {issue && !issue.ack && <button type="button" className="btn sm" disabled={busy} onClick={() => act(acknowledgeIssues([id]))}>Acknowledge</button>}
-          {issue && canEscalate && !issue.esc && (esc === null
-            ? <button type="button" className="btn sm danger" onClick={() => setEsc("")}>Escalate</button>
-            : <span className="row2" style={{ flex: "1 1 100%" }}>
-                <input type="text" placeholder="Note for the escalation (optional)" value={esc} onChange={(e) => setEsc(e.target.value)} style={{ flex: 1 }} aria-label="Escalation note" />
-                <button type="button" className="btn sm danger" disabled={busy} onClick={() => act(escalateIssue(id, esc))}>Escalate now</button>
-                <button type="button" className="link small" onClick={() => setEsc(null)}>Cancel</button>
-              </span>)}
-          {canEscalate && <button type="button" className="btn sm" onClick={() => router.push(`/escalations?task=${id}`)}>Raise escalation</button>}
+          {canEscalate && !issue?.esc && <button type="button" className="btn sm danger" onClick={() => router.push(`/escalations?task=${id}`)}>Escalate</button>}
           <span className="spacer" />
           <Link className="btn sm outline" href={`/review/${id}`}>Open full page</Link>
         </div>}

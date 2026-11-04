@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import Nav, { type NavItem } from "@/components/Nav";
 import SideToggle from "@/components/SideToggle";
+import NotificationBell from "@/components/NotificationBell";
+import { NavMemory } from "@/components/BackLink";
 
 const ROLE_LABEL: Record<string, string> = { admin: "Admin", reviewer: "Reviewer", auditor: "Auditor", cbm: "CBM", ground: "Ground team" };
 type U = { name: string; access_role: string; op_role: string | null } | null | undefined;
@@ -25,7 +27,7 @@ export default function Shell({ user, links, children }: { user: U; links: NavIt
           </div>
         )}
       </aside>
-      <div className="main">{children}</div>
+      <div className="main">{user && <Suspense><NavMemory /></Suspense>}{user && <div className="topbar"><NotificationBell /></div>}{children}</div>
     </div>
   );
 }

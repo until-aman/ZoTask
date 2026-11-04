@@ -4,9 +4,10 @@
 import { addDays, fmtDate, fmtDateTime } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { writeUrl } from "@/components/ui/useUrlState";
 import { getHistory, pullBackTask, reassignReviewer, remindTasks, ViewFilters } from "@/app/actions";
-import { ColumnsMenu, ExportMenu, Person, RowMenu, useHiddenCols } from "@/components/ui/TableKit";
+import { ColumnsMenu, ExportMenu, Person, RowMenu, useClearOnRowMenu, useHiddenCols } from "@/components/ui/TableKit";
 import { ActiveChip, DateRow, Field, FilterBar, SearchPick, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
 
 export type QItem = {
@@ -51,28 +52,47 @@ const empty: ViewFilters = { city: [], cluster: [], prop: [], role: [], asg: [],
 const CENTRAL_TABS = ["weekend", "wkclosed"];
 const isWeekend = (t: QItem) => !!t.wk && (t.s === "review" || t.s === "resub");
 
-export default function QueueClient({ items, geo, views, reviewers, me, canReview, isCentral, pullbackDays, today, initial }: {
-  items: QItem[]; geo: Geo[]; views: SavedView[]; reviewers: { id: number; name: string }[]; me: string; canReview: boolean; today: string;
+export default function QueueClient({ items, geo, views, reviewers, me, canReview, isAdmin, canEscalate, isCentral, pullbackDays, today, initial }: {
+  items: QItem[]; geo: Geo[]; views: SavedView[]; reviewers: { id: number; name: string }[]; me: string; canReview: boolean; isAdmin: boolean; canEscalate: boolean; today: string;
   isCentral: boolean; pullbackDays: number;
   initial: { tab?: string; city?: string[]; cluster?: string[]; prop?: string[]; from?: string; to?: string; bucket?: string; over?: boolean };
 }) {
   const router = useRouter();
-  const fromLink = !!(initial.tab || initial.city || initial.prop || initial.from);
+  // Everything about the view lives in the address, so Back from a review sheet lands on the same tab, filters, search, page and open task.
+  const sp = useSearchParams();
+  const g0 = (k: string) => sp?.get(k) ?? null, l0 = (k: string) => g0(k)?.split("|").filter(Boolean) ?? [];
+  // On Back the page comes from the browser's memory with the first load's server data, so the address is the truth for the view.
+  if (sp) initial = { ...initial, tab: g0("tab") ?? undefined, city: g0("city") ? l0("city") : undefined, cluster: g0("cluster") ? l0("cluster") : undefined,
+    prop: g0("prop") ? l0("prop") : undefined, from: g0("from") ?? undefined, to: g0("to") ?? undefined, bucket: g0("bucket") ?? undefined, over: g0("over") === "1" };
+  const d0 = g0("d"), sort0 = g0("sort");
+  const fromLink = !!(initial.tab || initial.city || initial.prop || initial.from || d0 || g0("role") || g0("asg") || g0("cbm") || g0("rv") || g0("mine"));
   const defView = views.find((v) => v.def);
-  const [f, setF] = useState<ViewFilters>(() => fromLink ? { ...empty, city: initial.city ?? [], cluster: initial.cluster ?? [], prop: initial.prop ?? [] } : defView ? { ...empty, ...(defView.f as Partial<ViewFilters>) } : empty);
-  const [date, setDateMode] = useState(initial.from ? "custom" : "today");
-  const [from, setFrom] = useState(initial.from ?? today);
-  const [to, setTo] = useState(initial.to ?? today);
+  const [f, setF] = useState<ViewFilters>(() => fromLink ? { ...empty, city: initial.city ?? [], cluster: initial.cluster ?? [], prop: initial.prop ?? [], role: l0("role"), asg: l0("asg"), cbm: l0("cbm"), rv: l0("rv"), mine: g0("mine") === "1" } : defView ? { ...empty, ...(defView.f as Partial<ViewFilters>) } : empty);
+  const dates0: Record<string, [string, string]> = { yday: [addDays(today, -1), addDays(today, -1)], "7d": [addDays(today, -6), today] };
+  const [date, setDateMode] = useState(initial.from ? "custom" : d0 && dates0[d0] ? d0 : "today");
+  const [from, setFrom] = useState(initial.from ?? (d0 && dates0[d0] ? dates0[d0][0] : today));
+  const [to, setTo] = useState(initial.to ?? (d0 && dates0[d0] ? dates0[d0][1] : today));
   const [tab, setTab] = useState(initial.tab ?? "review");
   const [bk, setBk] = useState(initial.bucket ?? (initial.over ? "over" : "all"));
-  const [q, setQ] = useState("");
-  const [sort, setSort] = useState<SortState>(null);
-  const [page, setPage] = useState(0);
+  const [q, setQ] = useState(g0("q") ?? "");
+  const [sort, setSort] = useState<SortState>(sort0 ? { key: sort0.replace(/[.-]1$/, ""), dir: sort0.endsWith("-1") ? -1 : 1 } : null);
+  const [page, setPage] = useState(Math.max(0, Number(g0("pg") ?? 1) - 1) || 0);
   const [sel, setSel] = useState<Set<number>>(new Set());
-  const [open, setOpen] = useState<number | null>(null);
+  const [open, setOpen] = useState<number | null>(g0("open") ? Number(g0("open")) : null);
+  useEffect(() => {
+    const j = (l: string[]) => (l.length ? l.join("|") : null);
+    writeUrl({ tab: tab === "review" ? null : tab, bucket: bk === "all" ? null : bk, over: null,
+      d: date === "today" || date === "custom" ? null : date, from: date === "custom" ? from : null, to: date === "custom" ? to : null,
+      city: j(f.city), cluster: j(f.cluster), prop: j(f.prop), role: j(f.role), asg: j(f.asg), cbm: j(f.cbm), rv: j(f.rv), mine: f.mine ? "1" : null,
+      q: q || null, pg: page ? String(page + 1) : null, sort: sort ? `${sort.key}${sort.dir === -1 ? "-1" : ".1"}` : null, open: open === null ? null : String(open) });
+  }, [tab, bk, date, from, to, f, q, page, sort, open]);
+  // Opening one row's ⋯ menu works on that row only, so any ticked rows are let go.
+  useClearOnRowMenu(() => setSel(new Set()));
   const [pop, setPop] = useState<string | null>(null);
   const [modal, setModal] = useState<"reassign" | null>(null);
   const [toast, setToast] = useState("");
+  // Nobody reminds themselves; reviewers and auditors remind the people doing the task, and only an admin chases another reviewer or auditor.
+  const canRemind = (t: QItem, who: string | null | undefined) => !!who && who !== me && (isAdmin || ["upcoming", "current", "notsub", "changes", "auditflag"].includes(t.s));
   const [hist, setHist] = useState<Ev[]>([]);
 
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); }, [toast]);
@@ -265,7 +285,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               <div className="bulk">
                 <span>{sel.size} selected</span><span className="spacer" />
                 <button type="button" className="btn sm primary" onClick={() => remind(selIds)}>Send reminder</button>
-                {canReview && ["review", "resub"].includes(tab) && <button type="button" className="btn sm" onClick={() => setModal("reassign")}>Reassign reviewer</button>}
+                {isAdmin && ["review", "resub"].includes(tab) && <button type="button" className="btn sm" onClick={() => setModal("reassign")}>Reassign reviewer</button>}
                 <button type="button" className="btn sm" onClick={() => setSel(new Set())}>Clear</button>
               </div>
             )}
@@ -303,8 +323,9 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                       { label: "Show details", onClick: () => setOpen(t.id) },
                       { label: "Open review sheet", onClick: () => router.push(`/review/${t.id}`) },
                       { label: "Pull back for review", hidden: !(canReview && t.pull), onClick: () => pullBack(t.id) },
-                      { label: n.who ? `Remind ${n.who.split(" ")[0]}` : "Send reminder", hidden: !g.open, onClick: () => remind([t.id]) },
-                      { label: "Reassign reviewer", hidden: !(canReview && ["review", "resub"].includes(t.s)), onClick: () => { setSel(new Set([t.id])); setModal("reassign"); } },
+                      { label: `Remind ${n.who?.split(" ")[0]}`, hidden: !g.open || !canRemind(t, n.who), onClick: () => remind([t.id]) },
+                      { label: "Escalate…", danger: true, hidden: !canEscalate, onClick: () => router.push(`/escalations?task=${t.id}`) },
+                      { label: "Reassign reviewer", hidden: !(isAdmin && ["review", "resub"].includes(t.s)), onClick: () => { setSel(new Set([t.id])); setModal("reassign"); } },
                     ]} />
                   </div>
                 </div>
@@ -355,7 +376,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               <div className="df">
                 <Link className="btn primary" href={`/review/${t.id}`}>Open review sheet</Link>
                 {canReview && t.pull && <button type="button" className="btn" onClick={() => pullBack(t.id)}>Pull back for review</button>}
-                {n.who && <button type="button" className="btn" onClick={() => remind([t.id])}>Remind {n.who.split(" ")[0]}</button>}
+                {canRemind(t, n.who) && <button type="button" className="btn" onClick={() => remind([t.id])}>Remind {n.who!.split(" ")[0]}</button>}
+                {canEscalate && <button type="button" className="btn danger" onClick={() => router.push(`/escalations?task=${t.id}`)}>Escalate</button>}
               </div>
             </aside>
           </>

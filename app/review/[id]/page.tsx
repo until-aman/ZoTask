@@ -1,8 +1,10 @@
 import { actionLabel } from "@/lib/statuses";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
+import { locationLabel } from "@/lib/geo";
 import { boot } from "@/lib/boot";
-import { taskInScope } from "@/lib/auth";
+import { can, taskInScope } from "@/lib/auth";
 import { all, one } from "@/lib/db";
 import { itemsFor, loadOff, missingEvidence } from "@/lib/engine";
 import { autoCloseAt } from "@/lib/offdays";
@@ -19,7 +21,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
   const [r] = await rows("i.id=?", id);
   if (!r) notFound();
   const items = await itemsFor(r.template_id);
-  const subs = await all<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; location_src: string | null; by_name: string }>(
+  const subs = await all<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; location_src: string | null; accuracy_m: number | null; by_name: string }>(
     "SELECT s.*, u.name AS by_name FROM submissions s JOIN users u ON u.id=s.submitted_by WHERE instance_id=? ORDER BY attempt", id);
   const answers = await all<{ submission_id: number; item_id: number; checked: number; value: string | null; note: string | null; photos: string; reply: string | null }>(
     `SELECT a.* FROM answers a JOIN submissions s ON s.id=a.submission_id WHERE s.instance_id=?`, id);
@@ -44,14 +46,17 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
 
   return (
     <div className="page">
-      <Link href="/queue" className="crumb">‹ Review Queue</Link>
+      {can.queue(u) ? <BackLink href="/queue" label="Review Queue" /> : <BackLink href="/tasks" label="My Tasks" />}
       <div className="phead">
         <div>
           <h1>{r.task}</h1>
           <p className="phead-sub">{r.property} · {r.cluster}, {r.city}</p>
           <p className="phead-sub">Scheduled for <b>{fmtDate(r.task_date)}, {r.window_start}–{r.window_end}</b> · Last action: <b>{actionLabel(r.last_type)}</b>, {fmtDateTime(r.last_at ?? r.status_since)}</p>
         </div>
-        <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
+        <span className="phead-acts">
+          <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
+          {isCentralRole(u.access_role) && <Link href={`/escalations?task=${r.id}`} className="btn sm danger">Escalate</Link>}
+        </span>
       </div>
       {isCentralRole(u.access_role) && r.wk && ["review", "resub"].includes(r.status) && <div className={`banner ${r.wk === "must" ? "warn" : ""}`} role="note">
           <b>Submitted on a reviewer day off.</b>{" "}
@@ -67,7 +72,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
           <dt>Auditor</dt><dd>{r.auditor ?? "—"} · audit within {r.audit_sla_h}h</dd>
           {latest && <><dt>Submitted</dt><dd>{fmtDateTime(latest.submitted_at)} by {latest.by_name} · attempt {latest.attempt} of {r.attempts_allowed}
             {latest.submitted_at > r.window_end_at && subs[0].id === latest.id ? <span className="pill a" style={{ marginLeft: 6 }}>Late by {fmtDur(latest.submitted_at - r.window_end_at)}</span> : null}</dd></>}
-          {latest && <><dt>Location</dt><dd>{latest.location_src === "simulated" ? <span className="pill a">Simulated (demo), not checked</span> : latest.location_ok === null ? <span className="pill a">Not checked</span> : latest.location_ok ? <span className="pill g">At property</span> : <span className="pill r">{latest.distance_m} m away</span>}</dd></>}
+          {latest && <><dt>Location</dt><dd>{(() => { const [t, tone] = locationLabel(latest); return <span className={`pill ${tone}`}>{t}</span>; })()}</dd></>}
         </dl>
       </div>
       {!latest && <div className="card muted">Nothing has been submitted yet.</div>}

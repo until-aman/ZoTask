@@ -27,3 +27,13 @@ export function km(a: { lat: number; lng: number }, b: { lat: number; lng: numbe
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
   return 12742 * Math.asin(Math.sqrt(h));
 }
+
+const dist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${m} m`);
+/** How a submission's location check reads to a reviewer, with a pill tone. */
+export function locationLabel(s: { location_ok: number | null; distance_m: number | null; location_src: string | null; accuracy_m?: number | null }): [string, "g" | "a" | "r"] {
+  if (s.location_src === "simulated") return ["Simulated (demo), not checked", "a"];
+  if (s.location_src === "approx") return [`Not verified: device gave only a rough area (±${dist(s.accuracy_m ?? 0)})`, "a"];
+  if (s.location_ok === null) return ["Not checked", "a"];
+  if (s.location_ok) return ["At property", "g"];
+  return [`${dist(s.distance_m ?? 0)} away`, "r"];
+}

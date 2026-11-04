@@ -73,6 +73,15 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
         <h2 style={{ margin: 0 }}>{mode === "audit" ? "Audit" : "Review"} sheet</h2>
         <span className="spacer" />
         {actOn && <span className="small muted"><b>{items.length - left} of {items.length}</b> items checked</span>}
+        {actOn && (() => {
+          // One tap marks every item OK. Items already marked Needs change keep their flag, so nothing the reviewer wrote is lost.
+          const open = items.filter((it) => !flags[it.id] && !okd.has(it.id));
+          const flagged = items.filter((it) => flags[it.id]).length;
+          return open.length
+            ? <button type="button" className="btn sm primary" onClick={() => setOkd(new Set([...okd, ...open.map((it) => it.id)]))}
+                title={flagged ? `${flagged} item${flagged > 1 ? "s" : ""} marked Needs change stay flagged` : undefined}>✓ Mark all OK{flagged ? ` (${open.length})` : ""}</button>
+            : okd.size > 0 && <button type="button" className="btn sm" onClick={() => setOkd(new Set())}>Undo all OK</button>;
+        })()}
       </div>
       <div className="items">
       {items.map((it) => {

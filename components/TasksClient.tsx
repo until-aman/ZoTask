@@ -1,5 +1,6 @@
 "use client";
 // My Tasks for the ground team and CBMs: counts per list on top, then search and filters, then the tasks, 20 a page.
+import { urlHas, useUrlPage, useUrlSort, useUrlState } from "@/components/ui/useUrlState";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -18,22 +19,22 @@ const COLS = [
   { key: "last", label: "Last action", w: "minmax(0,1.2fr)", m: "minmax(0,1.1fr)" },
   { key: "due", label: "Due", w: "minmax(0,1.3fr)", m: "minmax(0,1.1fr)" },
 ];
-const TABS: [string, string][] = [["now", "Current and upcoming"], ["overdue", "Overdue"], ["changes", "Changes required"], ["flags", "Audit flags"], ["done", "Completed"]];
+const TABS: [string, string][] = [["all", "All pending"], ["now", "Current and upcoming"], ["overdue", "Overdue"], ["changes", "Changes required"], ["flags", "Audit flags"], ["done", "Completed"]];
 
 export default function TasksClient({ lists, tab, range, from, to, today, views }: { lists: Record<string, MyTask[]>; tab: string; range: string; from: string; to: string; today: string; views: SavedView[] }) {
   const router = useRouter();
-  const [q, setQ] = useState("");
-  const [prop, setProp] = useState("");
-  const [cat, setCat] = useState("");
-  const [crit, setCrit] = useState(false);
-  const [sort, setSort] = useState<SortState>(null);
-  const [page, setPage] = useState(0);
+  const [q, setQ] = useUrlState("q", "");
+  const [prop, setProp] = useUrlState("prop", "");
+  const [cat, setCat] = useUrlState("cat", "");
+  const [crit, setCrit] = useUrlState("crit", false);
+  const [sort, setSort] = useUrlSort("sort");
+  const [page, setPage] = useUrlPage("pg");
   const [toast, setToast] = useState("");
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); }, [toast]);
   const current = { prop, cat, crit };
   const apply = (f: Record<string, unknown>) => { setProp(String(f.prop ?? "")); setCat(String(f.cat ?? "")); setCrit(!!f.crit); setPage(0); };
   const def = views.find((v) => v.def);
-  useEffect(() => { if (def && !sameFilters(def.f, current)) apply(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (def && !urlHas(["prop", "cat", "crit"]) && !sameFilters(def.f, current)) apply(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const everything = Object.values(lists).flat();
   const props = [...new Set(everything.map((t) => t.property))].sort(), cats = [...new Set(everything.map((t) => t.category))].sort();
@@ -45,7 +46,12 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
   const shown = list.slice(pg * size, pg * size + size);
   const nice = (d: string) => fmtDate(d);
   const dateQ = range === "custom" ? `&range=custom&from=${from}&to=${to}` : range === "today" ? "" : `&range=${range}`;
-  const go = (t: string, q = dateQ) => router.push(`/tasks?tab=${t}${q}`);
+  // A new tab or date range starts at page 1; search, filters and sort carry over.
+  const go = (t: string, dq = dateQ) => {
+    const keep = new URLSearchParams(window.location.search);
+    for (const k of ["tab", "range", "from", "to", "date", "pg"]) keep.delete(k);
+    router.push(`/tasks?tab=${t}${dq}${keep.toString() ? `&${keep}` : ""}`);
+  };
   const span = from === to ? nice(from) : `${nice(from)} – ${nice(to)}`;
   const chips: ActiveChip[] = [
     ...(prop ? [{ key: "prop", label: <>Property: <b>{prop}</b></>, clear: () => setProp("") }] : []),
@@ -81,14 +87,14 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
         const n = lists[k].filter(keep).length;
         return { key: k, label: l, value: n, active: tab === k, onClick: () => { setPage(0); go(k); },
           tone: (k === "overdue" || k === "changes" || k === "flags") && n ? (k === "overdue" ? "r" as const : "a" as const) : undefined,
-          sub: k === "now" || k === "done" ? span : undefined };
+          sub: k === "now" || k === "done" ? span : k === "all" ? "Any date" : undefined };
       })} />
       <section className="listcard" aria-label="Tasks" style={grid}>
         <div className="ttool"><span className="small muted">{list.length} task{list.length === 1 ? "" : "s"}</span><span className="spacer" />
           <ColumnsMenu cols={[{ key: "task", label: "Task", fixed: true }, ...COLS, { key: "status", label: "Status", fixed: true }]} hidden={hidden} toggle={toggle} />
           <ExportMenu name={`My Tasks ${TABS.find(([k]) => k === tab)?.[1] ?? ""}`} header={header} rows={() => cells(list)} page={list.length > shown.length ? () => cells(shown) : undefined} /></div>
         <div className="mthead">{sortHead("task", "Task")}{vis.map((c) => <span key={c.key}>{sortHead(c.key, c.label)}</span>)}{sortHead("status", "Status")}<span /></div>
-        {!shown.length ? <div className="empty"><b>Nothing here</b>{chips.length || q ? "No tasks match these filters." : tab === "now" ? `No open tasks for ${span}.` : "You're all caught up."}</div>
+        {!shown.length ? <div className="empty"><b>Nothing here</b>{chips.length || q ? "No tasks match these filters." : tab === "now" ? `No open tasks for ${span}.` : tab === "all" ? "Nothing is waiting on you. You're all caught up." : "You're all caught up."}</div>
           : shown.map((r) => (
             <div key={r.id} className="mtrow" onClick={() => router.push(`/tasks/${r.id}`)}>
               <div style={{ minWidth: 0 }}>

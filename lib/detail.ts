@@ -8,7 +8,7 @@ export async function taskDetail(id: number, u: User) {
   const [r] = await rows("i.id=?", id);
   if (!r) return null;
   const items = await itemsFor(r.template_id);
-  const subs = await all<{ id: number; attempt: number; submitted_at: number; location_ok: number | null; distance_m: number | null; location_src: string | null; by_name: string }>(
+  const subs = await all<{ id: number; attempt: number; submitted_at: number; location_ok: number | null; distance_m: number | null; location_src: string | null; accuracy_m: number | null; by_name: string }>(
     "SELECT s.*, u.name AS by_name FROM submissions s JOIN users u ON u.id=s.submitted_by WHERE instance_id=? ORDER BY attempt", id);
   const answers = await all<{ submission_id: number; item_id: number; checked: number; value: string | null; note: string | null; photos: string; reply: string | null }>(
     "SELECT a.* FROM answers a JOIN submissions s ON s.id=a.submission_id WHERE s.instance_id=?", id);

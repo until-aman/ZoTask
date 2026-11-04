@@ -15,7 +15,7 @@ const FIX_SLA_H = 24, ANSWER_SLA_H = 48;
 
 export default async function Queue({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const u = await boot();
-  if (!can.queue(u)) redirect("/tasks");
+  if (!can.queue(u)) redirect("/");
   const sp = await searchParams;
   const props = await scopeProps(u);
   const now = Date.now();
@@ -47,5 +47,5 @@ export default async function Queue({ searchParams }: { searchParams: Promise<Re
     from: sp.from, to: sp.to, bucket: sp.bucket, over: sp.over === "1",
   };
   return <QueueClient items={items} geo={g} views={views} reviewers={reviewers} me={u.name}
-    canReview={["reviewer", "admin"].includes(u.access_role)} isCentral={central} pullbackDays={off.pullbackDays} today={isoDate(now)} initial={initial} />;
+    canReview={["reviewer", "admin"].includes(u.access_role)} isAdmin={u.access_role === "admin"} canEscalate={central} isCentral={central} pullbackDays={off.pullbackDays} today={isoDate(now)} initial={initial} />;
 }
