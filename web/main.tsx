@@ -1,4 +1,4 @@
-// Browser build of ZoTask: the same pages, engine and SQL, running on an in-memory SQLite database.
+// Browser build of TaskTrail: the same pages, engine and SQL, running on an in-memory SQLite database.
 import { Component, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { init } from "./db";
@@ -117,6 +117,6 @@ function App() {
     await init((window as unknown as { initSqlJs: Parameters<typeof init>[0] }).initSqlJs);
     createRoot(root).render(<App />);
   } catch (e) {
-    root.innerHTML = `<div class="page"><div class="err">ZoTask couldn't start: ${(e as Error).message}</div></div>`;
+    root.innerHTML = `<div class="page"><div class="err">TaskTrail couldn't start: ${(e as Error).message}</div></div>`;
   }
 })();

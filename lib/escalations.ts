@@ -28,7 +28,7 @@ export type EscInput = {
   ownerName: string; ownerEmail: string; cc: string; due: string; mailSent: boolean; mailSubject: string; link: string; photos: string[]; instanceId: number | null;
 };
 
-/** The ZoTask account behind an owner, matched by email first, then by exact name. */
+/** The TaskTrail account behind an owner, matched by email first, then by exact name. */
 async function ownerAccount(name: string, email: string) {
   if (email.trim()) { const byEmail = await one<{ id: number }>("SELECT id FROM users WHERE lower(email)=lower(?)", email.trim()); if (byEmail) return byEmail.id; }
   return (await one<{ id: number }>("SELECT id FROM users WHERE name=?", name.trim()))?.id ?? null;
@@ -78,7 +78,7 @@ export async function update(u: User, id: number, p: EscPatch, now: number) {
   if (p.mailSent && !e.mail_sent_at) parts.push("Email sent");
   if (p.photos?.length) parts.push(`${p.photos.length} photo${p.photos.length > 1 ? "s" : ""} added`);
   if (!parts.length && !p.note?.trim() && p.mailSubject === undefined && p.link === undefined) throw new Error("Nothing to update.");
-  // A new owner takes over the escalation in ZoTask too, so the right person can update it.
+  // A new owner takes over the escalation in TaskTrail too, so the right person can update it.
   const ownerId = owner ? await ownerAccount(owner, p.ownerEmail ?? "") : undefined;
   await tx(async () => {
     if (owner) await run("UPDATE escalations SET owner_id=? WHERE id=?", ownerId, id);

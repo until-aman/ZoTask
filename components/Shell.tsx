@@ -14,8 +14,8 @@ export default function Shell({ user, links, children }: { user: U; links: NavIt
     <div className={`shell${user ? "" : " bare"}`}>
       <aside className="side top">
         <div className="side-brand">
-          <Link href="/" className="logo" aria-label="ZoTask home">Ω</Link>
-          <Link href="/" className="brand">ZoTask</Link>
+          <Link href="/" className="logo" aria-label="TaskTrail home">T</Link>
+          <Link href="/" className="brand">TaskTrail</Link>
           {user && <SideToggle />}
         </div>
         {user && <Suspense><Nav links={links} /></Suspense>}

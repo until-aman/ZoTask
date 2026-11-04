@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/storage";
 // Sign in: one search over everyone, office roles in small cards, and the ground team grouped by property.
 import { useEffect, useState } from "react";
 import { signIn } from "@/app/actions";
@@ -11,7 +12,7 @@ const OFFICE: [string, string, string][] = [
   ["auditor", "Auditors", "Re-check a sample of passed tasks"],
   ["cbm", "Cluster Business Managers", "Own properties, answer audit flags"],
 ];
-const LAST = "zotask.lastUser";
+const LAST = "tasktrail.lastUser";
 
 function Pick({ p, sub }: { p: Person; sub?: string }) {
   return (
@@ -41,10 +42,10 @@ export default function LoginClient({ people }: { people: Person[] }) {
 
   return (
     <div className="page narrow lg">
-      <div className="lg-brand"><span className="logo" aria-hidden="true">Ω</span><span className="brand">ZoTask</span></div>
+      <div className="lg-brand"><span className="logo" aria-hidden="true">T</span><span className="brand">TaskTrail</span></div>
       <div className="phead">
-        <div><h1>Sign in to ZoTask</h1>
-        <p className="phead-sub">Sample data. Pick anyone to see ZoTask from their side.</p></div>
+        <div><h1>Sign in to TaskTrail</h1>
+        <p className="phead-sub">Sample data. Pick anyone to see TaskTrail from their side.</p></div>
       </div>
       <div className="lg-top">
         <input type="search" className="search grow" placeholder="Search name, property, city or role" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search people" autoFocus />

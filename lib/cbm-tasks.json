@@ -16,7 +16,7 @@
     "count_of": null,
     "photo": false,
     "note": false,
-    "guide": "What to check:\n• HK/SHK connection call made by shift start (10:30 AM): Yes/No\n• If No: number of attempts and time of 11:00 AM escalation\nHow:\n• Check the ZoTask entry and its timestamp against shift start\n• If No: Call the ACEM to understand the reason.\n• Not connected by 11:00 AM: Escalate to HK Manager to arrange immediate cover"
+    "guide": "What to check:\n• HK/SHK connection call made by shift start (10:30 AM): Yes/No\n• If No: number of attempts and time of 11:00 AM escalation\nHow:\n• Check the TaskTrail entry and its timestamp against shift start\n• If No: Call the ACEM to understand the reason.\n• Not connected by 11:00 AM: Escalate to HK Manager to arrange immediate cover"
    },
    {
     "label": "How many SHK's are present?",

@@ -39,7 +39,7 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
   const pins = useMemo(() => {
     const s = q.trim().toLowerCase();
     return data.pins.filter((p) => (!city || p.city === city) && (!status || p.status === status) && (!gender || genderLabel(p.gender) === gender)
-      && (!only || (only === "zotask" ? !!p.propertyId : only === "attention" ? attention(p) : !p.propertyId))
+      && (!only || (only === "tasktrail" ? !!p.propertyId : only === "attention" ? attention(p) : !p.propertyId))
       && (!s || `${p.name} ${p.code} ${p.city} ${p.state} ${p.address} ${p.cluster} ${p.cbm} ${genderLabel(p.gender)}`.toLowerCase().includes(s)))
       .sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name));
   }, [data.pins, q, city, status, gender, only]);
@@ -153,7 +153,7 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
     city && { key: "city", label: city, clear: () => setCity("") },
     status && { key: "status", label: status, clear: () => setStatus("") },
     gender && { key: "gender", label: gender, clear: () => setGender("") },
-    only && { key: "only", label: only === "zotask" ? "Run on ZoTask" : only === "attention" ? "Needs attention" : "Not on ZoTask yet", clear: () => setOnly("") },
+    only && { key: "only", label: only === "tasktrail" ? "Run on TaskTrail" : only === "attention" ? "Needs attention" : "Not on TaskTrail yet", clear: () => setOnly("") },
   ].filter(Boolean) as ActiveChip[];
   const zt = data.pins.filter((p) => p.propertyId);
   const att = data.pins.filter(attention).length;
@@ -172,7 +172,7 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
           <Field label="City"><select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((c) => <option key={c}>{c}</option>)}</select></Field>
           <Field label="Status"><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Any status</option>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select></Field>
           {genders.length > 0 && <Field label="For"><select value={gender} onChange={(e) => setGender(e.target.value)}><option value="">Anyone</option>{genders.map((g) => <option key={g}>{g}</option>)}</select></Field>}
-          <Field label="Show"><select value={only} onChange={(e) => setOnly(e.target.value)}><option value="">All properties</option><option value="zotask">Run on ZoTask</option><option value="attention">Needs attention</option><option value="other">Not on ZoTask yet</option></select></Field>
+          <Field label="Show"><select value={only} onChange={(e) => setOnly(e.target.value)}><option value="">All properties</option><option value="tasktrail">Run on TaskTrail</option><option value="attention">Needs attention</option><option value="other">Not on TaskTrail yet</option></select></Field>
         </>} />
 
       {sheet && <section className="card grid mupload" aria-label="Upload locations">
@@ -204,9 +204,9 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
 
       <Stats compact items={[
         { key: "all", label: "Properties on map", value: data.pins.length, sub: `${cities.length} cit${cities.length === 1 ? "y" : "ies"}`, active: !chips.length, onClick: () => { setCity(""); setStatus(""); setGender(""); setOnly(""); } },
-        { key: "zt", label: "Run on ZoTask", value: zt.length, sub: data.uploaded ? `${data.pins.length - zt.length} not yet` : "Upload the full list to see the rest", active: only === "zotask", onClick: () => setOnly(only === "zotask" ? "" : "zotask") },
+        { key: "tt", label: "Run on TaskTrail", value: zt.length, sub: data.uploaded ? `${data.pins.length - zt.length} not yet` : "Upload the full list to see the rest", active: only === "tasktrail", onClick: () => setOnly(only === "tasktrail" ? "" : "tasktrail") },
         { key: "att", label: "Need attention", value: att, tone: att ? "a" : undefined, sub: "Under 85% on time or overdue, last 7 days", active: only === "attention", onClick: () => { setOnly(only === "attention" ? "" : "attention"); setBy("health"); } },
-        { key: "miss", label: "Missing location", value: data.missing.length, tone: data.missing.length ? "r" : undefined, sub: data.missing.length ? data.missing.slice(0, 3).map((m) => m.name).join(", ") + (data.missing.length > 3 ? "…" : "") : "Every ZoTask property is placed" },
+        { key: "miss", label: "Missing location", value: data.missing.length, tone: data.missing.length ? "r" : undefined, sub: data.missing.length ? data.missing.slice(0, 3).map((m) => m.name).join(", ") + (data.missing.length > 3 ? "…" : "") : "Every TaskTrail property is placed" },
       ]} />
 
       <div className="mapwrap">
@@ -214,7 +214,7 @@ export default function PropertyMap({ data, admin }: { data: MapData; admin: boo
           <div ref={box} className="pmap" role="application" aria-label="Map of Zolo properties" />
           <div className="mlegend small">{by === "status"
             ? <><i className="t-b" />Live<i className="t-a" />Upcoming<i className="t-x" />Closed</>
-            : <><i className="t-g" />85%+ on time<i className="t-a" />Under 85% or overdue<i className="t-r" />Under 70%<i className="t-x" />Not on ZoTask</>}
+            : <><i className="t-g" />85%+ on time<i className="t-a" />Under 85% or overdue<i className="t-r" />Under 70%<i className="t-x" />Not on TaskTrail</>}
             {noTiles && <span className="muted">· Street map can&apos;t load here, so an outline of India is shown</span>}</div>
           {!pins.length && <div className="mnote small">No properties match these filters.</div>}
         </div>

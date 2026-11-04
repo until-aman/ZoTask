@@ -53,7 +53,7 @@ export default function NotificationBell() {
         chan.current?.postMessage({ t: "sync" });
         // When the tab is in the background, also show a desktop alert if the person allowed it.
         if (document.hidden && "Notification" in window && Notification.permission === "granted")
-          for (const n of r.pop) { const d = new Notification(KIND[n.kind]?.[0] ?? "ZoTask", { body: `${n.title}\n${n.body ?? ""}`, tag: `zo-${n.id}` }); d.onclick = () => { window.focus(); if (n.link) router.push(n.link); }; }
+          for (const n of r.pop) { const d = new Notification(KIND[n.kind]?.[0] ?? "TaskTrail", { body: `${n.title}\n${n.body ?? ""}`, tag: `tt-${n.id}` }); d.onclick = () => { window.focus(); if (n.link) router.push(n.link); }; }
       }
     } catch { /* offline or signed out: try again next time */ } finally { busy.current = false; }
   }, [router]);
@@ -66,7 +66,7 @@ export default function NotificationBell() {
     window.addEventListener("focus", back);
     document.addEventListener("visibilitychange", back);
     if ("BroadcastChannel" in window) {
-      chan.current = new BroadcastChannel("zotask-notes");
+      chan.current = new BroadcastChannel("tasktrail-notes");
       chan.current.onmessage = (e) => { if (e.data?.t === "sync") load(); if (e.data?.t === "read") setPops([]); };
     }
     return () => { clearInterval(t); window.removeEventListener("focus", back); document.removeEventListener("visibilitychange", back); chan.current?.close(); };
@@ -151,7 +151,7 @@ export default function NotificationBell() {
                 </div>
               ))}
           </div>
-          {perm === "default" && <div className="nb-foot"><button type="button" className="link small" onClick={askDesktop}>Also alert me when ZoTask is in another tab</button></div>}
+          {perm === "default" && <div className="nb-foot"><button type="button" className="link small" onClick={askDesktop}>Also alert me when TaskTrail is in another tab</button></div>}
         </div>
       )}
       {pops.length > 0 && (

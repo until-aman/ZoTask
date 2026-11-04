@@ -282,7 +282,7 @@ function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; peri
 function emailText(e: { title: string; detail: string; owner: string; ownerEmail: string; cc: string; mailSubject: string; due: string | null; props: { name: string }[]; ref?: string; photos: string[] }, me: string) {
   const subject = e.mailSubject || `Escalation: ${e.title}`;
   const body = [`Hi ${e.owner},`, "", `${e.detail || e.title}`, "", `Property: ${e.props.map((p) => p.name).join(", ")}`, e.due ? `Expected closure: ${dayIso(e.due)}` : "", e.ref ? `Reference: ${e.ref}` : "",
-    e.photos.length ? `Photos: ${e.photos.length} attached in ZoTask` : "", "", "Please confirm the plan and the date it will be closed.", "", "Thanks,", me].filter((x, i, a) => x !== "" || a[i - 1] !== "").join("\n");
+    e.photos.length ? `Photos: ${e.photos.length} attached in TaskTrail` : "", "", "Please confirm the plan and the date it will be closed.", "", "Thanks,", me].filter((x, i, a) => x !== "" || a[i - 1] !== "").join("\n");
   return { subject, body, text: `To: ${e.owner}${e.ownerEmail ? ` <${e.ownerEmail}>` : ""}\n${e.cc ? `Cc: ${e.cc}\n` : ""}Subject: ${subject}\n\n${body}`, mailto: `mailto:${encodeURIComponent(e.ownerEmail)}?${e.cc ? `cc=${encodeURIComponent(e.cc)}&` : ""}subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}` };
 }
 
