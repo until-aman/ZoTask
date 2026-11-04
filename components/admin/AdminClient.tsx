@@ -2,6 +2,8 @@
 // Admin: task setup (with bulk actions), the libraries tasks draw on, and properties and people.
 import { urlHas, useUrlState, writeUrl } from "@/components/ui/useUrlState";
 import WeekOffs from "./WeekOffs";
+import TeamLeave from "@/components/TeamLeave";
+import type { TeamData } from "@/lib/team";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,12 +21,12 @@ export type Prop = { id: number; name: string; cluster: string; city: string; cb
 type Lib = { checklists: Checklist[]; schedules: Schedule[]; categories: Category[]; counts: Count[]; clusters: Cluster[]; cities: { id: number; name: string }[];
   reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; cbms: { id: number; name: string; email: string | null }[];
   off: import("@/lib/offdays").OffCfg; today: string; wkCounts: { must: number; auto: number; closed: number } };
-const TABS: [string, string][] = [["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"], ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"], ["weekoffs", "Week offs"]];
+const TABS: [string, string][] = [["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"], ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"], ["weekoffs", "Week offs and leave"]];
 const ROLE_NAME: Record<string, string> = { admin: "Admin", reviewer: "Reviewers", auditor: "Auditors", cbm: "CBMs", ground: "Ground team" };
 const when = (t: Tpl) => describeWhen(t);
 
-export default function AdminClient({ tab: tab0, templates, props, people, views, lib, children }: {
-  tab: string; templates: Tpl[]; props: Prop[]; people: { access_role: string; n: number }[]; views: SavedView[]; lib: Lib; children: React.ReactNode;
+export default function AdminClient({ tab: tab0, templates, props, people, views, lib, team, children }: {
+  tab: string; templates: Tpl[]; props: Prop[]; people: { access_role: string; n: number }[]; views: SavedView[]; lib: Lib; team: TeamData; children: React.ReactNode;
 }) {
   const router = useRouter();
   // The address is the truth for the tab: on Back the page may come from memory with the first load's tab.
@@ -154,7 +156,11 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
       {tab === "categories" && <Categories rows={lib.categories} notify={setToast} />}
       {tab === "counts" && <Counts rows={lib.counts} notify={setToast} />}
       {tab === "clusters" && <Clusters rows={lib.clusters} cities={lib.cities} props={props} reviewers={lib.reviewers} auditors={lib.auditors} cbms={lib.cbms} notify={setToast} />}
-      {tab === "weekoffs" && <WeekOffs cfg={lib.off} today={lib.today} counts={lib.wkCounts} notify={setToast} />}
+      {tab === "weekoffs" && <>
+        {/* One place for days off: the days the whole review team is off, then each person's own week off, leave and backup. */}
+        <WeekOffs cfg={lib.off} today={lib.today} counts={lib.wkCounts} notify={setToast} />
+        <TeamLeave data={team} admin embedded />
+      </>}
       {tab === "people" && <>
         <FilterBar search={q} setSearch={setQ} searchLabel="Search properties" chips={city ? [{ key: "city", label: <>City: <b>{city}</b></>, clear: () => setCity("") }] : []}
           panel={<Field label="City"><select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>} />
