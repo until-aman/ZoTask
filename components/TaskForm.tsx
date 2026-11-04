@@ -1,12 +1,13 @@
 "use client";
 import { fmtTime } from "@/lib/time";
+import { choicesFor } from "@/lib/answers";
 import { tryUpload } from "./upload";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { startTask, submitTask, type Where } from "@/app/actions";
 import Photo from "./Photo";
 
-type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null };
+type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null; options?: string | null };
 type Prev = { item_id: number; checked: number; value: string | null; note: string | null; photos: string };
 type Flag = { id: number; item_id: number; reason: string; comment: string | null };
 type Ans = { checked: boolean; value: string; note: string; photos: string[]; reply: string };
@@ -152,8 +153,8 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
             {flag && <div className="small warn">Flagged: {flag.reason}{flag.comment ? ` · “${flag.comment}”` : ""}</div>}
             <div className="ansrow">
             {it.kind === "count" && <label className="small muted">Number of {it.count_of === "SHK" ? "SHKs" : "HKs"} present<input type="number" min={0} value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} style={{ width: 140, display: "block" }} aria-label={it.label} /></label>}
-            {it.kind === "yesno" && <div className="seg" role="group" aria-label={it.label}>
-              {["Yes", "No"].map((v) => <button key={v} type="button" aria-pressed={a.value === v} onClick={() => set(it.id, { value: v })}>{v}</button>)}
+            {choicesFor(it) && <div className="seg seg-wrap" role="group" aria-label={it.label}>
+              {choicesFor(it)!.map((v) => <button key={v} type="button" aria-pressed={a.value === v} onClick={() => set(it.id, { value: v })}>{v}</button>)}
             </div>}
             {it.kind === "number" && <input type="number" min={0} value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} style={{ width: 140 }} aria-label={it.label} />}
             {it.kind === "text" && <textarea value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} aria-label={it.label} />}

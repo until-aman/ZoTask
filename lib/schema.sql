@@ -38,10 +38,11 @@ CREATE TABLE IF NOT EXISTS templates (
 );
 CREATE TABLE IF NOT EXISTS template_items (
   id INTEGER PRIMARY KEY, template_id INTEGER NOT NULL REFERENCES templates(id), pos INTEGER NOT NULL,
-  label TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'check',   -- check | yesno | number | count | text
+  label TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'check',   -- check | yesno | choice | number | count | text
   photo_required INTEGER NOT NULL DEFAULT 0, note_required INTEGER NOT NULL DEFAULT 0,
   photo_allowed INTEGER NOT NULL DEFAULT 1, note_allowed INTEGER NOT NULL DEFAULT 1,  -- allowed = shown; required = compulsory
   count_of TEXT,                                  -- kind=count: HK or SHK, checked against the property's ideal count
+  options TEXT,                                   -- kind=choice: JSON list of answers to pick from, e.g. ["Yes","No","N/A"]
   guide TEXT                                      -- for the reviewer: what to check and how
 );
 CREATE TABLE IF NOT EXISTS template_properties (template_id INTEGER NOT NULL, property_id INTEGER NOT NULL, PRIMARY KEY (template_id, property_id));

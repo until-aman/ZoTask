@@ -6,6 +6,7 @@ import { requireUser, can, inScope, taskInScope, requireTasks } from "@/lib/auth
 import { all, one, run, tx } from "@/lib/db";
 import * as E from "@/lib/engine";
 import { km } from "@/lib/geo";
+import { cleanOptions } from "@/lib/answers";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function guard(fn: () => Promise<string | void>): Promise<Result> {
@@ -193,7 +194,7 @@ export async function triggerTask(templateId: number, propertyId: number): Promi
   });
 }
 
-export type TemplateItemInput = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; guide?: string | null };
+export type TemplateItemInput = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; guide?: string | null; options?: string[] | null };
 export type TemplateInput = Omit<E.Template, "id"> & { items: TemplateItemInput[]; properties: number[] };
 /** Saves a task's setup. A new task's id comes back so the editor can confirm it and link to it. */
 export async function saveTemplate(id: number | null, t: TemplateInput): Promise<Result & { id?: number }> {
@@ -204,6 +205,8 @@ export async function saveTemplate(id: number | null, t: TemplateInput): Promise
     if (!t.name.trim()) throw new Error("Give the task a name.");
     if (!id && !t.description?.trim()) throw new Error("Add a short description so the team knows what this task is for.");
     if (!t.items.length) throw new Error("Add at least one checklist item.");
+    const bad = t.items.findIndex((it) => it.kind === "choice" && cleanOptions(it.options).length < 2);
+    if (bad >= 0) throw new Error(`Item ${bad + 1} needs at least two options to pick from.`);
     if (t.trigger === "event" && !E.list<string>(t.events).length) throw new Error("Pick at least one event that creates this task.");
     if (t.trigger === "scheduled" && (t.frequency === "weekly" || t.frequency === "monthly") && !E.list(t.days).length) throw new Error("Pick at least one day it repeats on.");
     if (t.trigger === "scheduled" && t.frequency === "once" && !t.once_date) throw new Error("Pick the date it runs on.");
@@ -221,9 +224,10 @@ export async function saveTemplate(id: number | null, t: TemplateInput): Promise
       // Items already answered are kept (renamed in place) so history stays readable; extra ones are appended.
       const existing = await all<{ id: number }>("SELECT id FROM template_items WHERE template_id=? ORDER BY pos", newId);
       for (const [pos, it] of t.items.entries()) {
-        const rules = [it.label, it.kind, it.photo_required, it.note_required, it.photo_allowed || it.photo_required, it.note_allowed || it.note_required, it.kind === "count" ? it.count_of ?? "HK" : null, it.guide?.trim() || null];
-        if (existing[pos]) await run("UPDATE template_items SET label=?, kind=?, photo_required=?, note_required=?, photo_allowed=?, note_allowed=?, count_of=?, guide=?, pos=? WHERE id=?", ...rules, pos, existing[pos].id);
-        else await run("INSERT INTO template_items (label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, guide, template_id, pos) VALUES (?,?,?,?,?,?,?,?,?,?)", ...rules, newId, pos);
+        const rules = [it.label, it.kind, it.photo_required, it.note_required, it.photo_allowed || it.photo_required, it.note_allowed || it.note_required, it.kind === "count" ? it.count_of ?? "HK" : null, it.guide?.trim() || null,
+          it.kind === "choice" ? JSON.stringify(cleanOptions(it.options)) : null];
+        if (existing[pos]) await run("UPDATE template_items SET label=?, kind=?, photo_required=?, note_required=?, photo_allowed=?, note_allowed=?, count_of=?, guide=?, options=?, pos=? WHERE id=?", ...rules, pos, existing[pos].id);
+        else await run("INSERT INTO template_items (label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, guide, options, template_id, pos) VALUES (?,?,?,?,?,?,?,?,?,?,?)", ...rules, newId, pos);
       }
       for (const ex of existing.slice(t.items.length)) {
         const used = await one("SELECT 1 FROM answers WHERE item_id=? LIMIT 1", ex.id);

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { saveTemplate, TemplateInput, TemplateItemInput } from "@/app/actions";
 import { saveChecklistPreset } from "@/app/admin-actions";
 import { SearchPick } from "@/components/ui/Filters";
+import { DEFAULT_OPTIONS, cleanOptions } from "@/lib/answers";
 
 type T = Omit<TemplateInput, "items" | "properties">;
 type It = TemplateItemInput;
@@ -18,7 +19,7 @@ export type SchedulePreset = { id: number; name: string; frequency: string; days
 export const EVENTS = ["Tenant onboarded", "Tenant exited", "Tenant exited by agent", "Booking confirmed", "Booking created", "Short stay tenant onboarded", "Short stay tenant exited"];
 export const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const ROLES = ["HK", "Reception", "CC", "CBM", "Short stays"];
-const KINDS: [string, string][] = [["check", "Tick box"], ["number", "Number"], ["text", "Text"], ["count", "Staff count"]];
+const KINDS: [string, string][] = [["check", "Tick box"], ["choice", "Options (Yes / No …)"], ["number", "Number"], ["text", "Text"], ["count", "Staff count"], ["yesno", "Yes / No"]];
 const TYPES = { scheduled: ["Scheduled", "Runs at set times"], event: ["Event-triggered", "Created when something happens"], on_demand: ["On demand", "Created by hand when needed"] } as const;
 const STEPS = ["Basics", "Type & trigger", "Checklist", "Schedule & properties", "Review & audit", "Summary"];
 const DEFAULTS: T = {
@@ -29,6 +30,9 @@ const DEFAULTS: T = {
 };
 // Grow a one-line textarea to fit its text, so long checklist items are never cut off.
 const fit = (el: HTMLTextAreaElement | null) => { if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight + 2}px`; } };
+// A Yes / No item opens as an Options item with Yes and No, so more answers (N/A …) can be added to it.
+const asOptions = (i: { kind: string; options?: unknown }) => (i.kind === "yesno" ? { kind: "choice", options: [...DEFAULT_OPTIONS] }
+  : { kind: i.kind, options: i.kind === "choice" ? cleanOptions(i.options) : null });
 const blank = (): It => ({ label: "", kind: "check", photo_allowed: true, photo_required: false, note_allowed: true, note_required: false, count_of: null });
 const parse = <X,>(s: string | null | undefined, d: X): X => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 const rule = (allowed: boolean, required: boolean) => (required ? "required" : allowed ? "optional" : "off");
@@ -85,8 +89,8 @@ export function ItemCard({ ix, it, last, notes, onChange, onMove, onRemove }: {
       <div className="te-opts">
         <label className="te-opt">Answer
           <select value={it.kind === "count" ? `count:${it.count_of ?? "HK"}` : it.kind}
-            onChange={(e) => { const v = e.target.value; onChange(v.startsWith("count:") ? { kind: "count", count_of: v.slice(6) } : { kind: v, count_of: null }); }}>
-            {KINDS.filter(([k]) => k !== "count").map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            onChange={(e) => { const v = e.target.value; onChange(v.startsWith("count:") ? { kind: "count", count_of: v.slice(6) } : { kind: v, count_of: null, ...(v === "choice" && !it.options?.length ? { options: [...DEFAULT_OPTIONS] } : {}) }); }}>
+            {KINDS.filter(([k]) => k !== "count" && (k !== "yesno" || it.kind === "yesno")).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             <option value="count:HK">Number of HKs</option><option value="count:SHK">Number of SHKs</option>
           </select></label>
         {rules.map(([name, allowed, required, change]) => (
@@ -97,6 +101,7 @@ export function ItemCard({ ix, it, last, notes, onChange, onMove, onRemove }: {
           </div>
         ))}
       </div>
+      {it.kind === "choice" && <OptionsField ix={ix} options={it.options ?? []} onChange={(options) => onChange({ options })} />}
       {notes && (
         <details className="te-guide">
           <summary>{it.guide ? "Reviewer notes" : "+ Reviewer notes"}</summary>
@@ -107,8 +112,42 @@ export function ItemCard({ ix, it, last, notes, onChange, onMove, onRemove }: {
   );
 }
 
+/** The answers a CBM picks from for an "Options" item: chips to rename or remove, a box to add more, and quick sets. */
+function OptionsField({ ix, options, onChange }: { ix: number; options: string[]; onChange: (o: string[]) => void }) {
+  const [add, setAdd] = useState("");
+  const push = () => { const o = cleanOptions([...options, ...add.split(",")]); if (o.length !== options.length) onChange(o); setAdd(""); };
+  const few = cleanOptions(options).length < 2;
+  return (
+    <div className="te-choice">
+      <span className="te-opt" style={{ display: "block" }}>Options the CBM picks from</span>
+      <div className="chips" role="list" aria-label={`Options for item ${ix + 1}`}>
+        {options.map((o, j) => (
+          <span key={j} className="chip te-chip" role="listitem">
+            <input value={o} aria-label={`Option ${j + 1}`} style={{ width: `${Math.max(2, o.length) + 1.5}ch` }} maxLength={40}
+              onChange={(e) => onChange(options.map((x, k) => (k === j ? e.target.value : x)))}
+              onBlur={() => onChange(cleanOptions(options))} />
+            <button type="button" aria-label={`Remove ${o || "option"}`} onClick={() => onChange(options.filter((_, k) => k !== j))}>×</button>
+          </span>
+        ))}
+        {options.length < 10 && (
+          <input className="te-addopt" value={add} placeholder="+ Add option" aria-label={`Add an option to item ${ix + 1}`} maxLength={40}
+            onChange={(e) => setAdd(e.target.value)} onBlur={() => add.trim() && push()}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); if (add.trim()) push(); } }} />
+        )}
+      </div>
+      <div className="row2 small" style={{ gap: 10 }}>
+        <span className="muted">Quick sets:</span>
+        {[["Yes", "No"], ["Yes", "No", "N/A"], ["Good", "Average", "Poor"], ["Working", "Not working"]].map((q) => (
+          <button key={q.join()} type="button" className="link small" onClick={() => onChange(q)}>{q.join(" / ")}</button>
+        ))}
+      </div>
+      {few && <div className="small t-r">Add at least two options.</div>}
+    </div>
+  );
+}
+
 export default function TemplateEditor({ id, initial, initialItems, selected, geo, reviewers, auditors, people, categories, checklists, schedules }: {
-  id: number | null; initial: (T & { id: number }) | null; initialItems: (Omit<It, "photo_allowed" | "photo_required" | "note_allowed" | "note_required"> & { photo_allowed: number; photo_required: number; note_allowed: number; note_required: number })[];
+  id: number | null; initial: (T & { id: number }) | null; initialItems: (Omit<It, "photo_allowed" | "photo_required" | "note_allowed" | "note_required" | "options"> & { photo_allowed: number; photo_required: number; note_allowed: number; note_required: number; options?: string | null })[];
   selected: number[]; geo: { id: number; city: string; cluster: string; property: string }[];
   reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; people: Person[];
   categories: string[]; checklists: ChecklistPreset[]; schedules: SchedulePreset[];
@@ -121,7 +160,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     return { ...DEFAULTS, ...rest, description: rest.description ?? "" };
   });
   const [items, setItems] = useState<It[]>(() => initialItems.length
-    ? initialItems.map((i) => ({ label: i.label, kind: i.kind, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, count_of: i.count_of, guide: i.guide ?? "" }))
+    ? initialItems.map((i) => ({ label: i.label, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, count_of: i.count_of, guide: i.guide ?? "", ...asOptions(i) }))
     : [blank()]);
   const [props, setProps] = useState<number[]>(selected.length || id ? selected : geo.map((g) => g.id));
   const [step, setStep] = useState(0);
@@ -156,7 +195,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     if (!p) return;
     if (!force && items.some((i) => i.label.trim())) return setPending(p);
     setPending(null);
-    setItems(parse<Partial<It>[]>(p.items, []).map((i) => ({ ...blank(), ...i, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required })));
+    setItems(parse<Partial<It>[]>(p.items, []).map((i) => ({ ...blank(), ...i, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, ...asOptions({ kind: i.kind ?? "check", options: i.options }) })));
   }
   function loadSchedule(sid: string) {
     const s = schedules.find((x) => String(x.id) === sid);
@@ -261,7 +300,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
             <div key={ix} className="te-rvrow">
               <span className="te-n">{ix + 1}</span>
               <span>{i.label}</span>
-              <span><span className="chipn">{i.kind === "count" ? `Number of ${i.count_of ?? "HK"}s` : KINDS.find(([k]) => k === i.kind)?.[1]}</span></span>
+              <span><span className="chipn">{i.kind === "count" ? `Number of ${i.count_of ?? "HK"}s` : i.kind === "choice" ? cleanOptions(i.options).join(" / ") || "Options" : KINDS.find(([k]) => k === i.kind)?.[1]}</span></span>
               <span>{rulePill(i.photo_allowed, i.photo_required)}</span>
               <span>{rulePill(i.note_allowed, i.note_required)}</span>
             </div>

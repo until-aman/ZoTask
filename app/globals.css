@@ -684,6 +684,11 @@ select{max-width:100%}
 .te-opt{display:grid;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
 .te-opt select{min-width:170px;font-size:14px;font-weight:400;color:var(--fg)}
 .seg.te-rules button{font-size:13px;padding:5px 12px}
+.te-choice{display:grid;gap:6px;padding-left:34px}
+.te-chip{padding:2px 4px 2px 4px}
+.te-chip input{border:0;background:transparent;padding:2px 4px;font-size:13px;min-width:0;box-shadow:none}
+.te-chip input:focus{outline:2px solid var(--accent);outline-offset:0;border-radius:999px}
+.te-addopt{width:130px;font-size:13px;padding:4px 10px;border-radius:999px;border-style:dashed}
 .seg.te-rules button[data-k=required][aria-pressed=true]{background:var(--amber-soft);color:var(--amber-ink)}
 .seg.te-rules button[data-k=off][aria-pressed=true]{background:var(--neutral-soft);color:var(--text)}
 .te-del:hover{color:var(--red)}
@@ -695,7 +700,7 @@ select{max-width:100%}
 .te-days button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .te-month{display:grid;grid-template-columns:repeat(7,44px)}
 @media (max-width:1000px){.te-body{grid-template-columns:minmax(0,1fr)}.te-side{display:none}}
-@media (max-width:700px){.te-opts{padding-left:0;display:grid}.te-opt select{width:100%}.seg.te-rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.te-seg{grid-template-columns:minmax(0,1fr)}.te-month{grid-template-columns:repeat(7,minmax(0,1fr))}}
+@media (max-width:700px){.te-opts,.te-choice{padding-left:0}.te-opts{display:grid}.te-opt select{width:100%}.seg.te-rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.te-seg{grid-template-columns:minmax(0,1fr)}.te-month{grid-template-columns:repeat(7,minmax(0,1fr))}}
 .timerbar{padding:10px 12px;border-radius:var(--r-md);background:var(--accent-soft)}
 /* Admin sections */
 .admtabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
@@ -1291,3 +1296,4 @@ table.aq .cmt{max-width:320px;overflow:visible;text-overflow:clip;white-space:no
 /* 24-hour time picker: hour and minute side by side. */
 .time24{display:inline-flex;align-items:center;gap:4px;width:100%}
 .time24 select{flex:1 1 0;min-width:64px}
+.seg.seg-wrap{flex-wrap:wrap;max-width:100%}

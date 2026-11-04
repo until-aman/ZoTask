@@ -6,6 +6,7 @@ import { all, one, run, tx } from "@/lib/db";
 import { dropUpcoming } from "@/lib/engine";
 import { ClusterPlan, planClusters, Snapshot } from "@/lib/cluster-sheet";
 import { fillFromCluster, setPropertyCbm } from "@/lib/people";
+import { cleanOptions } from "@/lib/answers";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function admin(fn: () => Promise<string | void>): Promise<Result> {
@@ -45,12 +46,14 @@ export async function archiveCategory(id: number, archived: boolean) {
 }
 
 // Predefined checklists and schedules
-export type PresetItem = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null };
+export type PresetItem = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; options?: string[] | null };
 export async function saveChecklistPreset(id: number | null, title: string, items: PresetItem[]) {
   return admin(async () => {
     const t = need(title, "a checklist title");
-    const its = items.filter((i) => i.label.trim());
+    const its = items.filter((i) => i.label.trim()).map((i) => ({ ...i, options: i.kind === "choice" ? cleanOptions(i.options) : null }));
     if (!its.length) throw new Error("Add at least one item.");
+    const bad = its.findIndex((i) => i.kind === "choice" && i.options!.length < 2);
+    if (bad >= 0) throw new Error(`Item ${bad + 1} needs at least two options to pick from.`);
     if (id) await run("UPDATE checklist_presets SET title=?, items=? WHERE id=?", t, JSON.stringify(its), id);
     else await run("INSERT INTO checklist_presets (title, items) VALUES (?,?)", t, JSON.stringify(its));
     return `Saved "${t}".`;
