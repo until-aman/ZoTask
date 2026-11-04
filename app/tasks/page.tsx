@@ -8,7 +8,7 @@ import TasksClient, { MyTask } from "@/components/TasksClient";
 export default async function MyTasks({ searchParams }: { searchParams: Promise<{ tab?: string; date?: string; range?: string; from?: string; to?: string }> }) {
   const u = await boot();
   const sp = await searchParams;
-  const tab = sp.tab ?? "now";
+  const tab = sp.tab ?? "all";
   const today = isoDate(Date.now());
   // Dates: today by default, or yesterday, the last 7 days, or a custom From–To. An old ?date= link means that one day.
   const back = (n: number) => isoDate(Date.now() - n * 864e5);
@@ -18,7 +18,11 @@ export default async function MyTasks({ searchParams }: { searchParams: Promise<
   const inDates = (r: Row) => r.task_date >= from && r.task_date <= to;
   const mine = await rows("(i.assignee_id=? OR (p.cbm_id=? AND i.status='auditflag'))", u.id, u.id);
   const now = Date.now();
+  // Everything waiting on this person, whatever its date: what's overdue or sent back first, then what's open now, then what's coming up.
+  const PENDING = ["notsub", "changes", "auditflag", "current", "upcoming"];
   const lists: Record<string, Row[]> = {
+    all: mine.filter((r) => PENDING.includes(r.status)).sort((a, b) => PENDING.indexOf(a.status) - PENDING.indexOf(b.status)
+      || (a.status === "notsub" ? a.late_until_at - b.late_until_at : a.status === "upcoming" ? a.window_start_at - b.window_start_at : a.window_end_at - b.window_end_at)),
     now: mine.filter((r) => inDates(r) && ["current", "upcoming"].includes(r.status)).sort((a, b) => (a.status === "current" ? -1 : 1) - (b.status === "current" ? -1 : 1) || a.window_start_at - b.window_start_at),
     overdue: mine.filter((r) => r.status === "notsub").sort((a, b) => a.late_until_at - b.late_until_at),
     changes: mine.filter((r) => r.status === "changes"),
