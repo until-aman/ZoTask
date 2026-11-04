@@ -398,15 +398,19 @@ function PhotoAdd({ photos, setPhotos }: { photos: string[]; setPhotos: (p: stri
 }
 
 function RaiseForm({ d, close, onDone }: { d: EscData; close: () => void; onDone: (msg: string, id?: number) => void }) {
+  // Three short steps: where and what, who fixes it, how soon. The contact, email subject and the rest are
+  // filled in from those answers; "More options" is there only for the rare case they need changing.
   const t = d.fromTask;
   const guessDept = (c?: string) => (!c ? "R&M" : /house|hk|facil|clean/i.test(c) ? "HK & Facilities" : /stock|store|inventor|warehouse/i.test(c) ? "Warehouse" : /procure|sourc|vendor/i.test(c) ? "Sourcing" : /r&m|repair|mainten/i.test(c) ? "R&M" : "Central Support");
-  const [department, setDepartment] = useState(guessDept(t?.category));
+  const dept0 = guessDept(t?.category);
+  const [department, setDepartment] = useState(dept0);
   const [propertyIds, setPropertyIds] = useState<number[]>(t ? [t.property_id] : []);
-  const [title, setTitle] = useState(t ? `${t.task} - ${t.property}` : "");
+  const [title, setTitle] = useState(t ? t.task : "");
   const [detail, setDetail] = useState("");
   const [priority, setPriority] = useState("medium");
-  const [ownerName, setOwnerName] = useState(d.teams[guessDept(t?.category)]?.[0] ?? "");
-  const [ownerEmail, setOwnerEmail] = useState(d.teams[guessDept(t?.category)]?.[1] ?? "");
+  const [ownerName, setOwnerName] = useState(d.teams[dept0]?.[0] ?? "");
+  const [ownerEmail, setOwnerEmail] = useState(d.teams[dept0]?.[1] ?? "");
+  const [changeOwner, setChangeOwner] = useState(false);
   const [cc, setCc] = useState("");
   const [due, setDue] = useState(addDays(d.today, PRIO_DAYS.medium));
   const [dueTouched, setDueTouched] = useState(false);
@@ -419,61 +423,85 @@ function RaiseForm({ d, close, onDone }: { d: EscData; close: () => void; onDone
   const [mail, setMail] = useState(false);
   const contacts = useMemo(() => [...Object.entries(d.teams).map(([k, [n, e]]) => ({ name: n, email: e, sub: k })), ...d.people.map((p) => ({ name: p.name, email: p.email, sub: p.access_role.toUpperCase() === "CBM" ? "CBM" : p.access_role }))], [d.teams, d.people]);
   const props = d.geo;
-  const pickDept = (x: string) => { setDepartment(x); const tm = d.teams[x]; if (tm && (!ownerName || Object.values(d.teams).some(([n]) => n === ownerName))) { setOwnerName(tm[0]); setOwnerEmail(tm[1]); } };
+  const pickDept = (x: string) => { setDepartment(x); const tm = d.teams[x]; if (tm && !changeOwner) { setOwnerName(tm[0]); setOwnerEmail(tm[1]); } };
   const pickPrio = (p: string) => { setPriority(p); if (!dueTouched) setDue(addDays(d.today, PRIO_DAYS[p])); };
   const pickOwner = (n: string) => { setOwnerName(n); const c = contacts.find((x) => x.name === n); if (c) setOwnerEmail(c.email); };
-  const subject = mailSubject || (title ? `Escalation: ${title}` : "");
+  const propNames = props.filter((p) => propertyIds.includes(p.id)).map((p) => p.property);
+  const subject = mailSubject || (title ? `Escalation: ${title.trim()}${propNames.length ? ` || ${propNames.join(", ")}` : ""}` : "");
+  const missing = !propertyIds.length ? "Pick a property" : !title.trim() ? "Say what the issue is" : !ownerName.trim() ? "Pick who it goes to" : "";
   const submit = async () => {
     setBusy(true); setErr("");
     const r = await raiseEscalation({ department, title, detail, priority, propertyIds, ownerName, ownerEmail, cc, due, mailSent, mailSubject: subject, link, photos, instanceId: t?.id ?? null });
     setBusy(false);
     if (r.ok) onDone(r.msg ?? "Raised", (r as { id?: number }).id); else setErr(r.error);
   };
-  const draft = emailText({ title, detail, owner: ownerName || "team", ownerEmail, cc, mailSubject: subject, due, props: props.filter((p) => propertyIds.includes(p.id)).map((p) => ({ name: p.property })), photos }, d.me);
+  const draft = emailText({ title, detail, owner: ownerName || "team", ownerEmail, cc, mailSubject: subject, due, props: propNames.map((name) => ({ name })), photos }, d.me);
+  const days = Math.round((dayStart(due) - dayStart(d.today)) / 86400000);
   return (
     <div className="modal" onClick={close}>
       <div className="mcard wide esc-form" onClick={(x) => x.stopPropagation()} role="dialog" aria-label="Raise escalation">
         <div className="row2"><h2 style={{ margin: 0 }}>Raise escalation</h2><span className="spacer" /><button type="button" className="x" onClick={close} aria-label="Close">×</button></div>
-        {t && <p className="small muted" style={{ margin: 0 }}>From task: <b>{t.task}</b> · {t.property} · {dayIso(t.task_date)}. It will show on the task&apos;s history.</p>}
-        <div className="esc-grid">
-          <label className="f">Department
-            <select value={department} onChange={(x) => pickDept(x.target.value)}>{d.departments.map((x) => <option key={x}>{x}</option>)}</select></label>
-          <div className="f">Priority
-            <span className="seg" role="group" aria-label="Priority">{Object.entries(PRIO).map(([k, l]) => <button key={k} type="button" aria-pressed={priority === k} onClick={() => pickPrio(k)}>{l}</button>)}</span></div>
-          <div className="f span2">Property
-            <span className="row2">
+        {t && <p className="esc-from">From task <b>{t.task}</b> at {t.property}, {dayIso(t.task_date)}. It will show on that task&apos;s history.</p>}
+
+        <section className="esc-step">
+          <h3><span>1</span>What&apos;s the issue?</h3>
+          <div className="f">Property
+            <span className="row2" style={{ flexWrap: "wrap", gap: 6 }}>
               {propertyIds.map((id) => <span key={id} className="cmp-chip">{props.find((p) => p.id === id)?.property}<button type="button" aria-label="Remove" onClick={() => setPropertyIds(propertyIds.filter((x) => x !== id))}>×</button></span>)}
               <span style={{ flex: "1 1 220px" }}><SearchPick multi onChange={(v) => setPropertyIds([...propertyIds, Number(v)])} placeholder={propertyIds.length ? "+ Add another property" : "Type a property name"}
                 options={props.filter((p) => !propertyIds.includes(p.id)).map((p) => ({ v: String(p.id), label: p.property, sub: p.cluster }))} /></span>
             </span></div>
-          <label className="f span2">What is the issue
-            <input type="text" value={title} onChange={(x) => setTitle(x.target.value)} placeholder="e.g. Washing machine repair - Zolo Arcadia" /></label>
-          <label className="f span2">Details
-            <textarea rows={3} value={detail} onChange={(x) => setDetail(x.target.value)} placeholder="What you saw, since when, impact on residents" /></label>
-          <label className="f">Raised to
-            <input type="text" list="esc-contacts" value={ownerName} onChange={(x) => pickOwner(x.target.value)} placeholder="Team or person" />
-            <datalist id="esc-contacts">{contacts.map((c) => <option key={c.name + c.email} value={c.name}>{c.sub}</option>)}</datalist></label>
-          <label className="f">Their email
-            <input type="email" value={ownerEmail} onChange={(x) => setOwnerEmail(x.target.value)} placeholder="name@zolostays.com" /></label>
-          <label className="f">Cc
-            <input type="text" value={cc} onChange={(x) => setCc(x.target.value)} placeholder="Optional, comma separated" /></label>
-          <label className="f">Expected closure
-            <input type="date" value={due} min={d.today} onChange={(x) => { setDue(x.target.value); setDueTouched(true); }} /></label>
-          <label className="f span2">Email subject
-            <input type="text" value={subject} onChange={(x) => setMailSubject(x.target.value)} placeholder="Subject of the escalation email" /></label>
-          <label className="f span2">Supporting link
-            <input type="url" value={link} onChange={(x) => setLink(x.target.value)} placeholder="Optional: ticket, sheet or mail thread link" /></label>
-        </div>
-        <div className="row2">
+          <label className="f">Issue
+            <input type="text" value={title} onChange={(x) => setTitle(x.target.value)} placeholder="e.g. Washing machine not working" /></label>
+          <label className="f">Details (optional)
+            <textarea rows={2} value={detail} onChange={(x) => setDetail(x.target.value)} placeholder="What you saw, since when, effect on residents" /></label>
           <PhotoAdd photos={photos} setPhotos={setPhotos} />
-          <span className="spacer" />
-          <label className="switch small"><input type="checkbox" checked={mailSent} onChange={(x) => setMailSent(x.target.checked)} />Email already sent</label>
-        </div>
+        </section>
+
+        <section className="esc-step">
+          <h3><span>2</span>Who should fix it?</h3>
+          <div className="esc-depts" role="radiogroup" aria-label="Department">
+            {d.departments.map((x) => <button key={x} type="button" role="radio" aria-checked={department === x} onClick={() => pickDept(x)}>{x}</button>)}
+          </div>
+          {!changeOwner ? (
+            <p className="esc-to">Goes to <b>{ownerName || "nobody yet"}</b>{ownerEmail && <span className="muted"> · {ownerEmail}</span>}
+              <button type="button" className="link" onClick={() => setChangeOwner(true)}>Change</button></p>
+          ) : (
+            <div className="esc-grid">
+              <label className="f">Name
+                <input type="text" list="esc-contacts" value={ownerName} onChange={(x) => pickOwner(x.target.value)} placeholder="Team or person" autoFocus />
+                <datalist id="esc-contacts">{contacts.map((c) => <option key={c.name + c.email} value={c.name}>{c.sub}</option>)}</datalist></label>
+              <label className="f">Email
+                <input type="email" value={ownerEmail} onChange={(x) => setOwnerEmail(x.target.value)} placeholder="name@zolostays.com" /></label>
+            </div>
+          )}
+        </section>
+
+        <section className="esc-step">
+          <h3><span>3</span>How urgent?</h3>
+          <div className="row2" style={{ flexWrap: "wrap", gap: "8px 14px" }}>
+            <span className="seg" role="group" aria-label="Priority">{Object.entries(PRIO).map(([k, l]) => <button key={k} type="button" aria-pressed={priority === k} onClick={() => pickPrio(k)}>{l}</button>)}</span>
+            <label className="row2 small" style={{ gap: 6 }}>Close by
+              <input type="date" value={due} min={d.today} onChange={(x) => { setDue(x.target.value); setDueTouched(true); }} /></label>
+            <span className="small muted">{days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`}</span>
+          </div>
+        </section>
+
+        <details className="esc-more">
+          <summary>More options <span className="muted">(Cc, link, email subject)</span></summary>
+          <div className="esc-grid" style={{ marginTop: 10 }}>
+            <label className="f">Cc<input type="text" value={cc} onChange={(x) => setCc(x.target.value)} placeholder="Comma separated emails" /></label>
+            <label className="f">Supporting link<input type="url" value={link} onChange={(x) => setLink(x.target.value)} placeholder="Ticket, sheet or mail thread" /></label>
+            <label className="f span2">Email subject<input type="text" value={subject} onChange={(x) => setMailSubject(x.target.value)} /></label>
+            <label className="switch small span2"><input type="checkbox" checked={mailSent} onChange={(x) => setMailSent(x.target.checked)} />I&apos;ve already emailed them</label>
+          </div>
+        </details>
+
         {err && <div className="err">{err}</div>}
-        <div className="row2">
-          <button type="button" className="btn primary" disabled={busy || !title.trim() || !propertyIds.length || !ownerName.trim()} onClick={submit}>{busy ? "Raising…" : "Raise escalation"}</button>
-          <button type="button" className="btn" disabled={!title.trim()} onClick={() => setMail(true)}>Email draft</button>
-          <span className="small muted">Expected closure defaults to 1, 3 or 7 days by priority.</span>
+        <div className="row2 esc-foot">
+          <button type="button" className="btn primary" disabled={busy || !!missing} onClick={submit}>{busy ? "Raising…" : "Raise escalation"}</button>
+          <button type="button" className="btn" disabled={!title.trim()} onClick={() => setMail(true)}>See email draft</button>
+          {missing && <span className="small muted">{missing} to continue.</span>}
         </div>
       </div>
       {mail && <div onClick={(x) => x.stopPropagation()}><MailModal m={draft} close={() => setMail(false)} /></div>}
