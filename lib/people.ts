@@ -2,6 +2,7 @@
 import type { InStatement } from "@libsql/client";
 import { one, run } from "./db";
 import { GEO } from "./seed";
+import { dayStart } from "./time";
 
 /** Tasks that can still be reviewed or audited. */
 const OPEN = "('upcoming','current','notsub','review','resub','changes','audit','auditflag','flagans')";
@@ -96,6 +97,28 @@ export async function removeSampleEscalations(): Promise<InStatement[]> {
   if (await one("SELECT v FROM meta WHERE k=?", key)) return [];
   const E = "(SELECT id FROM escalations e WHERE NOT EXISTS (SELECT 1 FROM escalation_properties ep WHERE ep.escalation_id=e.id))";
   return [
+    `DELETE FROM escalation_updates WHERE escalation_id IN ${E}`,
+    `DELETE FROM escalations WHERE id IN ${E}`,
+    { sql: "INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)", args: [key, String(Date.now())] },
+  ];
+}
+
+/** Escalations raised before this IST day were trial entries and are cleared once from the live database. */
+export const ESCALATIONS_KEPT_FROM = "2026-11-04";
+
+/**
+ * Deletes every escalation raised before ESCALATIONS_KEPT_FROM, with its properties, updates, bell notices
+ * and the "escalation raised" lines in task histories. Runs once.
+ */
+export async function removeOldEscalations(): Promise<InStatement[]> {
+  const key = `escalations_before_${ESCALATIONS_KEPT_FROM}_removed`;
+  if (await one("SELECT v FROM meta WHERE k=?", key)) return [];
+  const cut = dayStart(ESCALATIONS_KEPT_FROM);
+  const E = `(SELECT id FROM escalations WHERE created_at < ${cut})`;
+  return [
+    `DELETE FROM events WHERE type='escalation_raised' AND at < ${cut}`,
+    `DELETE FROM notifications WHERE kind='escalation' AND at < ${cut}`,
+    `DELETE FROM escalation_properties WHERE escalation_id IN ${E}`,
     `DELETE FROM escalation_updates WHERE escalation_id IN ${E}`,
     `DELETE FROM escalations WHERE id IN ${E}`,
     { sql: "INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)", args: [key, String(Date.now())] },

@@ -21,11 +21,11 @@ const offOf = (p: TeamPerson) => ({ week: p.week, backup: p.backup_id, leaves: p
 
 type Data = { people: TeamPerson[]; options: Record<number, number[]>; names: Record<number, string>; today: string };
 
-export default function TeamLeave({ data, admin }: { data: Data; admin: boolean }) {
+export default function TeamLeave({ data, admin, embedded = false }: { data: Data; admin: boolean; embedded?: boolean }) {
   const router = useRouter();
   const { people, names, today } = data;
-  const [q, setQ] = useUrlState("q", "");
-  const [role, setRole] = useUrlState("role", "");
+  const [q, setQ] = useUrlState("who", "");
+  const [role, setRole] = useUrlState("who-role", "");
   const [showRaw, setShowRaw] = useUrlState("show", ""); const show = showRaw as "" | "off" | "nobackup", setShow = (x: "" | "off" | "nobackup") => setShowRaw(x);
   const [edit, setEdit] = useState<number | null>(null);
   const [toast, setToast] = useState("");
@@ -46,12 +46,11 @@ export default function TeamLeave({ data, admin }: { data: Data; admin: boolean 
   ];
   const editing = people.find((p) => p.id === edit) ?? null;
   return (
-    <div className="page grid" style={{ gap: 14 }}>
-      <div className="phead"><div><h1>Team leave</h1><p className="phead-sub">Each person&apos;s weekly day off, leave and backup.</p></div></div>
+    <div className={embedded ? "grid" : "page grid"} style={{ gap: 14 }}>
+      {!embedded && <div className="phead"><div><h1>Week offs and leave</h1><p className="phead-sub">Each person&apos;s weekly day off, leave and backup.</p></div></div>}
       <p className="small muted" style={{ margin: 0, maxWidth: 820 }}>
-        On someone&apos;s days off, their new and open tasks go to their backup, or to a teammate with the same role at that property. If nobody can cover,
-        the task is excused: it isn&apos;t counted as missed and doesn&apos;t affect anyone&apos;s score. Reviews and audits waiting for someone who&apos;s off move
-        to their backup. Without a backup, their review clock pauses until they&apos;re back.
+        <b style={{ color: "var(--fg)" }}>Each person&apos;s own days off.</b> While someone is off, their tasks go to their backup or a teammate at the same property;
+        with nobody to cover, the task isn&apos;t counted. Their reviews move to their backup, or their clock pauses until they&apos;re back.
       </p>
       <Stats items={[
         { key: "all", label: "People", value: people.length, active: !show, onClick: () => setShow("") },

@@ -9,6 +9,7 @@ import TriggerForm from "@/components/TriggerForm";
 import AdminClient, { Tpl } from "@/components/admin/AdminClient";
 import { Category, Checklist, Cluster, Count, Schedule } from "@/components/admin/Libraries";
 import { viewsFor } from "@/lib/views";
+import { teamData } from "@/lib/team";
 
 export default async function Admin({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const u = await boot();
@@ -45,7 +46,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
         count(*) FILTER (WHERE wk_closed_at>=? AND status='done') closed FROM instances`, Date.now() - off.pullbackDays * 86_400_000))!,
   };
   return (
-    <AdminClient tab={tab} templates={templates} props={props} people={people} views={await viewsFor(u.id, "admin")} lib={lib}>
+    <AdminClient tab={tab} templates={templates} props={props} people={people} views={await viewsFor(u.id, "admin")} lib={lib} team={await teamData(u)}>
       <TriggerForm templates={templates.filter((t) => t.trigger !== "scheduled" && t.active).map((t) => ({ id: t.id, name: t.name, label: JSON.parse(t.events || "[]")[0] ?? t.event_name ?? "On demand" }))}
         properties={(await geo()).map((g) => ({ id: g.id, name: `${g.property} · ${g.city}` }))} />
     </AdminClient>

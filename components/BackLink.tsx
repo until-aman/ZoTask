@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 const NAMES: [RegExp, string][] = [[/^\/queue/, "Review Queue"], [/^\/tasks\/?$/, "My Tasks"], [/^\/dashboard/, "Review Dashboard"], [/^\/compare/, "Compare"],
-  [/^\/escalations/, "Escalations"], [/^\/admin\/?$/, "Admin"], [/^\/team/, "Team leave"], [/^\/map/, "Map"], [/^\/review\//, "the review sheet"], [/^\/tasks\/\d/, "the task"]];
+  [/^\/escalations/, "Escalations"], [/^\/admin\/?$/, "Admin"], [/^\/map/, "Map"], [/^\/review\//, "the review sheet"], [/^\/tasks\/\d/, "the task"]];
 const KEY = "zt-nav";
 
 /** Remembers the page before this one, for BackLink. Mounted once in the app frame. */

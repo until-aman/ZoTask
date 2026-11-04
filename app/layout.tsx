@@ -21,8 +21,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     if (can.map(u)) links.push({ href: "/map", label: "Map" });
     if (can.admin(u)) links.push({ href: "/admin", label: "Admin", children: [
       ["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"],
-      ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"], ["weekoffs", "Week offs"], ["team", "Team leave"],
-    ].map(([k, l]) => ({ href: k === "tasks" ? "/admin" : k === "team" ? "/team" : `/admin?tab=${k}`, label: l })) });
+      ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"], ["weekoffs", "Week offs and leave"],
+    ].map(([k, l]) => ({ href: k === "tasks" ? "/admin" : `/admin?tab=${k}`, label: l })) });
   }
   return (
     <html lang="en">

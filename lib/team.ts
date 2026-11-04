@@ -51,3 +51,4 @@ export async function personFor(u: User, id: number) {
   if (!(await manageableIds(u)).includes(id)) throw new Error("You can't set days off for that person.");
   return (await one<{ id: number; name: string; access_role: string }>("SELECT id, name, access_role FROM users WHERE id=?", id))!;
 }
+export type TeamData = Awaited<ReturnType<typeof teamData>>;
