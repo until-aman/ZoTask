@@ -43,7 +43,7 @@ export async function insertTaskList(reviewers: number[], auditors: number[], sh
   }
 }
 
-const ids = async (role: string) => (await all<{ id: number }>("SELECT id FROM users WHERE access_role=? ORDER BY id", role)).map((u) => u.id);
+const ids = async (role: string) => (await all<{ id: number }>("SELECT id FROM users WHERE access_role=? AND archived=0 ORDER BY id", role)).map((u) => u.id);
 
 /** True when this version's list is in place and checked for duplicates, so starts can skip the work. */
 export async function taskListDone() {

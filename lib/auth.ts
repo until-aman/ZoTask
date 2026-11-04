@@ -7,7 +7,7 @@ export type User = { id: number; name: string; email: string; access_role: strin
 export async function currentUser(): Promise<User | null> {
   const uid = (await cookies()).get("uid")?.value;
   if (!uid) return null;
-  return await one<User>("SELECT * FROM users WHERE id=?", Number(uid)) ?? null;
+  return await one<User>("SELECT * FROM users WHERE id=? AND archived=0", Number(uid)) ?? null;
 }
 export async function requireUser(): Promise<User> {
   const u = await currentUser();

@@ -130,7 +130,7 @@ export async function escalationData(u: User, sp: Record<string, string | undefi
   // Prefill when raising from a task.
   const fromTask = sp.task ? await one<{ id: number; property_id: number; task: string; task_date: string; category: string; property: string }>(
     `SELECT i.id, i.property_id, t.name task, i.task_date, t.category, p.name property FROM instances i JOIN templates t ON t.id=i.template_id JOIN properties p ON p.id=i.property_id WHERE i.id=?`, Number(sp.task)) ?? null : null;
-  const people = await all<{ id: number; name: string; email: string; access_role: string }>("SELECT id, name, email, access_role FROM users WHERE access_role IN ('admin','cbm','reviewer','auditor') ORDER BY name");
+  const people = await all<{ id: number; name: string; email: string; access_role: string }>("SELECT id, name, email, access_role FROM users WHERE access_role IN ('admin','cbm','reviewer','auditor') AND archived=0 ORDER BY name");
   return {
     now, today, rows, geo: G, people, teams: TEAMS, departments: DEPARTMENTS,
     canRaise: canRaise(u), me: u.name, openNew: sp.new === "1" || !!fromTask,

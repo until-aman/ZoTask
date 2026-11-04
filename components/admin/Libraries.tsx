@@ -2,12 +2,13 @@
 // Admin libraries: predefined checklists and schedules, task categories, HK/SHK ideal counts, clusters.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addCategory, applyClusterSheet, archiveCategory, archiveCluster, deleteChecklistPreset, MappingPlan, MappingRow, previewClusterSheet, deleteSchedulePreset, moveCategory, PresetItem, saveChecklistPreset, saveCluster, saveCounts, saveSchedulePreset } from "@/app/admin-actions";
+import { addCategory, applyClusterSheet, archiveCategory, archiveCluster, deleteChecklistPreset, previewClusterSheet, deleteSchedulePreset, moveCategory, PresetItem, saveChecklistPreset, saveCluster, saveCounts, saveSchedulePreset } from "@/app/admin-actions";
 import { DAYS, describeWhen, ItemCard } from "@/components/TemplateEditor";
 import { Table } from "@/components/cc/parts";
 import { readWorkbook } from "@/app/map-actions";
 import { parseCsv } from "@/lib/sheet";
-import { toCsv, toXlsx } from "@/lib/template";
+import { xlsx } from "@/lib/xlsx-write";
+import { ClusterPlan, sheetRows } from "@/lib/cluster-sheet";
 
 type R = { ok: true; msg?: string } | { ok: false; error: string };
 const parse = <X,>(s: string, d: X): X => { try { return JSON.parse(s); } catch { return d; } };
@@ -172,9 +173,34 @@ export function Clusters({ rows, cities, props, reviewers, auditors, notify }: {
 }) {
   const run = useRun(notify);
   const [tab, setTab] = useState<"active" | "archived">("active");
-  const [bulk, setBulk] = useState(false);
+  const [sheet, setSheet] = useState<{ file: string; rows: string[][]; plan: ClusterPlan } | null>(null);
+  const [reading, setReading] = useState(false);
   const [edit, setEdit] = useState<{ id: number | null; name: string; city_id: number; reviewer_id: number | null; auditor_id: number | null; properties: number[] } | null>(null);
   const name = (l: { id: number; name: string }[], id: number | null) => l.find((x) => x.id === id)?.name ?? "—";
+  function download() {
+    const people = [...reviewers.map((p) => ({ ...p, email: null, access_role: "reviewer" })), ...auditors.map((p) => ({ ...p, email: null, access_role: "auditor" }))];
+    const data = sheetRows({ cities, clusters: rows, properties: props, people });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(xlsx(data, "Clusters")); a.download = "clusters.xlsx"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  async function upload(f: File | undefined) {
+    if (!f) return;
+    setEdit(null); setSheet(null);
+    let table: string[][];
+    setReading(true);
+    try {
+      if (/\.xlsx$/i.test(f.name)) {
+        const fd = new FormData(); fd.append("file", f);
+        const r = await readWorkbook(fd);
+        if (!r.ok) { notify(r.error); return; }
+        table = r.rows;
+      } else if (/\.(csv|txt)$/i.test(f.name)) table = parseCsv((await f.text()).replace(/^\uFEFF/, ""));
+      else { notify("Upload the sheet as Excel (.xlsx) or CSV."); return; }
+      const r = await previewClusterSheet(table);
+      if (r.ok) setSheet({ file: f.name, rows: table, plan: r.plan }); else notify(r.error);
+    } catch (e) { notify((e as Error).message); }
+    finally { setReading(false); }
+  }
   return (
     <section className="grid" style={{ gap: 10 }}>
       <p className="small muted" style={{ margin: 0 }}>Clusters group properties in a city and drive the dashboard&apos;s City and Cluster filters. A cluster&apos;s reviewer and auditor take review work for tasks that don&apos;t name their own.</p>
@@ -184,10 +210,12 @@ export function Clusters({ rows, cities, props, reviewers, auditors, notify }: {
           <button type="button" aria-pressed={tab === "archived"} onClick={() => setTab("archived")}>Archived ({rows.filter((c) => c.archived).length})</button>
         </div>
         <span className="spacer" />
-        <button type="button" className="btn sm" aria-pressed={bulk} onClick={() => { setBulk(!bulk); setEdit(null); }}>Bulk upload</button>
-        <button type="button" className="btn primary sm" onClick={() => { setBulk(false); setEdit({ id: null, name: "", city_id: cities[0]?.id ?? 0, reviewer_id: null, auditor_id: null, properties: [] }); }}>+ New cluster</button>
+        <button type="button" className="btn sm" onClick={download}>Download sheet</button>
+        <label className="btn sm" style={{ cursor: "pointer" }}>{reading ? "Reading…" : "Upload sheet"}
+          <input type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden disabled={reading} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} /></label>
+        <button type="button" className="btn primary sm" onClick={() => { setSheet(null); setEdit({ id: null, name: "", city_id: cities[0]?.id ?? 0, reviewer_id: null, auditor_id: null, properties: [] }); }}>+ New cluster</button>
       </div>
-      {bulk && <ClusterUpload notify={notify} onDone={() => setBulk(false)} />}
+      {sheet && <SheetPreview {...sheet} notify={notify} onDone={() => setSheet(null)} />}
       {edit && <div className="card grid">
         <div className="te-row">
           <label className="f">Cluster name<input type="text" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
@@ -212,106 +240,38 @@ export function Clusters({ rows, cities, props, reviewers, auditors, notify }: {
         { label: "Edit", hidden: !!c.archived, onClick: () => setEdit({ id: c.id, name: c.name, city_id: c.city_id, reviewer_id: c.reviewer_id, auditor_id: c.auditor_id, properties: props.filter((p) => p.cluster_id === c.id).map((p) => p.id) }) },
         { label: c.archived ? "Restore" : "Archive", danger: !c.archived, onClick: () => run(archiveCluster(c.id, !c.archived)) },
       ]} />
+      <p className="small muted" style={{ margin: 0 }}>Sheet columns: City, Cluster, Reviewer, Auditor, Property, Zolo Code. One row per property. Every property must be in the sheet.</p>
     </section>
   );
 }
 
-// Bulk cluster mapping: download the template, upload the filled sheet, check the preview, then apply.
-const MAP_COLS = ["Zolo Code", "City Name", "Cluster Name", "Property name", "Reviewer Name", "Auditor Name"];
-const MAP_EXAMPLE = [
-  ["ZP049", "Pune", "Pune Kharadi 1", "Zolo Avalon (example, delete this row)", "reviewer.name@zolostays.com", "auditor.name@zolostays.com"],
-  ["ZP040", "Pune", "Pune Kharadi 1", "Zolo Hendrix (example, delete this row)", "reviewer.name@zolostays.com", "auditor.name@zolostays.com"],
-];
-const MAP_FIND: [keyof Omit<MappingRow, "line">, RegExp][] = [
-  ["code", /zolo.?code|property.?code|^code$/], ["city", /city/], ["cluster", /cluster/], ["property", /property.?name|^property$|^name$/],
-  ["reviewer", /reviewer/], ["auditor", /auditor/],
-];
-function readMapping(rows: string[][]): MappingRow[] | string {
-  const head = (rows[0] ?? []).map((h) => h.replace(/^\uFEFF/, "").trim().toLowerCase());
-  const at = Object.fromEntries(MAP_FIND.map(([k, re]) => [k, head.findIndex((h) => re.test(h))])) as Record<keyof Omit<MappingRow, "line">, number>;
-  const missing = (["city", "cluster", "property"] as const).filter((k) => at[k] < 0);
-  if (missing.length) return `The sheet needs these columns: ${missing.map((k) => MAP_COLS[["code", "city", "cluster", "property"].indexOf(k)]).join(", ")}. Download the template to see the layout.`;
-  const get = (r: string[], k: keyof typeof at) => (at[k] >= 0 ? (r[at[k]] ?? "").trim() : "");
-  return rows.slice(1).map((r, i) => ({ line: i + 2, code: get(r, "code"), city: get(r, "city"), cluster: get(r, "cluster"), property: get(r, "property"), reviewer: get(r, "reviewer"), auditor: get(r, "auditor") }))
-    .filter((r) => (r.city || r.cluster || r.property) && !/delete this row/i.test(r.property));
-}
-
-function ClusterUpload({ notify, onDone }: { notify: (m: string) => void; onDone: () => void }) {
+// What an uploaded cluster sheet will change. Errors come first and block Apply.
+function SheetPreview({ file, rows, plan, notify, onDone }: { file: string; rows: string[][]; plan: ClusterPlan; notify: (m: string) => void; onDone: () => void }) {
   const run = useRun(notify);
-  const [file, setFile] = useState(""), [rows, setRows] = useState<MappingRow[]>([]);
-  const [plan, setPlan] = useState<MappingPlan | null>(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false), [addPeople, setAddPeople] = useState(true);
-  function template(kind: "xlsx" | "csv") {
-    const data = [MAP_COLS, ...MAP_EXAMPLE];
-    const blob = kind === "xlsx" ? new Blob([toXlsx("Cluster mapping", data, [12, 14, 20, 34, 30, 30]) as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }) : new Blob([toCsv(data)], { type: "text/csv" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `cluster-mapping-template.${kind}`; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }
-  async function preview(r: MappingRow[], people: boolean) {
-    setBusy(true);
-    const res = await previewClusterSheet(r, people).catch((e: Error) => ({ ok: false as const, error: e.message }));
-    setBusy(false);
-    if (res.ok) { setPlan(res.plan); setErr(""); } else { setPlan(null); setErr(res.error); }
-  }
-  async function pick(f: File | undefined) {
-    if (!f) return;
-    setFile(f.name); setPlan(null); setErr("");
-    let table: string[][];
-    if (/\.xlsx$/i.test(f.name)) {
-      const fd = new FormData(); fd.append("file", f);
-      setBusy(true);
-      const r = await readWorkbook(fd).catch((e: Error) => ({ ok: false as const, error: e.message }));
-      setBusy(false);
-      if (!r.ok) { setErr(r.error); return; }
-      table = r.rows;
-    } else if (/\.(csv|txt)$/i.test(f.name)) table = parseCsv((await f.text()).replace(/^\uFEFF/, ""));
-    else { setErr("Upload the sheet as Excel (.xlsx) or CSV."); return; }
-    const m = readMapping(table);
-    if (typeof m === "string") { setErr(m); return; }
-    setRows(m);
-    await preview(m, addPeople);
-  }
-  const changes = plan ? plan.newClusters.length + plan.restored.length + plan.leads.length + plan.moves.length + plan.newProps.length + (addPeople ? plan.newPeople.length : 0) : 0;
+  const [busy, setBusy] = useState(false);
+  const changes = plan.create.length + plan.update.length + plan.archive.length + plan.moves.length;
   const tile = (n: number, label: string, tone = "") => <div className={`cu-tile ${n ? tone : "zero"}`}><b>{n}</b><span>{label}</span></div>;
   const list = (title: string, items: string[]) => items.length > 0 && <details className="cu-list"><summary>{title} ({items.length})</summary><ul>{items.map((x, i) => <li key={i}>{x}</li>)}</ul></details>;
   return (
-    <div className="card grid cu">
-      <div className="row2"><h3 className="te-h" style={{ margin: 0, fontSize: 15 }}>Bulk upload clusters</h3><span className="spacer" /><button type="button" className="link small" onClick={onDone}>Close</button></div>
-      <ol className="cu-steps">
-        <li><b>Download the template</b><span className="small muted">One row per property. Reviewer and auditor are email addresses. The example rows are skipped if you leave them in.</span>
-          <div className="row2"><button type="button" className="btn sm" onClick={() => template("xlsx")}>Excel template</button><button type="button" className="btn sm" onClick={() => template("csv")}>CSV template</button></div>
-          <div className="chips">{MAP_COLS.map((c) => <span key={c} className="chipn small">{c}</span>)}</div></li>
-        <li><b>Upload the filled sheet</b><span className="small muted">Nothing changes yet. You will see what the sheet does first.</span>
-          <div className="row2"><label className="btn sm primary" style={{ cursor: "pointer" }}>{busy ? "Reading…" : file ? "Choose another file" : "Choose Excel or CSV file"}<input type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = ""; }} /></label>
-            {file && <span className="small muted">{file}{rows.length ? ` · ${rows.length} rows` : ""}</span>}</div></li>
-        <li><b>Check and apply</b>
-          {err && <div className="err">{err}</div>}
-          {!plan && !err && <span className="small muted">The preview appears here after you upload.</span>}
-          {plan && <>
-            <div className="cu-tiles">
-              {tile(plan.newClusters.length, "new clusters", "b")}
-              {tile(plan.moves.length, "properties moved", "a")}
-              {tile(plan.newProps.length, "new properties", "b")}
-              {tile(plan.leads.length, "reviewer / auditor changes", "b")}
-              {tile(plan.newCities.length, "new cities", "b")}
-              {tile(plan.same, "already in place", "g")}
-            </div>
-            {list("New clusters", plan.newClusters)}
-            {list("Restored from archive", plan.restored)}
-            {list("Properties moving", plan.moves.map((m) => `${m.property}: ${m.from} → ${m.to}`))}
-            {list("New properties", plan.newProps.map((m) => `${m.property} → ${m.cluster}`))}
-            {list("Reviewer and auditor", plan.leads.map((l) => `${l.cluster}: ${[l.reviewer && `reviewer ${l.reviewer}`, l.auditor && `auditor ${l.auditor}`].filter(Boolean).join(", ")}`))}
-            {plan.newPeople.length > 0 && <div className="cu-people">
-              <label className="switch"><input type="checkbox" checked={addPeople} onChange={(e) => { setAddPeople(e.target.checked); void preview(rows, e.target.checked); }} />Add {plan.newPeople.length} {plan.newPeople.length === 1 ? "person" : "people"} not in ZoTask yet</label>
-              <div className="chips">{plan.newPeople.map((n) => <span key={n.email} className="chipn small">{n.name} · {n.role} · {n.email}</span>)}</div>
-              {!addPeople && <span className="small muted">Their clusters keep the reviewer or auditor they have now.</span>}
-            </div>}
-            {plan.problems.length > 0 && <div className="te-gaps warn"><b>{plan.problems.length} row{plan.problems.length > 1 ? "s" : ""} to check</b><ul>{plan.problems.slice(0, 20).map((x, i) => <li key={i}>{x}</li>)}{plan.problems.length > 20 && <li>…and {plan.problems.length - 20} more</li>}</ul></div>}
-            <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={onDone}>Cancel</button>
-              <button type="button" className="btn primary sm" disabled={busy || !changes} onClick={async () => { setBusy(true); const ok = await run(applyClusterSheet(rows, addPeople)); setBusy(false); if (ok) onDone(); }}>
-                {changes ? `Apply ${changes} change${changes > 1 ? "s" : ""}` : "Nothing to change"}</button></div>
-          </>}
-        </li>
-      </ol>
+    <div className="card grid">
+      <div className="row2"><b>{file}</b><span className="spacer" />{plan.errors.length > 0 && <span className="pill r">{plan.errors.length} error{plan.errors.length > 1 ? "s" : ""}</span>}</div>
+      <div className="cu-tiles">
+        {tile(plan.create.length, "New", "b")}
+        {tile(plan.update.length, "Changed", "b")}
+        {tile(plan.archive.length, "Archived", "a")}
+        {tile(plan.moves.length, "Properties moving", "a")}
+        {tile(plan.same, "Unchanged", "g")}
+      </div>
+      {plan.errors.length > 0 && <div className="err"><b>Fix these and upload again</b><ul style={{ margin: "4px 0 0", paddingLeft: 20 }}>{plan.errors.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
+      {list("New clusters", plan.create.map((c) => `${c.name} (${c.city}) · ${c.properties} propert${c.properties === 1 ? "y" : "ies"}`))}
+      {list("Changed clusters", plan.update.map((c) => `${c.name} (${c.city}): ${c.changes.join(", ")}`))}
+      {list("Archived", plan.archive.map((c) => `${c.name} (${c.city})`))}
+      {list("Properties moving", plan.moves.map((m) => `${m.property}: ${m.from} → ${m.to}`))}
+      <p className="small muted" style={{ margin: 0 }}>Clusters not in the file are archived, not deleted. Restore brings one back.</p>
+      <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={onDone}>Cancel</button>
+        <button type="button" className="btn primary sm" disabled={busy || plan.errors.length > 0 || !changes}
+          onClick={async () => { setBusy(true); const ok = await run(applyClusterSheet(rows)); setBusy(false); if (ok) onDone(); }}>
+          {busy ? "Applying…" : changes || plan.errors.length ? "Apply changes" : "Nothing to change"}</button></div>
     </div>
   );
 }

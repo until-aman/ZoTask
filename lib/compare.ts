@@ -23,7 +23,7 @@ export async function compareData(u: User, sp: Record<string, string | undefined
 
   // Options for each kind, limited to what this user can see.
   const people = (role: string) => all<{ id: number; name: string; op_role: string | null }>(
-    `SELECT DISTINCT u.id, u.name, u.op_role FROM users u WHERE u.access_role=? ORDER BY u.name`, role);
+    `SELECT DISTINCT u.id, u.name, u.op_role FROM users u WHERE u.access_role=? AND u.archived=0 ORDER BY u.name`, role);
   const assignees = await all<{ id: number; name: string; op_role: string | null; property: string }>(
     `SELECT u.id, u.name, u.op_role, min(p.name) property FROM instances i JOIN users u ON u.id=i.assignee_id JOIN properties p ON p.id=i.property_id
      WHERE i.property_id ${inScope} GROUP BY u.id ORDER BY u.name`);

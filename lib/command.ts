@@ -109,7 +109,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
   const mine = u.access_role === "reviewer" && sp.mine !== "0" && !sp.rv;
   // Reviewer filter: a picked reviewer, or yourself in My portfolio.
   const rvId = sp.rv ? Number(sp.rv) : mine ? u.id : null;
-  const reviewerOpts = await all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' ORDER BY name");
+  const reviewerOpts = await all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' AND archived=0 ORDER BY name");
   const cats = (await all<{ category: string }>("SELECT DISTINCT category FROM templates ORDER BY category")).map((c) => c.category);
 
   const scope = await scopeProps(u);

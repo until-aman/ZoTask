@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS properties (
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT,
   access_role TEXT NOT NULL CHECK (access_role IN ('admin','reviewer','auditor','cbm','ground')),
-  op_role TEXT
+  op_role TEXT, archived INTEGER NOT NULL DEFAULT 0  -- archived people keep their history but can't sign in or be picked
 );
 CREATE TABLE IF NOT EXISTS user_properties (user_id INTEGER NOT NULL, property_id INTEGER NOT NULL, PRIMARY KEY (user_id, property_id));
 

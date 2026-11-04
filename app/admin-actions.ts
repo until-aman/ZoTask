@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireUser, can } from "@/lib/auth";
 import { all, one, run, tx } from "@/lib/db";
+import { ClusterPlan, planClusters, Snapshot } from "@/lib/cluster-sheet";
+import { fillFromCluster } from "@/lib/people";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function admin(fn: () => Promise<string | void>): Promise<Result> {
@@ -98,6 +100,7 @@ export async function saveCluster(id: number | null, c: { name: string; city_id:
     if (id) await run("UPDATE clusters SET name=?, city_id=?, reviewer_id=?, auditor_id=? WHERE id=?", n, c.city_id, c.reviewer_id, c.auditor_id, id);
     else cid = (await run("INSERT INTO clusters (name, city_id, reviewer_id, auditor_id) VALUES (?,?,?,?)", n, c.city_id, c.reviewer_id, c.auditor_id)).lastInsertRowid;
     for (const p of c.properties) await run("UPDATE properties SET cluster_id=? WHERE id=?", cid, p);
+    await fillFromCluster(cid!);
     return `Saved "${n}".`;
   });
 }
@@ -109,122 +112,39 @@ export async function archiveCluster(id: number, archived: boolean) {
   });
 }
 
-// Cluster mapping sheet: one row per property, naming its city, cluster, and the cluster's reviewer and auditor by email.
-export type MappingRow = { line: number; code: string; city: string; cluster: string; property: string; reviewer: string; auditor: string };
-export type MappingPlan = {
-  rows: number; newCities: string[]; newClusters: string[]; restored: string[];
-  leads: { cluster: string; reviewer?: string; auditor?: string }[];
-  moves: { property: string; from: string; to: string }[]; newProps: { property: string; cluster: string }[]; same: number;
-  newPeople: { email: string; name: string; role: "reviewer" | "auditor" }[]; problems: string[];
-};
-const low = (s: string) => s.trim().toLowerCase();
-const nameFromEmail = (e: string) => e.split("@")[0].split(/[._-]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
-
-async function mappingPlan(input: MappingRow[], addPeople: boolean) {
-  const cities = await all<{ id: number; name: string }>("SELECT id, name FROM cities");
-  const clusters = await all<{ id: number; name: string; city_id: number; reviewer_id: number | null; auditor_id: number | null; archived: number }>("SELECT id, name, city_id, reviewer_id, auditor_id, archived FROM clusters");
-  const props = await all<{ id: number; name: string; cluster_id: number }>("SELECT id, name, cluster_id FROM properties ORDER BY id");
-  const codes = await all<{ code: string; property_id: number }>("SELECT code, property_id FROM map_sites WHERE code IS NOT NULL AND property_id IS NOT NULL");
-  const users = await all<{ id: number; name: string; email: string | null; access_role: string }>("SELECT id, name, email, access_role FROM users");
-  const p: MappingPlan = { rows: input.length, newCities: [], newClusters: [], restored: [], leads: [], moves: [], newProps: [], same: 0, newPeople: [], problems: [] };
-  const cityOf = (n: string) => cities.find((c) => low(c.name) === low(n));
-  const clusterIn = (cityId: number | undefined, n: string) => (cityId ? clusters.find((c) => c.city_id === cityId && low(c.name) === low(n)) : undefined);
-  const clName = (id: number) => clusters.find((c) => c.id === id)?.name ?? "?";
-
-  // Reviewer and auditor per cluster, from its first row; a person is found by email and must hold that role.
-  const person = (email: string, role: "reviewer" | "auditor", line: number) => {
-    if (!email) return undefined;
-    const u = users.find((x) => x.email && low(x.email) === low(email));
-    if (u) {
-      if (u.access_role !== role && u.access_role !== "admin") { p.problems.push(`Row ${line}: ${u.name} (${email}) is not a${role === "auditor" ? "n" : ""} ${role}, so they were left out.`); return null; }
-      return u;
-    }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { p.problems.push(`Row ${line}: "${email}" is not an email address.`); return null; }
-    if (!p.newPeople.some((x) => low(x.email) === low(email))) p.newPeople.push({ email: email.trim(), name: nameFromEmail(email), role });
-    return addPeople ? { id: 0, name: nameFromEmail(email), email, access_role: role } : null;
+// Cluster sheet: the uploaded file replaces the clusters. Clusters it leaves out are archived, never deleted.
+async function snapshot(): Promise<Snapshot> {
+  return {
+    cities: await all("SELECT id, name FROM cities"),
+    clusters: await all("SELECT id, name, city_id, reviewer_id, auditor_id, archived FROM clusters ORDER BY id"),
+    properties: await all("SELECT id, name, cluster_id FROM properties ORDER BY id"),
+    people: await all("SELECT id, name, email, access_role FROM users WHERE access_role IN ('reviewer','auditor','admin') AND archived=0 ORDER BY id"),
   };
-
-  type Want = { city: string; cluster: string; reviewer?: { id: number; name: string; email: string | null } | null; auditor?: { id: number; name: string; email: string | null } | null; line: number };
-  const want = new Map<string, Want>();
-  const assign: { line: number; property: string; code: string; key: string }[] = [];
-  const seen = new Map<string, number>();
-  for (const r of input) {
-    if (!r.city || !r.cluster || !r.property) { p.problems.push(`Row ${r.line}: needs City Name, Cluster Name and Property name. Skipped.`); continue; }
-    const key = `${low(r.city)}|${low(r.cluster)}`;
-    const dup = seen.get(low(r.property));
-    if (dup) { p.problems.push(`Row ${r.line}: ${r.property} is already on row ${dup}. Skipped.`); continue; }
-    seen.set(low(r.property), r.line);
-    const w = want.get(key);
-    if (!w) {
-      const rv = person(r.reviewer, "reviewer", r.line), au = person(r.auditor, "auditor", r.line);
-      if (rv && au && low(rv.email ?? "") === low(au.email ?? "")) { p.problems.push(`Row ${r.line}: the auditor must be a different person from the reviewer, so the auditor was left out.`); want.set(key, { city: r.city, cluster: r.cluster, reviewer: rv, auditor: null, line: r.line }); }
-      else want.set(key, { city: r.city, cluster: r.cluster, reviewer: rv, auditor: au, line: r.line });
-    } else if ((r.reviewer && low(r.reviewer) !== low(w.reviewer?.email ?? r.reviewer)) || (r.auditor && low(r.auditor) !== low(w.auditor?.email ?? r.auditor))) {
-      p.problems.push(`Row ${r.line}: ${r.cluster} names a different reviewer or auditor than row ${w.line}. Row ${w.line} was used.`);
-    }
-    assign.push({ line: r.line, property: r.property, code: r.code, key });
-  }
-
-  for (const w of want.values()) {
-    const city = cityOf(w.city);
-    if (!city && !p.newCities.some((c) => low(c) === low(w.city))) p.newCities.push(w.city.trim());
-    const cl = clusterIn(city?.id, w.cluster);
-    if (!cl) p.newClusters.push(`${w.cluster.trim()} (${w.city.trim()})`);
-    else if (cl.archived) p.restored.push(cl.name);
-    const lead: MappingPlan["leads"][number] = { cluster: w.cluster.trim() };
-    if (w.reviewer && (!cl || w.reviewer.id !== cl.reviewer_id)) lead.reviewer = w.reviewer.name;
-    if (w.auditor && (!cl || w.auditor.id !== cl.auditor_id)) lead.auditor = w.auditor.name;
-    if (lead.reviewer || lead.auditor) p.leads.push(lead);
-  }
-  const found: { property: string; key: string; propId: number | null }[] = [];
-  for (const a of assign) {
-    const viaCode = a.code ? codes.find((c) => low(c.code) === low(a.code)) : undefined;
-    const prop = (viaCode && props.find((x) => x.id === viaCode.property_id)) || props.find((x) => low(x.name) === low(a.property));
-    const w = want.get(a.key)!, cl = clusterIn(cityOf(w.city)?.id, w.cluster);
-    if (!prop) p.newProps.push({ property: a.property.trim(), cluster: w.cluster.trim() });
-    else if (cl && prop.cluster_id === cl.id) p.same++;
-    else p.moves.push({ property: prop.name, from: clName(prop.cluster_id), to: w.cluster.trim() });
-    found.push({ property: a.property.trim(), key: a.key, propId: prop?.id ?? null });
-  }
-  return { plan: p, want, found };
 }
 
 /** What uploading the sheet would change, without changing anything. */
-export async function previewClusterSheet(rows: MappingRow[], addPeople: boolean): Promise<{ ok: true; plan: MappingPlan } | { ok: false; error: string }> {
+export async function previewClusterSheet(rows: string[][]): Promise<{ ok: true; plan: ClusterPlan } | { ok: false; error: string }> {
   const u = await requireUser();
   if (!can.admin(u)) return { ok: false, error: "Only admins can change this." };
-  if (!rows.length) return { ok: false, error: "The sheet has no rows under the header." };
-  try { return { ok: true, plan: (await mappingPlan(rows, addPeople)).plan }; }
+  try { return { ok: true, plan: planClusters(rows, await snapshot()) }; }
   catch (e) { return { ok: false, error: (e as Error).message }; }
 }
 
-/** Creates missing cities, clusters, properties (and, if asked, people), sets each cluster's reviewer and auditor, and moves properties into place. */
-export async function applyClusterSheet(rows: MappingRow[], addPeople: boolean) {
+/** Makes the clusters match the sheet. The plan is worked out again here, and nothing changes while it has errors. */
+export async function applyClusterSheet(rows: string[][]) {
   return admin(async () => {
-    const { plan, want, found } = await mappingPlan(rows, addPeople);
-    const people = new Map<string, number>();
-    if (addPeople) for (const n of plan.newPeople) people.set(low(n.email), Number((await run("INSERT INTO users (name, email, access_role) VALUES (?,?,?)", n.name, n.email, n.role)).lastInsertRowid));
-    const idOf = (x: { id: number; email: string | null } | null | undefined) => (!x ? undefined : x.id || people.get(low(x.email ?? "")));
-    const clusterIds = new Map<string, number>();
-    for (const [key, w] of want) {
-      let city = await one<{ id: number }>("SELECT id FROM cities WHERE lower(name)=lower(?)", w.city.trim());
-      if (!city) city = { id: Number((await run("INSERT INTO cities (name) VALUES (?)", w.city.trim())).lastInsertRowid) };
-      const cl = await one<{ id: number; reviewer_id: number | null; auditor_id: number | null }>("SELECT id, reviewer_id, auditor_id FROM clusters WHERE city_id=? AND lower(name)=lower(?)", city.id, w.cluster.trim());
-      const rv = idOf(w.reviewer) ?? cl?.reviewer_id ?? null, au = idOf(w.auditor) ?? cl?.auditor_id ?? null;
-      if (cl) { await run("UPDATE clusters SET reviewer_id=?, auditor_id=?, archived=0 WHERE id=?", rv, au, cl.id); clusterIds.set(key, cl.id); }
-      else clusterIds.set(key, Number((await run("INSERT INTO clusters (name, city_id, reviewer_id, auditor_id) VALUES (?,?,?,?)", w.cluster.trim(), city.id, rv, au)).lastInsertRowid));
-    }
-    for (const f of found) {
-      const cid = clusterIds.get(f.key)!;
-      if (f.propId) await run("UPDATE properties SET cluster_id=? WHERE id=?", cid, f.propId);
-      else await run("INSERT INTO properties (cluster_id, name) VALUES (?,?)", cid, f.property);
-    }
-    const bits = [plan.newClusters.length && `${plan.newClusters.length} new cluster${plan.newClusters.length > 1 ? "s" : ""}`,
-      plan.moves.length && `${plan.moves.length} propert${plan.moves.length > 1 ? "ies" : "y"} moved`,
-      plan.newProps.length && `${plan.newProps.length} propert${plan.newProps.length > 1 ? "ies" : "y"} added`,
-      plan.leads.length && `${plan.leads.length} reviewer/auditor update${plan.leads.length > 1 ? "s" : ""}`,
-      addPeople && plan.newPeople.length && `${plan.newPeople.length} people added`].filter(Boolean);
-    return bits.length ? `Uploaded: ${bits.join(", ")}.` : "Uploaded. Everything already matched the sheet.";
+    const plan = planClusters(rows, await snapshot());
+    if (plan.errors.length) throw new Error(`The sheet has ${plan.errors.length} error${plan.errors.length > 1 ? "s" : ""}. Fix ${plan.errors.length > 1 ? "them" : "it"} and upload again.`);
+    const ids = new Map<string, number>();
+    for (const c of plan.create)
+      ids.set(String(c.ref), (await run("INSERT INTO clusters (name, city_id, reviewer_id, auditor_id) VALUES (?,?,?,?)", c.name, c.city_id, c.reviewer_id, c.auditor_id)).lastInsertRowid);
+    for (const c of plan.update) await run("UPDATE clusters SET name=?, reviewer_id=?, auditor_id=?, archived=0 WHERE id=?", c.name, c.reviewer_id, c.auditor_id, c.id);
+    for (const m of plan.moves) await run("UPDATE properties SET cluster_id=? WHERE id=?", typeof m.ref === "number" ? m.ref : ids.get(m.ref), m.property_id);
+    for (const id of [...plan.update.map((c) => c.id), ...ids.values()]) await fillFromCluster(id);
+    // Safe: every property is in the sheet, so these clusters have none left.
+    for (const c of plan.archive) await run("UPDATE clusters SET archived=1 WHERE id=?", c.id);
+    const n = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
+    return `${plan.create.length} added, ${plan.update.length} updated, ${plan.archive.length} archived, ${n(plan.moves.length, "property", "properties")} moved.`;
   });
 }
 

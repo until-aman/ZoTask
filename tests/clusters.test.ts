@@ -1,54 +1,103 @@
-// Bulk cluster mapping upload: preview changes nothing, apply creates and moves exactly what the preview said.
+// Cluster sheet upload: the file replaces the clusters. Preview changes nothing; apply archives what the file leaves out.
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import * as A from "@/app/admin-actions";
-import { signInAs, ready, one, all, ADMIN, REVIEWER } from "./helpers";
+import { sheetRows, Snapshot } from "@/lib/cluster-sheet";
+import { signInAs, ready, one, all, ADMIN, REVIEWER, AUDITOR } from "./helpers";
 
-before(async () => { await ready(); });
+before(ready);
+const yes = (r: { ok: boolean }) => assert.equal(r.ok, true, JSON.stringify(r));
 
-const row = (line: number, city: string, cluster: string, property: string, reviewer: string, auditor: string, code = ""): A.MappingRow => ({ line, code, city, cluster, property, reviewer, auditor });
-const sheet = [
-  row(2, "Pune", "Pune Kharadi 1", "Zolo Avalon", "akash.sh@zolostays.com", "karthick.l@zolostays.com", "ZP049"),
-  row(3, "Pune", "Pune Kharadi 1", "Zolo Harmony", "akash.sh@zolostays.com", "karthick.l@zolostays.com"),
-  row(4, "Coimbatore", "Coimbatore 1", "Zolo Arcade", "lindashalini.y@zolostays.com", "karthick.l@zolostays.com"),
-  row(5, "Coimbatore", "Coimbatore 1", "Zolo Edison", "lindashalini.y@zolostays.com", "karthick.l@zolostays.com"),
-  row(6, "Coimbatore", "Coimbatore 1", "Zolo Arcade", "lindashalini.y@zolostays.com", "karthick.l@zolostays.com"),
-  row(7, "Pune", "", "Zolo Nowhere", "", ""),
-];
+/** The sheet Download builds, from the database as it is now. */
+async function download() {
+  const s: Snapshot = {
+    cities: await all("SELECT id, name FROM cities"),
+    clusters: await all("SELECT id, name, city_id, reviewer_id, auditor_id, archived FROM clusters"),
+    properties: await all("SELECT id, name, cluster_id FROM properties"),
+    people: await all("SELECT id, name, email, access_role FROM users"),
+  };
+  return sheetRows(s);
+}
+async function preview(rows: string[][]) {
+  signInAs(ADMIN);
+  const r = await A.previewClusterSheet(rows);
+  assert.ok(r.ok, JSON.stringify(r));
+  return r.plan;
+}
+const C = { city: 0, cluster: 1, reviewer: 2, auditor: 3, property: 4, code: 5 };
+/** Two clusters in one city, each with at least two properties. */
+async function pair() {
+  return (await all<{ a: string; b: string }>(`SELECT a.name a, b.name b FROM clusters a JOIN clusters b ON b.city_id=a.city_id AND b.id>a.id
+    WHERE a.archived=0 AND b.archived=0 AND (SELECT count(*) FROM properties WHERE cluster_id=a.id)>1 AND (SELECT count(*) FROM properties WHERE cluster_id=b.id)>1 LIMIT 1`))[0];
+}
 
-test("only admins can preview or apply a cluster sheet", async () => {
+test("only admins can preview or apply the sheet", async () => {
+  const rows = await download();
   signInAs(REVIEWER);
-  assert.equal((await A.previewClusterSheet(sheet, true)).ok, false);
-  assert.equal((await A.applyClusterSheet(sheet, true)).ok, false);
+  assert.equal((await A.previewClusterSheet(rows)).ok, false);
+  assert.equal((await A.applyClusterSheet(rows)).ok, false);
 });
 
-test("preview reports new cities, clusters, properties, moves and people without changing anything", async () => {
-  signInAs(ADMIN);
-  const before = await one<{ n: number }>("SELECT count(*) n FROM clusters");
-  const r = await A.previewClusterSheet(sheet, true);
-  assert.ok(r.ok, JSON.stringify(r));
-  const p = r.plan;
-  assert.deepEqual(p.newCities, ["Coimbatore"]);
-  assert.deepEqual(p.newClusters.sort(), ["Coimbatore 1 (Coimbatore)", "Pune Kharadi 1 (Pune)"]);
-  assert.deepEqual(p.moves, [{ property: "Zolo Harmony", from: "Hinjewadi", to: "Pune Kharadi 1" }]);
-  assert.deepEqual(p.newProps.map((x) => x.property).sort(), ["Zolo Arcade", "Zolo Avalon", "Zolo Edison"]);
-  assert.deepEqual(p.newPeople.map((x) => [x.name, x.role]).sort(), [["Akash Sh", "reviewer"], ["Lindashalini Y", "reviewer"]]);
-  assert.equal(p.problems.length, 2, p.problems.join("\n"));
-  assert.equal((await one<{ n: number }>("SELECT count(*) n FROM clusters"))!.n, before!.n);
+test("uploading the downloaded sheet unchanged changes nothing", async () => {
+  const plan = await preview(await download());
+  assert.deepEqual(plan.errors, []);
+  assert.equal(plan.create.length + plan.update.length + plan.archive.length + plan.moves.length, 0);
+  assert.equal(plan.same, (await one<{ n: number }>("SELECT count(*) n FROM clusters WHERE archived=0"))!.n);
 });
 
-test("apply creates the clusters, sets reviewer and auditor, and moves properties", async () => {
-  signInAs(ADMIN);
-  const r = await A.applyClusterSheet(sheet, true);
-  assert.ok(r.ok, JSON.stringify(r));
-  const cl = await one<{ id: number; rv: string; au: string }>(
-    "SELECT c.id, r.email rv, a.email au FROM clusters c JOIN cities ci ON ci.id=c.city_id LEFT JOIN users r ON r.id=c.reviewer_id LEFT JOIN users a ON a.id=c.auditor_id WHERE ci.name='Pune' AND c.name='Pune Kharadi 1'");
-  assert.deepEqual([cl?.rv, cl?.au], ["akash.sh@zolostays.com", "karthick.l@zolostays.com"]);
-  const names = (await all<{ name: string }>("SELECT name FROM properties WHERE cluster_id=? ORDER BY name", cl!.id)).map((x) => x.name);
-  assert.deepEqual(names, ["Zolo Avalon", "Zolo Harmony"]);
-  // A second upload of the same sheet has nothing left to do.
-  const again = await A.previewClusterSheet(sheet, true);
-  assert.ok(again.ok);
-  assert.equal(again.plan.newClusters.length + again.plan.moves.length + again.plan.newProps.length + again.plan.leads.length + again.plan.newPeople.length, 0);
-  assert.equal(again.plan.same, 4);
+test("a property left out is an error, and apply changes nothing", async () => {
+  const rows = (await download()).filter((r, i) => i !== 1);
+  const plan = await preview(rows);
+  assert.ok(plan.errors.some((e) => e.includes("is missing")), plan.errors.join("\n"));
+  const before = await all("SELECT id, cluster_id FROM properties ORDER BY id");
+  assert.equal((await A.applyClusterSheet(rows)).ok, false);
+  assert.deepEqual(await all("SELECT id, cluster_id FROM properties ORDER BY id"), before);
+});
+
+test("unknown reviewer, same reviewer and auditor, and a property in the wrong city each name their row", async () => {
+  const reviewer = (await one<{ email: string }>("SELECT email FROM users WHERE id=?", REVIEWER))!.email;
+  const auditor = (await one<{ name: string }>("SELECT name FROM users WHERE id=?", AUDITOR))!.name;
+  const other = (await one<{ name: string }>("SELECT name FROM cities ORDER BY id DESC LIMIT 1"))!.name;
+  const rows = await download();
+  rows[1][C.reviewer] = "Nobody Here";
+  rows[2][C.reviewer] = reviewer; rows[2][C.auditor] = reviewer.toUpperCase();
+  rows[3][C.reviewer] = reviewer; rows[3][C.auditor] = auditor;
+  const far = rows.findIndex((r, i) => i > 3 && r[C.city] !== other && r[C.property]);
+  rows[far][C.city] = other;
+  const errors = (await preview(rows)).errors;
+  assert.ok(errors.some((e) => e.startsWith("Row 2:") && e.includes("Nobody Here")), errors.join("\n"));
+  assert.ok(errors.some((e) => e.startsWith("Row 3:") && e.includes("same person")), errors.join("\n"));
+  assert.ok(!errors.some((e) => e.startsWith("Row 4:") && /no reviewer|no auditor|not a/.test(e)), errors.join("\n"));
+  assert.ok(errors.some((e) => e.startsWith(`Row ${far + 1}:`) && e.includes(`not ${other}`)), errors.join("\n"));
+});
+
+test("moving a property and renaming a cluster", async () => {
+  const { a, b } = await pair();
+  const rows = await download();
+  for (const r of rows) if (r[C.cluster] === a) r[C.cluster] = `${a} North`;
+  const moved = rows.find((r) => r[C.cluster] === b)!, into = rows.find((r) => r[C.cluster] === `${a} North`)!;
+  moved[C.cluster] = into[C.cluster]; moved[C.reviewer] = into[C.reviewer]; moved[C.auditor] = into[C.auditor];
+  const plan = await preview(rows);
+  assert.deepEqual(plan.errors, []);
+  assert.equal(plan.create.length, 0);
+  assert.equal(plan.update.filter((u) => u.changes.some((c) => c.startsWith("renamed"))).length, 1);
+  assert.equal(plan.moves.length, 1);
+  assert.equal(plan.moves[0].property, moved[C.property]);
+  yes(await A.applyClusterSheet(rows));
+  const p = await one<{ name: string }>("SELECT c.name FROM properties p JOIN clusters c ON c.id=p.cluster_id WHERE p.name=?", moved[C.property]);
+  assert.equal(p?.name, `${a} North`);
+  assert.equal((await preview(await download())).same, plan.same + plan.update.length);
+});
+
+test("a cluster left out of the file is archived, not deleted", async () => {
+  const { a, b } = await pair();
+  const id = (await one<{ id: number }>("SELECT id FROM clusters WHERE name=?", a))!.id;
+  const rows = await download();
+  for (const r of rows) if (r[C.cluster] === a) { r[C.cluster] = b; r[C.reviewer] = ""; r[C.auditor] = ""; }
+  const plan = await preview(rows);
+  assert.deepEqual(plan.errors, []);
+  assert.deepEqual(plan.archive.map((c) => c.name), [a]);
+  yes(await A.applyClusterSheet(rows));
+  assert.equal((await one<{ archived: number }>("SELECT archived FROM clusters WHERE id=?", id))?.archived, 1);
+  assert.equal((await one<{ n: number }>("SELECT count(*) n FROM properties WHERE cluster_id=?", id))!.n, 0);
 });
