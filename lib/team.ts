@@ -1,0 +1,64 @@
+// Team leave: each person's own weekly days off, leave and backup. Admins manage everyone; a CBM manages
+// their own days and the ground team at their properties.
+import { all, one } from "./db";
+import type { User } from "./auth";
+import { addDays, isoDate } from "./time";
+import { list } from "./engine";
+
+export type TeamPerson = {
+  id: number; name: string; access_role: string; op_role: string | null; props: string; propIds: number[];
+  week: number[]; backup_id: number | null; leaves: { id: number; from: string; to: string; note: string | null }[];
+};
+
+/** Ids of the properties a CBM looks after (their own CBM properties and any they're linked to). */
+async function cbmProps(u: User): Promise<number[]> {
+  return (await all<{ id: number }>("SELECT id FROM properties WHERE cbm_id=? UNION SELECT property_id FROM user_properties WHERE user_id=?", u.id, u.id)).map((x) => x.id);
+}
+
+/** The people this user may set days off for. */
+export async function manageableIds(u: User): Promise<number[]> {
+  if (u.access_role === "admin") return (await all<{ id: number }>("SELECT id FROM users WHERE archived=0")).map((x) => x.id);
+  if (u.access_role !== "cbm") return [];
+  const props = await cbmProps(u);
+  const ground = props.length ? (await all<{ id: number }>(
+    `SELECT DISTINCT u.id FROM users u JOIN user_properties up ON up.user_id=u.id WHERE u.archived=0 AND u.access_role='ground' AND up.property_id IN (${props.join(",")})`)).map((x) => x.id) : [];
+  return [u.id, ...ground];
+}
+
+/** Who may cover for `target`: same access role, still active, not themselves; a CBM picks ground staff from their own properties. */
+export async function backupOptions(u: User, target: { id: number; access_role: string }): Promise<number[]> {
+  const same = (await all<{ id: number }>("SELECT id FROM users WHERE archived=0 AND access_role=? AND id<>?", target.access_role, target.id)).map((x) => x.id);
+  if (u.access_role === "admin" || target.access_role !== "ground") return same;
+  const mine = new Set(await manageableIds(u));
+  return same.filter((id) => mine.has(id));
+}
+
+export async function teamData(u: User) {
+  const ids = await manageableIds(u);
+  const today = isoDate(Date.now());
+  if (!ids.length) return { people: [] as TeamPerson[], options: {} as Record<number, number[]>, names: {} as Record<number, string>, today };
+  const IN = `(${ids.join(",")})`;
+  const people = await all<{ id: number; name: string; access_role: string; op_role: string | null; week_off: string | null; backup_id: number | null; props: string | null; prop_ids: string | null }>(
+    `SELECT u.id, u.name, u.access_role, u.op_role, u.week_off, u.backup_id,
+       (SELECT group_concat(p.name, ', ') FROM properties p WHERE p.id IN (SELECT property_id FROM user_properties WHERE user_id=u.id) OR p.cbm_id=u.id) props,
+       (SELECT group_concat(p.id) FROM properties p WHERE p.id IN (SELECT property_id FROM user_properties WHERE user_id=u.id) OR p.cbm_id=u.id) prop_ids
+     FROM users u WHERE u.id IN ${IN} ORDER BY CASE u.access_role WHEN 'reviewer' THEN 1 WHEN 'auditor' THEN 2 WHEN 'cbm' THEN 3 WHEN 'ground' THEN 4 ELSE 5 END, u.name`);
+  const leaves = await all<{ id: number; user_id: number; from_date: string; to_date: string; note: string | null }>(
+    `SELECT id, user_id, from_date, to_date, note FROM leaves WHERE user_id IN ${IN} AND to_date>=? ORDER BY from_date`, addDays(today, -30));
+  const options: Record<number, number[]> = {};
+  for (const p of people) options[p.id] = await backupOptions(u, p);
+  const names = Object.fromEntries((await all<{ id: number; name: string }>("SELECT id, name FROM users")).map((x) => [x.id, x.name]));
+  return {
+    people: people.map((p): TeamPerson => ({
+      id: p.id, name: p.name, access_role: p.access_role, op_role: p.op_role, props: p.props ?? "", propIds: (p.prop_ids ?? "").split(",").filter(Boolean).map(Number),
+      week: list<number>(p.week_off), backup_id: p.backup_id,
+      leaves: leaves.filter((l) => l.user_id === p.id).map((l) => ({ id: l.id, from: l.from_date, to: l.to_date, note: l.note })),
+    })),
+    options, names, today,
+  };
+}
+
+export async function personFor(u: User, id: number) {
+  if (!(await manageableIds(u)).includes(id)) throw new Error("You can't set days off for that person.");
+  return (await one<{ id: number; name: string; access_role: string }>("SELECT id, name, access_role FROM users WHERE id=?", id))!;
+}

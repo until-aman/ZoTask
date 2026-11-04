@@ -31,6 +31,7 @@ export default function WeekOffs({ cfg, today, counts, notify }: {
       <p className="small muted" style={{ margin: 0 }}>
         The days the central team doesn&apos;t review. Review and audit time limits don&apos;t count these days. Tasks submitted on them go to the
         reviewers&apos; <b>Weekend</b> list, where only some need a check. CBMs see nothing different: their task shows To Review and then Done, as on any other day.
+        One person&apos;s own week off, leave or backup is set in <a href="/team">Team leave</a>.
       </p>
       <div className="card grid" style={{ gap: 14 }}>
         <label className="switch"><input type="checkbox" checked={c.on} onChange={(e) => set({ on: e.target.checked })} /> <b>Reviewer week offs are on</b></label>

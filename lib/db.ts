@@ -43,7 +43,7 @@ async function init(): Promise<Client> {
     ["template_items", "photo_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "note_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "count_of", "TEXT"], ["template_items", "options", "TEXT"],
     ["clusters", "reviewer_id", "INTEGER"], ["clusters", "auditor_id", "INTEGER"], ["clusters", "archived", "INTEGER NOT NULL DEFAULT 0"],
     ["map_sites", "gender", "TEXT"], ["map_sites", "details", "TEXT"], ["submissions", "location_src", "TEXT"], ["template_items", "guide", "TEXT"],
-    ["users", "archived", "INTEGER NOT NULL DEFAULT 0"],
+    ["users", "archived", "INTEGER NOT NULL DEFAULT 0"], ["users", "week_off", "TEXT NOT NULL DEFAULT '[]'"], ["users", "backup_id", "INTEGER"],
     ["instances", "wk", "TEXT"], ["instances", "wk_why", "TEXT"], ["instances", "wk_closed_at", "INTEGER"],
   ];
   const have = new Map<string, string[]>();

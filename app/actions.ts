@@ -300,3 +300,49 @@ export async function updateEscalation(id: number, p: import("@/lib/escalations"
   const X = await import("@/lib/escalations");
   return guard(async () => `ESC-${id}: ${await X.update(u, id, p, Date.now())}`);
 }
+
+// Team leave: a person's own weekly days off, leave and backup. Changes move affected tasks straight away.
+async function afterAway() {
+  const n = await E.coverAway(Date.now(), true);
+  return n ? ` ${n} task${n > 1 ? "s" : ""} moved to cover or excused.` : "";
+}
+export async function saveWeekOff(userId: number, week: number[], backupId: number | null): Promise<Result> {
+  const u = await requireUser();
+  return guard(async () => {
+    const T = await import("@/lib/team");
+    const p = await T.personFor(u, userId);
+    const days = [...new Set(week.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+    if (days.length > 3) throw new Error("Pick at most 3 weekly days off.");
+    if (backupId !== null && !(await T.backupOptions(u, p)).includes(backupId)) throw new Error("Pick a backup with the same role.");
+    await run("UPDATE users SET week_off=?, backup_id=? WHERE id=?", JSON.stringify(days), backupId, userId);
+    return `Saved ${p.name}'s week off and backup.${await afterAway()}`;
+  });
+}
+export async function addLeave(userId: number, from: string, to: string, note: string): Promise<Result> {
+  const u = await requireUser();
+  return guard(async () => {
+    const T = await import("@/lib/team");
+    const { addDays, isoDate } = await import("@/lib/time");
+    const p = await T.personFor(u, userId);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to || from)) throw new Error("Pick the leave dates.");
+    const end = to || from;
+    if (end < from) throw new Error("The last day must be on or after the first day.");
+    if (end < addDays(isoDate(Date.now()), -7)) throw new Error("That leave is more than a week ago.");
+    if (end > addDays(from, 92)) throw new Error("Leave can be at most 3 months at a time.");
+    if (await one("SELECT 1 FROM leaves WHERE user_id=? AND from_date<=? AND to_date>=?", userId, end, from)) throw new Error(`${p.name} already has leave on some of those days.`);
+    await run("INSERT INTO leaves (user_id, from_date, to_date, note, by_id, at) VALUES (?,?,?,?,?,?)", userId, from, end, note.trim().slice(0, 80) || null, u.id, Date.now());
+    return `Added leave for ${p.name}.${await afterAway()}`;
+  });
+}
+export async function removeLeave(leaveId: number): Promise<Result> {
+  const u = await requireUser();
+  return guard(async () => {
+    const T = await import("@/lib/team");
+    const l = await one<{ user_id: number }>("SELECT user_id FROM leaves WHERE id=?", leaveId);
+    if (!l) throw new Error("That leave was already removed.");
+    const p = await T.personFor(u, l.user_id);
+    await run("DELETE FROM leaves WHERE id=?", leaveId);
+    await E.loadAway(true);
+    return `Removed the leave for ${p.name}. Tasks already moved stay with whoever has them.`;
+  });
+}
