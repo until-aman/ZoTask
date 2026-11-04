@@ -1,6 +1,7 @@
 // Task lifecycle: instance generation, time-based sweeps, submit, review, audit.
 import { all, batch, one, run, tx } from "./db";
 import { DAY, HOUR, addDays, atTime, isoDate, weekday } from "./time";
+import { addWork, autoCloseAt, awayCacheFresh, awayMap, coverFor, forPerson, isOff, normOff, offCacheFresh, offCfg, personOffWhy, setAwayCache, setOffCache, type OffCfg, type PersonOff } from "./offdays";
 
 export const REASONS = ["Photo missing", "Photo unclear", "Wrong location", "Count mismatch", "Item not done", "Other"];
 export const GEOFENCE_M = 200;
@@ -15,7 +16,7 @@ export type Template = {
 };
 export type Item = {
   id: number; template_id: number; pos: number; label: string; kind: string; photo_required: number; note_required: number;
-  photo_allowed: number; note_allowed: number; count_of: string | null; guide?: string | null;
+  photo_allowed: number; note_allowed: number; count_of: string | null; guide?: string | null; options?: string | null; option_rules?: string | null;
 };
 export const list = <T = number>(s: string | null | undefined): T[] => { try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
 export type Instance = {
@@ -23,7 +24,41 @@ export type Instance = {
   late_until_at: number; assignee_id: number | null; reviewer_id: number | null; auditor_id: number | null; status: string;
   attempt: number; first_submitted_at: number | null; last_submitted_at: number | null; status_since: number;
   first_decision: string | null; closed_at: number | null; source: string;
+  /** Submitted on a reviewer day off: "must" (in the Weekend list to check) or "auto" (closes by itself unless someone checks it). */
+  wk: string | null; wk_why: string | null; wk_closed_at: number | null;
 };
+
+/** Reviewer week-off settings (Admin → Week offs), cached for 30 seconds. */
+export async function loadOff(force = false): Promise<OffCfg> {
+  if (!force && offCacheFresh()) return offCfg();
+  const v = await one<{ v: string }>("SELECT v FROM meta WHERE k='offdays'");
+  let c: OffCfg;
+  try { c = normOff(v ? JSON.parse(v.v) : null); } catch { c = normOff(null); }
+  setOffCache(c);
+  return c;
+}
+
+/** For a submission on a reviewer day off: must it be checked, and why? Critical tasks, anything the system already
+ *  flags (missing evidence, late, away from the property, a count below the ideal) and a random share are checked;
+ *  the rest close by themselves. Nothing here is shown to the CBM. */
+async function weekendPick(c: OffCfg, i: Instance, t: Template, sid: number, at: number, loc: Loc, resub: boolean): Promise<{ wk: string; why: string }> {
+  const why: string[] = [];
+  if (t.criticality === "high") why.push("Critical");
+  if (resub) why.push("Resubmitted after changes");
+  if (!resub && at > i.window_end_at) why.push("Submitted late");
+  if (t.geofence && (loc.ok === false || loc.source === "simulated")) why.push("Location not confirmed");
+  const miss = await missingEvidence(sid, t.id);
+  if (miss.length) why.push("Missing evidence");
+  const counts = await all<{ count_of: string | null; value: string | null }>(
+    "SELECT it.count_of, a.value FROM answers a JOIN template_items it ON it.id=a.item_id WHERE a.submission_id=? AND it.kind='count'", sid);
+  if (counts.length) {
+    const ideal = await one<{ ideal_hk: number; ideal_shk: number }>("SELECT ideal_hk, ideal_shk FROM staffing WHERE property_id=?", i.property_id);
+    if (ideal && counts.some((x) => x.value !== null && x.value !== "" && Number(x.value) < ((x.count_of ?? "HK") === "SHK" ? ideal.ideal_shk : ideal.ideal_hk))) why.push("Count below ideal");
+  }
+  // A fixed draw per submission, so the pick can't be changed by reloading and isn't predictable from the task.
+  if (!why.length && hash(sid * 7919 + i.id) < c.sample) why.push("Random check");
+  return why.length ? { wk: "must", why: why.join(", ") } : { wk: "auto", why: "Not picked" };
+}
 export type AnswerInput = { itemId: number; checked: boolean; value?: string; note?: string; photos?: string[]; reply?: string };
 export type FlagInput = { itemId: number; reason: string; comment?: string };
 
@@ -35,7 +70,7 @@ async function setStatus(id: number, status: string, at: number, extra = "", ...
 }
 function hash(n: number) {
   let x = (n * 2654435761) >>> 0;
-  x ^= x >>> 16;
+  x = (x ^ (x >>> 16)) >>> 0; // keep it unsigned: a negative draw would always be "picked", even at 0%
   return (x % 1000) / 1000;
 }
 
@@ -122,14 +157,92 @@ export async function triggerEvent(templateId: number, propertyId: number, actor
   const t = (await one<Template>("SELECT * FROM templates WHERE id=?", templateId))!;
   const id = await createInstance(t, propertyId, isoDate(now), `${t.trigger}:${now}`, now);
   if (id) await logEvent(id, now, actorId, "triggered", list<string>(t.events).join(", ") || t.event_name || "On demand");
+  if (id) await coverAway(now);
   return id;
 }
 
 /** Moves instances along time-based transitions. Safe to call on every request: when nothing is due it is one read. */
+/** People's own week offs, leave and backups (cached for a short while, like the team's week offs). */
+export async function loadAway(force = false): Promise<Map<number, PersonOff>> {
+  if (!force && awayCacheFresh()) return awayMap();
+  const since = addDays(isoDate(Date.now()), -120);
+  const users = await all<{ id: number; week_off: string | null; backup_id: number | null }>(
+    `SELECT u.id, u.week_off, (SELECT b.id FROM users b WHERE b.id=u.backup_id AND b.archived=0) backup_id FROM users u
+     WHERE u.archived=0 AND ((u.week_off IS NOT NULL AND u.week_off<>'[]') OR u.backup_id IS NOT NULL OR u.id IN (SELECT user_id FROM leaves WHERE to_date>=?))`, since);
+  const leaves = await all<{ user_id: number; from_date: string; to_date: string; note: string | null }>(
+    "SELECT user_id, from_date, to_date, note FROM leaves WHERE to_date>=? ORDER BY from_date", since);
+  const m = new Map<number, PersonOff>();
+  for (const u of users) m.set(u.id, { week: list<number>(u.week_off).filter((d) => d >= 0 && d <= 6), leaves: [], backup: u.backup_id });
+  for (const l of leaves) m.get(l.user_id)?.leaves.push({ from: l.from_date, to: l.to_date, note: l.note });
+  setAwayCache(m);
+  return m;
+}
+
+/** Moves work away from people who are off. Tasks to do on someone's day off go to their backup or a teammate with the same role
+ *  at that property; with nobody to cover, they're waived (not counted against anyone). Reviews and audits waiting for someone
+ *  who's off today go to their backup; with no backup, the clock for those tasks pauses until they're back. Returns how many moved. */
+export async function coverAway(now: number, force = false): Promise<number> {
+  const m = await loadAway(force);
+  const offIds = [...m].filter(([, p]) => p.week.length || p.leaves.length).map(([id]) => id);
+  if (!offIds.length) return 0;
+  const today = isoDate(now), IN = `(${offIds.join(",")})`;
+  const todo = await all<{ id: number; status: string; task_date: string; property_id: number; op_role: string; assignee_id: number | null; reviewer_id: number | null; auditor_id: number | null; last_rev: number | null }>(
+    `SELECT i.id, i.status, i.task_date, i.property_id, t.op_role, i.assignee_id, i.reviewer_id, i.auditor_id,
+       (SELECT r.reviewer_id FROM reviews r WHERE r.instance_id=i.id AND r.kind='review' ORDER BY r.id DESC LIMIT 1) last_rev
+     FROM instances i JOIN templates t ON t.id=i.template_id
+     WHERE (i.status IN ('upcoming','current','notsub') AND i.task_date>=? AND i.assignee_id IN ${IN})
+        OR (i.status IN ('review','resub') AND i.reviewer_id IN ${IN}) OR (i.status IN ('audit','flagans') AND i.auditor_id IN ${IN})`, addDays(today, -7));
+  if (!todo.length) return 0;
+  const people = new Map((await all<{ id: number; name: string; access_role: string; op_role: string | null }>(
+    "SELECT id, name, access_role, op_role FROM users WHERE archived=0")).map((u) => [u.id, u]));
+  const props = await all<{ user_id: number; property_id: number }>(
+    "SELECT user_id, property_id FROM user_properties UNION SELECT cbm_id, id FROM properties WHERE cbm_id IS NOT NULL");
+  const at = new Map<number, Set<number>>();
+  for (const x of props) at.set(x.user_id, (at.get(x.user_id) ?? new Set()).add(x.property_id));
+  const name = (id: number) => people.get(id)?.name ?? "someone";
+  let n = 0;
+  await tx(async () => {
+    for (const i of todo) {
+      if (i.status === "upcoming" || i.status === "current" || i.status === "notsub") {
+        const why = personOffWhy(m.get(i.assignee_id!), i.task_date);
+        if (!why) continue;
+        const role = people.get(i.assignee_id!)?.access_role;
+        const works = (id: number) => people.get(id)?.access_role === role && !!at.get(id)?.has(i.property_id);
+        const mates = [...people.values()].filter((u) => u.op_role === i.op_role && works(u.id)).map((u) => u.id);
+        const cover = coverFor(m, i.assignee_id!, i.task_date, mates, works);
+        if (cover) {
+          await run("UPDATE instances SET assignee_id=? WHERE id=?", cover, i.id);
+          await logEvent(i.id, now, null, "reassigned", `${name(cover)} covering for ${name(i.assignee_id!)} (${why.toLowerCase()})`);
+        } else {
+          await setStatus(i.id, "waived", now, ", closed_at=?", now);
+          await logEvent(i.id, now, null, "waived", `Not counted: ${name(i.assignee_id!)} was off (${why.toLowerCase()}) and nobody could cover`);
+        }
+        n++;
+        continue;
+      }
+      const review = i.status === "review" || i.status === "resub";
+      const who = review ? i.reviewer_id! : i.auditor_id!;
+      const why = personOffWhy(m.get(who), today);
+      if (!why) continue;
+      const role = people.get(who)?.access_role;
+      const cover = coverFor(m, who, today, [], (id) => people.get(id)?.access_role === role, review ? [i.auditor_id] : [i.reviewer_id, i.last_rev]);
+      if (!cover) continue; // Nobody to cover: the clock pauses on their days off (see waitMs).
+      await run(`UPDATE instances SET ${review ? "reviewer_id" : "auditor_id"}=? WHERE id=?`, cover, i.id);
+      await logEvent(i.id, now, null, "reassigned", `${review ? "Review" : "Audit"} moved to ${name(cover)}: ${name(who)} is off (${why.toLowerCase()})`);
+      n++;
+    }
+  });
+  return n;
+}
+
 export async function sweep(now = Date.now()) {
   await generateInstances(isoDate(now), addDays(isoDate(now), 1), now);
-  const due = await one<{ n: number }>(`SELECT count(*) n FROM instances WHERE (status='upcoming' AND window_start_at<=?)
-    OR (status='current' AND window_end_at<=?) OR (status='notsub' AND late_until_at<=?)`, now, now, now);
+  await coverAway(now);
+  const c = await loadOff();
+  const due = await one<{ n: number; wk: number }>(`SELECT count(*) FILTER (WHERE (status='upcoming' AND window_start_at<=?)
+    OR (status='current' AND window_end_at<=?) OR (status='notsub' AND late_until_at<=?)) n,
+    count(*) FILTER (WHERE wk='auto' AND status IN ('review','resub') AND last_submitted_at<=?) wk FROM instances`, now, now, now, now - c.closeAfterH * HOUR);
+  if (due?.wk) await autoCloseWeekend(now);
   if (!due?.n) return;
   await batch([
     ["UPDATE instances SET status='current', status_since=window_start_at WHERE status='upcoming' AND window_start_at<=?", now],
@@ -187,6 +300,11 @@ export async function submit(instanceId: number, userId: number, answers: Answer
       await setStatus(instanceId, next, at, `, attempt=?, first_submitted_at=?, last_submitted_at=?${next === "done" ? ", closed_at=?" : ""}`, attempt, at, at, ...(next === "done" ? [at] : []));
       await logEvent(instanceId, at, userId, "submitted", (late ? "Submitted late" : "Submitted on time") + (next === "done" ? " · no review needed" : ""));
     }
+    // Off-day submissions go to the reviewers' Weekend list (working-day ones clear any earlier mark).
+    const toReview = resub || t.review_required !== 0;
+    const c = await loadOff();
+    const pick = toReview && isOff(c, isoDate(at)) ? await weekendPick(c, i, t, sid, at, loc, resub) : null;
+    await run("UPDATE instances SET wk=?, wk_why=? WHERE id=?", pick?.wk ?? null, pick?.why ?? null, instanceId);
     if (t.geofence && loc.ok === false) await logEvent(instanceId, at, userId, "location_warning", `Submitted ${loc.distance ?? "?"} m from property`);
     if (t.geofence && loc.source === "simulated") await logEvent(instanceId, at, userId, "location_warning", "Location simulated, not checked");
     return sid;
@@ -198,12 +316,58 @@ export async function latestSubmission(instanceId: number) {
     "SELECT * FROM submissions WHERE instance_id=? ORDER BY attempt DESC LIMIT 1", instanceId);
 }
 
-async function pickAuditor(i: Instance, reviewerId: number, at: number) {
+async function pickAuditor(i: Instance, reviewerId: number | null, at: number) {
   const sub = await latestSubmission(i.id);
   const bad = new Set([reviewerId, sub?.submitted_by, i.assignee_id]);
   if (i.auditor_id && !bad.has(i.auditor_id)) return i.auditor_id;
   const auditors = await all<{ id: number }>("SELECT id FROM users WHERE access_role='auditor' AND archived=0 ORDER BY id");
   return auditors.find((a) => !bad.has(a.id))?.id ?? auditors[0]?.id ?? null;
+}
+
+/** A pass: the audit sample sends some to an auditor, the rest are done. */
+async function pass(i: Instance, t: Template, reviewerId: number | null, at: number, note = "") {
+  if (hash(i.id) < t.audit_rate) {
+    const aud = await pickAuditor(i, reviewerId, at);
+    await setStatus(i.id, "audit", at, ", auditor_id=?", aud);
+    await logEvent(i.id, at, reviewerId, "passed", "Selected for audit" + note);
+  } else {
+    await setStatus(i.id, "done", at, ", closed_at=?", at);
+    await logEvent(i.id, at, reviewerId, "passed", "Verified" + note);
+  }
+}
+
+/** Off-day tasks nobody picked close by themselves once the team has been back for the set hours. They pass the same
+ *  way a reviewed task does (the audit sample still applies); the internal note says it wasn't checked by hand. */
+export async function autoCloseWeekend(now: number) {
+  const c = await loadOff();
+  const due = await all<Instance>(`SELECT * FROM instances WHERE wk='auto' AND status IN ('review','resub') AND last_submitted_at<=?`, now - c.closeAfterH * HOUR);
+  const ready = due.filter((i) => autoCloseAt(c, i.last_submitted_at ?? i.status_since) <= now);
+  if (!ready.length) return 0;
+  await tx(async () => {
+    for (const r of ready) {
+      const i = (await one<Instance>("SELECT * FROM instances WHERE id=?", r.id))!;
+      if (i.wk !== "auto" || !["review", "resub"].includes(i.status)) continue;
+      const t = (await one<Template>("SELECT * FROM templates WHERE id=?", i.template_id))!;
+      const at = autoCloseAt(c, i.last_submitted_at ?? i.status_since);
+      if (!i.first_decision) await run("UPDATE instances SET first_decision='pass' WHERE id=?", i.id);
+      await pass(i, t, null, at);
+      await run("UPDATE instances SET wk_closed_at=? WHERE id=?", at, i.id);
+      await logEvent(i.id, at, null, "weekend_closed", "Closed by weekend sampling, not checked by hand");
+    }
+  });
+  return ready.length;
+}
+
+/** A reviewer takes an auto-closed off-day task back into review, within the pull-back window. */
+export async function pullBack(instanceId: number, actorId: number, at: number) {
+  const c = await loadOff();
+  await tx(async () => {
+    const i = (await one<Instance>("SELECT * FROM instances WHERE id=?", instanceId))!;
+    if (!i.wk_closed_at || i.status !== "done") throw new Error("Only tasks closed by weekend sampling can be pulled back.");
+    if (at - i.wk_closed_at > c.pullbackDays * DAY) throw new Error(`Tasks can be pulled back for ${c.pullbackDays} days after closing.`);
+    await setStatus(instanceId, i.attempt > 1 ? "resub" : "review", at, ", closed_at=NULL, wk='must', wk_why='Pulled back', wk_closed_at=NULL");
+    await logEvent(instanceId, at, actorId, "reopened", "Back to review");
+  });
 }
 
 export async function reviewDecision(instanceId: number, reviewerId: number, decision: "pass" | "changes", flags: FlagInput[], comment: string, at: number, openedAt?: number) {
@@ -217,7 +381,7 @@ export async function reviewDecision(instanceId: number, reviewerId: number, dec
     const accepted = decision === "pass" ? (await missingEvidence(sub.id, t.id)).map((m) => m.label) : [];
     if (decision === "changes" && !flags.length) throw new Error("Flag at least one item, with a reason, to request changes.");
     const r = await run("INSERT INTO reviews (instance_id, submission_id, reviewer_id, kind, decision, opened_at, decided_at, due_at, comment) VALUES (?,?,?,?,?,?,?,?,?)",
-      instanceId, sub.id, reviewerId, "review", decision, openedAt ?? null, at, (i.last_submitted_at ?? at) + t.review_sla_h * HOUR, comment || null);
+      instanceId, sub.id, reviewerId, "review", decision, openedAt ?? null, at, addWork(forPerson(await loadOff(), reviewerId), i.last_submitted_at ?? at, t.review_sla_h * HOUR), comment || null);
     const rid = Number(r.lastInsertRowid);
     for (const f of flags) await run("INSERT INTO review_flags (review_id, item_id, reason, comment) VALUES (?,?,?,?)", rid, f.itemId, f.reason, f.comment ?? null);
     if (!i.first_decision) await run("UPDATE instances SET first_decision=? WHERE id=?", decision, instanceId);
@@ -228,15 +392,7 @@ export async function reviewDecision(instanceId: number, reviewerId: number, dec
       await logEvent(instanceId, at, reviewerId, "changes_requested", flags.map((f) => f.reason).join(", ") + (exhausted ? " · attempts used up, not rectified" : ""));
     } else {
       const noEvidence = accepted.length ? ` · accepted without evidence: ${accepted.join("; ")}` : "";
-      const sampled = hash(instanceId) < t.audit_rate;
-      if (sampled) {
-        const aud = await pickAuditor(i, reviewerId, at);
-        await setStatus(instanceId, "audit", at, ", auditor_id=?", aud);
-        await logEvent(instanceId, at, reviewerId, "passed", "Selected for audit" + noEvidence);
-      } else {
-        await setStatus(instanceId, "done", at, ", closed_at=?", at);
-        await logEvent(instanceId, at, reviewerId, "passed", "Verified" + noEvidence);
-      }
+      await pass(i, t, reviewerId, at, noEvidence);
     }
   });
 }
@@ -251,7 +407,7 @@ export async function auditDecision(instanceId: number, auditorId: number, decis
     if (decision === "fail" && !flags.length) throw new Error("Flag at least one item to fail an audit.");
     const sub = (await latestSubmission(instanceId))!;
     const r = await run("INSERT INTO reviews (instance_id, submission_id, reviewer_id, kind, decision, decided_at, due_at, comment) VALUES (?,?,?,?,?,?,?,?)",
-      instanceId, sub.id, auditorId, "audit", decision, at, i.status_since + t.audit_sla_h * HOUR, comment || null);
+      instanceId, sub.id, auditorId, "audit", decision, at, addWork(forPerson(await loadOff(), auditorId), i.status_since, t.audit_sla_h * HOUR), comment || null);
     const rid = Number(r.lastInsertRowid);
     for (const f of flags) await run("INSERT INTO review_flags (review_id, item_id, reason, comment) VALUES (?,?,?,?)", rid, f.itemId, f.reason, f.comment ?? null);
     if (decision === "pass") {
@@ -297,7 +453,7 @@ export async function closeFlagAnswers(instanceId: number, auditorId: number, ac
 export async function reopen(instanceId: number, actorId: number, at: number) {
   const i = (await one<Instance>("SELECT * FROM instances WHERE id=?", instanceId))!;
   if (i.status !== "done") throw new Error("Only verified tasks can be reopened.");
-  await setStatus(instanceId, "review", at, ", closed_at=NULL");
+  await setStatus(instanceId, "review", at, ", closed_at=NULL, wk=NULL, wk_why=NULL, wk_closed_at=NULL");
   await logEvent(instanceId, at, actorId, "reopened", "Back to review");
 }
 
@@ -345,4 +501,15 @@ export async function remind(instanceIds: number[], actorId: number, at: number)
     }
   });
   return { people: people.size, skipped };
+}
+
+/** Removes not-yet-open runs of a task at properties it no longer covers (with their "created" history). */
+export async function dropUpcoming(templateId: number, propertyIds: number[]) {
+  if (!propertyIds.length) return;
+  const q = propertyIds.map(() => "?").join(",");
+  const ids = (await all<{ id: number }>(`SELECT id FROM instances WHERE template_id=? AND status='upcoming' AND attempt=0 AND property_id IN (${q})`, templateId, ...propertyIds)).map((x) => x.id);
+  if (!ids.length) return;
+  const iq = ids.map(() => "?").join(",");
+  await run(`DELETE FROM events WHERE instance_id IN (${iq})`, ...ids);
+  await run(`DELETE FROM instances WHERE id IN (${iq})`, ...ids);
 }

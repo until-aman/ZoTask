@@ -16,7 +16,7 @@ export const EVENT_LABEL: Record<string, [string, string]> = {
   audit_passed: ["Audit passed", "g"], audit_failed: ["Audit failed", "r"], flags_answered: ["Audit flags answered", "b"],
   flags_closed: ["Audit flags closed", "g"], flags_reopened: ["Flag answers sent back", "r"], reopened: ["Reopened", "a"],
   waived: ["Waived", ""], reminder: ["Reminder", "a"], reassigned: ["Reassigned", ""], location_warning: ["Location warning", "r"],
-  acknowledged: ["Acknowledged", ""], escalated: ["Escalated", "r"], escalation_raised: ["Escalation raised", "r"],
+  acknowledged: ["Acknowledged", ""], weekend_closed: ["Closed by weekend sampling", ""], escalated: ["Escalated", "r"], escalation_raised: ["Escalation raised", "r"],
 };
 /** Events that move a task along; reminders, warnings and escalations don't count as its last action. */
 export const ACTION_EVENTS = ["created", "triggered", "started", "window_closed", "missed", "submitted", "resubmitted", "changes_requested", "passed",

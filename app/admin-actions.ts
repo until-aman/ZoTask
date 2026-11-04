@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requireUser, can } from "@/lib/auth";
 import { all, one, run, tx } from "@/lib/db";
+import { dropUpcoming } from "@/lib/engine";
 import { ClusterPlan, planClusters, Snapshot } from "@/lib/cluster-sheet";
 import { fillFromCluster, setPropertyCbm } from "@/lib/people";
+import { cleanOptionRules, cleanOptions } from "@/lib/answers";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function admin(fn: () => Promise<string | void>): Promise<Result> {
@@ -44,12 +46,17 @@ export async function archiveCategory(id: number, archived: boolean) {
 }
 
 // Predefined checklists and schedules
-export type PresetItem = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null };
+export type PresetItem = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; options?: string[] | null; option_rules?: import("@/lib/answers").OptRules | null };
 export async function saveChecklistPreset(id: number | null, title: string, items: PresetItem[]) {
   return admin(async () => {
     const t = need(title, "a checklist title");
-    const its = items.filter((i) => i.label.trim());
+    const its = items.filter((i) => i.label.trim()).map((i) => {
+      const options = i.kind === "choice" ? cleanOptions(i.options) : null;
+      return { ...i, options, option_rules: options ? cleanOptionRules(i.option_rules, options) : null };
+    });
     if (!its.length) throw new Error("Add at least one item.");
+    const bad = its.findIndex((i) => i.kind === "choice" && i.options!.length < 2);
+    if (bad >= 0) throw new Error(`Item ${bad + 1} needs at least two options to pick from.`);
     if (id) await run("UPDATE checklist_presets SET title=?, items=? WHERE id=?", t, JSON.stringify(its), id);
     else await run("INSERT INTO checklist_presets (title, items) VALUES (?,?)", t, JSON.stringify(its));
     return `Saved "${t}".`;
@@ -159,6 +166,20 @@ export async function setTasksActive(ids: number[], active: boolean) {
     return `${active ? "Resumed" : "Paused"} ${ids.length} ${ids.length === 1 ? "task" : "tasks"}.`;
   });
 }
+/** Sets exactly which properties a task runs at: ticked ones are added, unticked ones removed.
+ *  At a removed property, tasks not yet open are dropped; anything already open or done stays for the record. */
+export async function setTaskProperties(id: number, properties: number[]) {
+  return admin(async () => {
+    const want = new Set(properties.map(Number));
+    const have = new Set((await all<{ p: number }>("SELECT property_id p FROM template_properties WHERE template_id=?", id)).map((x) => x.p));
+    const add = [...want].filter((p) => !have.has(p)), drop = [...have].filter((p) => !want.has(p));
+    for (const p of add) await run("INSERT OR IGNORE INTO template_properties VALUES (?,?)", id, p);
+    for (const p of drop) await run("DELETE FROM template_properties WHERE template_id=? AND property_id=?", id, p);
+    await dropUpcoming(id, drop);
+    if (!add.length && !drop.length) return "No changes.";
+    return `Now at ${want.size} propert${want.size === 1 ? "y" : "ies"}${add.length ? ` · ${add.length} added (from the next window)` : ""}${drop.length ? ` · ${drop.length} removed` : ""}.`;
+  });
+}
 /** Adds the tasks to more properties. Tasks already there are left as they are. */
 export async function copyTasksTo(ids: number[], properties: number[]) {
   return admin(async () => {
@@ -181,5 +202,16 @@ export async function deleteTasks(ids: number[]) {
     }
     const out = [del && `deleted ${del}`, paused && `paused ${paused} that already ran, so reports keep their history`].filter(Boolean).join(", ");
     return out.charAt(0).toUpperCase() + out.slice(1) + ".";
+  });
+}
+
+// Reviewer week offs
+export async function saveOffDays(v: import("@/lib/offdays").OffCfg) {
+  return admin(async () => {
+    const { normOff, setOffCache } = await import("@/lib/offdays");
+    const c = normOff(v);
+    await run("INSERT OR REPLACE INTO meta (k, v) VALUES ('offdays', ?)", JSON.stringify(c));
+    setOffCache(c);
+    return c.on ? "Week offs saved." : "Week offs turned off. Every day counts towards review time limits.";
   });
 }

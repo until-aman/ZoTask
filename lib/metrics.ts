@@ -1,6 +1,7 @@
 // Command-center metrics. Definitions follow the audit report's KPI fixes:
 // on-time uses tasks past their deadline as the denominator, review SLA counts the overdue backlog,
 // "verified" counts tasks (not pass decisions), and every per-person rollup credits one accountable CBM.
+import { offCfg, waitMs } from "./offdays";
 import { all } from "./db";
 import { HOUR, addDays, isoDate, dayStart, DAY, fmtDateTime } from "./time";
 import { rows, Row } from "./queries";
@@ -52,8 +53,8 @@ export function review(revs: Rev[], openRows: Row[], now: number) {
   for (const x of revs.filter((r) => r.kind === "review")) byTask.set(x.instance_id, [...(byTask.get(x.instance_id) ?? []), x]);
   const tasks = [...byTask.values()];
   const onTime = tasks.filter((t) => t.every((x) => x.due_at && x.decided_at <= x.due_at)).length;
-  const backlog = openRows.filter((r) => ["review", "resub"].includes(r.status));
-  const pendingOver = backlog.filter((r) => now - r.status_since > r.review_sla_h * HOUR).length;
+  const backlog = openRows.filter((r) => ["review", "resub"].includes(r.status) && r.wk !== "auto");
+  const pendingOver = backlog.filter((r) => waitMs(offCfg(), r, now) > r.review_sla_h * HOUR).length;
   const audited = new Map<number, boolean>();
   for (const x of revs.filter((r) => r.kind === "audit")) audited.set(x.instance_id, (audited.get(x.instance_id) ?? false) || x.decision === "fail");
   return {
@@ -69,7 +70,7 @@ export type Attention = { id?: number; sev: "r" | "a"; title: string; sub: strin
 export function attention(openRows: Row[], period: Row[], now: number, q: string): Attention[] {
   const out: Attention[] = [];
   for (const r of openRows) {
-    const age = (now - r.status_since) / HOUR, sla = slaOf(r);
+    const age = waitMs(offCfg(), r, now) / HOUR, sla = slaOf(r);
     const href = `/review/${r.id}`;
     if (["review", "resub"].includes(r.status) && age > sla)
       out.push({ id: r.id, sev: age > 2 * sla ? "r" : "a", title: `Check overdue · ${r.task}`, sub: `${r.property} · ${Math.round(age)}h (limit ${sla}h)`, owner: r.reviewer ?? "Unassigned", age, href });

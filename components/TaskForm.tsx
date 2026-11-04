@@ -1,12 +1,13 @@
 "use client";
 import { fmtTime } from "@/lib/time";
+import { answerIssue, choicesFor, needs, nonNegative } from "@/lib/answers";
 import { tryUpload } from "./upload";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { startTask, submitTask, type Where } from "@/app/actions";
 import Photo from "./Photo";
 
-type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null };
+type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null; options?: string | null; option_rules?: string | null };
 type Prev = { item_id: number; checked: number; value: string | null; note: string | null; photos: string };
 type Flag = { id: number; item_id: number; reason: string; comment: string | null };
 type Ans = { checked: boolean; value: string; note: string; photos: string[]; reply: string };
@@ -95,14 +96,21 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
       { enableHighAccuracy: true, timeout: 10000 });
   }
 
-  const problems = items.filter((it) => {
-    const a = ans[it.id];
-    return (it.kind === "check" ? !a.checked : !a.value) || (!!it.photo_required && !a.photos.length) || (!!it.note_required && !a.note);
-  });
+  // What's still missing per item. Shown under each item once Submit was pressed, or as soon as an item has been touched.
+  const issues = Object.fromEntries(items.map((it) => [it.id, answerIssue(it, ans[it.id], flags.some((f) => f.item_id === it.id))]));
+  const problems = items.filter((it) => issues[it.id]);
+  // With Start/Stop on, nothing can be filled in until the task is started.
+  const locked = !!timer?.startStop && status !== "changes" && !startedAt;
+  const [tried, setTried] = useState(false);
 
   async function onSubmit() {
     setErr("");
     if (pending) return setErr("Wait for the photos to finish uploading.");
+    if (problems.length) {
+      setTried(true);
+      document.getElementById(`item-${problems[0].id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return setErr(`${problems.length === 1 ? "1 item needs" : `${problems.length} items need`} attention before you can submit.`);
+    }
     if (property.geofence && !loc.where && !locWarned) {
       setLocWarned(true);
       return setErr("Location hasn't been checked. Validate it, or press Submit again to send without it. The reviewer will see that.");
@@ -132,66 +140,94 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
         <div className="err" style={{ fontWeight: 600 }}>The reviewer sent this back. Fix the flagged items and reply to each flag. This will be attempt {attempt + 1} of {attemptsAllowed}{attempt + 1 === attemptsAllowed ? ", your last one" : ""}.</div>
       )}
       {status === "notsub" && <div className="err" style={{ fontWeight: 600 }}>The window has closed. You can still submit, but it will count as late.</div>}
-      <div className="items">
-      {items.map((it) => {
+      {locked && <div className="info" role="status"><i>!</i><span>Tap Start task first. The checklist unlocks once the task is started.</span></div>}
+      <div className="tf-prog" aria-live="polite">
+        <span><b>{items.length - problems.length} of {items.length}</b> items complete</span>
+        <div className="tf-bar" aria-hidden="true"><i style={{ width: `${items.length ? ((items.length - problems.length) / items.length) * 100 : 0}%` }} /></div>
+      </div>
+      <fieldset className="items" disabled={locked} aria-disabled={locked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, opacity: locked ? 0.55 : 1 }}>
+      {items.map((it, ix) => {
         const a = ans[it.id];
         const flag = flags.find((f) => f.item_id === it.id);
+        const need = needs(it, a);
+        const done = !issues[it.id];
+        const hasPhoto = a.photos.length > 0, hasNote = !!a.note.trim();
+        const showNote = !!(it.note_allowed || need.note || (it.kind === "check" && !a.checked));
+        const show = (it.photo_allowed || need.photo);
         return (
-          <div key={it.id} className={`item${flag ? " flagged" : ""}`}>
-            <div className="row2">
-              {it.kind === "check" ? (
-                <label className="row2" style={{ fontWeight: 700 }}>
-                  <input type="checkbox" checked={a.checked} onChange={(e) => set(it.id, { checked: e.target.checked })} style={{ width: 18, height: 18 }} />
-                  {it.label}
-                </label>
-              ) : <b>{it.label}</b>}
-              <span className="spacer" />
-              {it.photo_required ? <span className="pill">Photo needed</span> : null}
-              {it.note_required ? <span className="pill">Note needed</span> : null}
-            </div>
-            {flag && <div className="small warn">Flagged: {flag.reason}{flag.comment ? ` · “${flag.comment}”` : ""}</div>}
-            <div className="ansrow">
-            {it.kind === "count" && <label className="small muted">Number of {it.count_of === "SHK" ? "SHKs" : "HKs"} present<input type="number" min={0} value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} style={{ width: 140, display: "block" }} aria-label={it.label} /></label>}
-            {it.kind === "yesno" && <div className="seg" role="group" aria-label={it.label}>
-              {["Yes", "No"].map((v) => <button key={v} type="button" aria-pressed={a.value === v} onClick={() => set(it.id, { value: v })}>{v}</button>)}
-            </div>}
-            {it.kind === "number" && <input type="number" min={0} value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} style={{ width: 140 }} aria-label={it.label} />}
-            {it.kind === "text" && <textarea value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} aria-label={it.label} />}
-            {!!(it.photo_allowed || it.photo_required) && <div className="photos">
-              {a.photos.map((p, ix) => (
-                <span key={p + ix} style={{ position: "relative" }}>
-                  <Photo name={p} />
-                  <button type="button" className="chip" style={{ position: "absolute", top: -6, right: -6, padding: 0, width: 20, height: 20, justifyContent: "center" }} aria-label="Remove photo"
-                    onClick={() => set(it.id, { photos: a.photos.filter((_, j) => j !== ix) })}>×</button>
-                </span>
-              ))}
-              {Array.from({ length: uploading[it.id] ?? 0 }, (_, k) => <span key={`up${k}`} className="ph" role="status" aria-label="Uploading photo">Uploading…</span>)}
-              {a.photos.length + (uploading[it.id] ?? 0) < 10 && (
-                <label className="ph" style={{ cursor: "pointer", borderStyle: "dashed" }}>
-                  + Photo
-                  <input type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { upload(it.id, e.target.files); e.target.value = ""; }} />
-                </label>
+          <div key={it.id} id={`item-${it.id}`} className={`item tf-item${flag ? " flagged" : ""}${tried && !done ? " missing" : ""}${done ? " done" : ""}`}>
+            <span className="tf-n" aria-label={done ? `Item ${ix + 1}, complete` : `Item ${ix + 1}`}>{done ? "✓" : ix + 1}</span>
+            <div className="tf-body">
+              <div className="tf-q">{it.label}</div>
+              {flag && <div className="tf-flag">Flagged by the reviewer: <b>{flag.reason}</b>{flag.comment ? ` · “${flag.comment}”` : ""}</div>}
+              <div className="ansrow">
+                {it.kind === "check" && (
+                  <label className={`tf-tick${a.checked ? " on" : ""}`}>
+                    <input type="checkbox" checked={a.checked} onChange={(e) => set(it.id, { checked: e.target.checked })} />
+                    {a.checked ? "Done" : "Mark as done"}
+                  </label>
+                )}
+                {it.kind === "count" && <label className="small muted">Number of {it.count_of === "SHK" ? "SHKs" : "HKs"} present<input type="text" inputMode="numeric" pattern="[0-9]*" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value, true) })} style={{ width: 140, display: "block" }} aria-label={it.label} placeholder="0 or more" /></label>}
+                {choicesFor(it) && <div className="seg seg-wrap" role="group" aria-label={it.label}>
+                  {choicesFor(it)!.map((v) => <button key={v} type="button" aria-pressed={a.value === v} onClick={() => set(it.id, { value: v })}>{v}</button>)}
+                </div>}
+                {it.kind === "number" && <input type="text" inputMode="decimal" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value) })} style={{ width: 140 }} aria-label={it.label} placeholder="0 or more" />}
+                {it.kind === "text" && <textarea value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} aria-label={it.label} placeholder="Your answer" />}
+              </div>
+              {!!show && (
+                <div className={`tf-sec${need.photo ? (hasPhoto ? " ok" : " req") : ""}`}>
+                  <div className="tf-sec-h">Photo
+                    {need.photo ? <span className={`tf-tag ${hasPhoto ? "ok" : "req"}`}>{hasPhoto ? "✓ Added" : "Compulsory"}</span> : <span className="tf-tag">Optional</span>}
+                  </div>
+                  <div className="photos">
+                    {a.photos.map((p, j) => (
+                      <span key={p + j} style={{ position: "relative" }}>
+                        <Photo name={p} />
+                        <button type="button" className="chip" style={{ position: "absolute", top: -6, right: -6, padding: 0, width: 20, height: 20, justifyContent: "center" }} aria-label="Remove photo"
+                          onClick={() => set(it.id, { photos: a.photos.filter((_, k) => k !== j) })}>×</button>
+                      </span>
+                    ))}
+                    {Array.from({ length: uploading[it.id] ?? 0 }, (_, k) => <span key={`up${k}`} className="ph" role="status" aria-label="Uploading photo">Uploading…</span>)}
+                    {a.photos.length + (uploading[it.id] ?? 0) < 10 && (
+                      <label className="ph tf-add">
+                        + Photo
+                        <input type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { upload(it.id, e.target.files); e.target.value = ""; }} />
+                      </label>
+                    )}
+                  </div>
+                  {failed[it.id] && <div className="small warn" role="alert">{failed[it.id]}</div>}
+                </div>
               )}
-            </div>}
+              {showNote && (
+                <div className={`tf-sec${need.note || (tried && it.kind === "check" && !a.checked) ? (hasNote ? " ok" : " req") : ""}`}>
+                  <div className="tf-sec-h">Note
+                    {need.note ? <span className={`tf-tag ${hasNote ? "ok" : "req"}`}>{hasNote ? "✓ Added" : "Compulsory"}</span>
+                      : it.kind === "check" && !a.checked ? <span className={`tf-tag${tried && !hasNote ? " req" : ""}`}>Needed if not done</span> : <span className="tf-tag">Optional</span>}
+                  </div>
+                  <input type="text" aria-label={`Note for ${it.label}`} placeholder={it.kind === "check" && !a.checked && !need.note ? "Not done? Say why" : "Write a note"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />
+                </div>
+              )}
+              {flag && <div className={`tf-sec ${a.reply.trim() ? "ok" : "req"}`}>
+                <div className="tf-sec-h">Reply to the reviewer<span className={`tf-tag ${a.reply.trim() ? "ok" : "req"}`}>{a.reply.trim() ? "✓ Added" : "Compulsory"}</span></div>
+                <input type="text" aria-label="Reply to the reviewer" placeholder="What did you fix?" value={a.reply} onChange={(e) => set(it.id, { reply: e.target.value })} />
+              </div>}
+              {tried && issues[it.id] && <div className="tf-issue" role="alert">{issues[it.id]}</div>}
             </div>
-            {failed[it.id] && <div className="small warn" role="alert">{failed[it.id]}</div>}
-            {!!(it.note_allowed || it.note_required) && <input type="text" placeholder={it.note_required ? "Note (required)" : "Note (optional)"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />}
-            {flag && <input type="text" placeholder="Reply to the reviewer" value={a.reply} onChange={(e) => set(it.id, { reply: e.target.value })} />}
           </div>
         );
       })}
-      </div>
+      </fieldset>
       {property.geofence && (
         <div className="row2">
-          <button type="button" className="btn" onClick={checkLocation}>Validate location</button>
-          <button type="button" className="link small" onClick={() => setLoc({ ok: null, distance: null, where: "simulated", msg: "Demo: location skipped. The reviewer will see it was simulated." })}>Simulate being on site (demo)</button>
+          <button type="button" className="btn" disabled={locked} onClick={checkLocation}>Validate location</button>
+          <button type="button" className="link small" disabled={locked} onClick={() => setLoc({ ok: null, distance: null, where: "simulated", msg: "Demo: location skipped. The reviewer will see it was simulated." })}>Simulate being on site (demo)</button>
           <span className={`small ${loc.ok === false ? "warn" : "muted"}`}>{loc.msg}</span>
         </div>
       )}
-      {problems.length > 0 && <div className="info"><i>!</i>{problems.length} item{problems.length > 1 ? "s are" : " is"} incomplete. The reviewer can't pass a task with missing evidence.</div>}
+      {problems.length > 0 && <div className="info"><i>!</i>{problems.length} item{problems.length > 1 ? "s are" : " is"} still incomplete. Compulsory photos and notes, and an answer to every question, are needed to submit.</div>}
       {err && <div className="err">{err}</div>}
       <div className="row2">
-        <button type="button" className="btn primary" disabled={busy || pending > 0} onClick={onSubmit}>{busy ? "Submitting…" : pending ? `Uploading ${pending} photo${pending > 1 ? "s" : ""}…` : status === "changes" ? "Resubmit" : "Submit"}</button>
+        <button type="button" className="btn primary" disabled={busy || pending > 0 || locked} onClick={onSubmit}>{busy ? "Submitting…" : pending ? `Uploading ${pending} photo${pending > 1 ? "s" : ""}…` : status === "changes" ? "Resubmit" : "Submit"}</button>
       </div>
     </div>
   );

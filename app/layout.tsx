@@ -19,9 +19,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       { href: "/dashboard", label: "Review Dashboard" }, { href: "/compare", label: "Compare" }] });
     if (can.dashboard(u)) links.push({ href: "/escalations", label: "Escalations" });
     if (can.dashboard(u)) links.push({ href: "/map", label: "Map" });
+    if (["admin", "cbm"].includes(u.access_role)) links.push({ href: "/team", label: "Team leave" });
     if (can.admin(u)) links.push({ href: "/admin", label: "Admin", children: [
       ["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"],
-      ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"],
+      ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"], ["weekoffs", "Week offs"],
     ].map(([k, l]) => ({ href: k === "tasks" ? "/admin" : `/admin?tab=${k}`, label: l })) });
   }
   return (
