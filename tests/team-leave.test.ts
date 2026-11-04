@@ -85,14 +85,16 @@ test("a reviewer's week off: reviews go to the backup; with no backup the clock 
   yes(await A.saveWeekOff(REVIEWER, [], null));
 });
 
-test("only admins, and CBMs for their own ground team, can set days off", async () => {
+test("only admins can set days off", async () => {
   signInAs(REVIEWER);
   assert.equal((await A.saveWeekOff(REVIEWER, [0], null)).ok, false);
   const cbm = (await one<{ id: number }>("SELECT cbm_id id FROM properties WHERE cbm_id IS NOT NULL LIMIT 1"))!.id;
   signInAs(cbm);
   assert.equal((await A.saveWeekOff(REVIEWER, [0], null)).ok, false, "a CBM can't change a reviewer");
-  yes(await A.saveWeekOff(cbm, [0], null));
+  assert.equal((await A.saveWeekOff(cbm, [0], null)).ok, false, "nor their own");
+  assert.equal((await A.addLeave(cbm, "2026-12-01", "2026-12-02", "")).ok, false);
+  signInAs(ADMIN);
   assert.equal((await A.addLeave(cbm, "2026-12-10", "2026-12-01", "")).ok, false, "end before start");
-  yes(await A.saveWeekOff(cbm, [], null));
+  yes(await A.addLeave(cbm, "2026-12-01", "2026-12-02", ""));
   void HOUR;
 });

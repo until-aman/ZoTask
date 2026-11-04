@@ -1,5 +1,4 @@
-// Team leave: each person's own weekly days off, leave and backup. Admins manage everyone; a CBM manages
-// their own days and the ground team at their properties.
+// Team leave: each person's own weekly days off, leave and backup. Only admins manage it.
 import { all, one } from "./db";
 import type { User } from "./auth";
 import { addDays, isoDate } from "./time";
@@ -10,27 +9,17 @@ export type TeamPerson = {
   week: number[]; backup_id: number | null; leaves: { id: number; from: string; to: string; note: string | null }[];
 };
 
-/** Ids of the properties a CBM looks after (their own CBM properties and any they're linked to). */
-async function cbmProps(u: User): Promise<number[]> {
-  return (await all<{ id: number }>("SELECT id FROM properties WHERE cbm_id=? UNION SELECT property_id FROM user_properties WHERE user_id=?", u.id, u.id)).map((x) => x.id);
-}
-
 /** The people this user may set days off for. */
 export async function manageableIds(u: User): Promise<number[]> {
-  if (u.access_role === "admin") return (await all<{ id: number }>("SELECT id FROM users WHERE archived=0")).map((x) => x.id);
-  if (u.access_role !== "cbm") return [];
-  const props = await cbmProps(u);
-  const ground = props.length ? (await all<{ id: number }>(
-    `SELECT DISTINCT u.id FROM users u JOIN user_properties up ON up.user_id=u.id WHERE u.archived=0 AND u.access_role='ground' AND up.property_id IN (${props.join(",")})`)).map((x) => x.id) : [];
-  return [u.id, ...ground];
+  // Only admins set week offs, leave and backups.
+  if (u.access_role !== "admin") return [];
+  return (await all<{ id: number }>("SELECT id FROM users WHERE archived=0")).map((x) => x.id);
 }
 
 /** Who may cover for `target`: same access role, still active, not themselves; a CBM picks ground staff from their own properties. */
 export async function backupOptions(u: User, target: { id: number; access_role: string }): Promise<number[]> {
   const same = (await all<{ id: number }>("SELECT id FROM users WHERE archived=0 AND access_role=? AND id<>?", target.access_role, target.id)).map((x) => x.id);
-  if (u.access_role === "admin" || target.access_role !== "ground") return same;
-  const mine = new Set(await manageableIds(u));
-  return same.filter((id) => mine.has(id));
+  return u.access_role === "admin" ? same : [];
 }
 
 export async function teamData(u: User) {

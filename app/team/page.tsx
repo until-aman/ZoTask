@@ -5,6 +5,6 @@ import TeamLeave from "@/components/TeamLeave";
 
 export default async function TeamPage() {
   const u = await boot();
-  if (!["admin", "cbm"].includes(u.access_role)) redirect("/");
+  if (u.access_role !== "admin") redirect("/");
   return <TeamLeave data={await teamData(u)} admin={u.access_role === "admin"} />;
 }
