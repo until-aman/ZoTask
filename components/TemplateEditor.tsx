@@ -375,17 +375,22 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
             <section className="card grid">
               <div className="row2"><h3 className="te-h" style={{ margin: 0 }}>Properties</h3><span className="spacer" /><span className={props.length ? "pill b" : "pill r"}>{props.length} of {geo.length} selected</span>
                 <button type="button" className="link small" onClick={() => setProps(geo.map((g) => g.id))}>All</button><button type="button" className="link small" onClick={() => setProps([])}>None</button></div>
-              <div className="te-cities" role="group" aria-label="Cities">
-                {cities.map((c) => { const [n, of] = cityCount(c); return (
-                  <button key={c} type="button" aria-pressed={pCity === c} className={n === of ? "full" : n ? "part" : ""} onClick={() => { setPCity(pCity === c ? "" : c); setPCluster(""); }}>{c}<small>{n}/{of}</small></button>
-                ); })}
-              </div>
               <div className="te-pfilt">
                 <input type="search" value={pq} onChange={(e) => setPq(e.target.value)} placeholder="Search property, cluster or city" aria-label="Search properties" />
                 <select value={pCity} onChange={(e) => { setPCity(e.target.value); setPCluster(""); }} aria-label="City"><option value="">All cities</option>{cities.map((c) => <option key={c}>{c}</option>)}</select>
                 <select value={pCluster} onChange={(e) => setPCluster(e.target.value)} aria-label="Cluster"><option value="">All clusters</option>{clusters.map((c) => <option key={c}>{c}</option>)}</select>
                 <label className="switch"><input type="checkbox" checked={pSel} onChange={(e) => setPSel(e.target.checked)} />Selected only</label>
               </div>
+              {pCity && (() => {
+                // Once a city is picked: its clusters, each with how many of its properties are selected.
+                const cl = clusters.map((c) => { const ids = geo.filter((g) => g.city === pCity && g.cluster === c).map((g) => g.id); return { c, n: ids.filter((x) => picked.has(x)).length, of: ids.length }; });
+                return <div className="grid" style={{ gap: 6 }}>
+                  <span className="small muted"><b>{cl.filter((x) => x.n).length} of {cl.length}</b> clusters in {pCity} selected{cl.some((x) => x.n && x.n < x.of) ? " (some partly)" : ""}</span>
+                  <div className="te-cities" role="group" aria-label={`Clusters in ${pCity}`}>
+                    {cl.map(({ c, n, of }) => <button key={c} type="button" aria-pressed={pCluster === c} className={n === of ? "full" : n ? "part" : ""} onClick={() => setPCluster(pCluster === c ? "" : c)}>{c}<small>{n}/{of}</small></button>)}
+                  </div>
+                </div>;
+              })()}
               <div className="te-pbar">
                 <label className="opt"><input type="checkbox" checked={shownAll} disabled={!shown.length} onChange={() => (shownAll ? dropProps(shownIds) : addProps(shownIds))} />
                   <b>{shownAll ? "Clear" : "Select"} all {shown.length} shown</b></label>
