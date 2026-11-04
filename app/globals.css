@@ -606,6 +606,9 @@ select{max-width:100%}
 .hbands .kpis.k4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .sumband .kpi .v{font-size:24px}
 @media (max-width:900px){.hbands .kpis.k4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.hbands .kpis.k5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:1100px){.hbands .kpis.k5{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){.hbands .kpis.k4,.hbands .kpis.k5{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* Sign in */
 .lg-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .lg-top .search{flex:1 1 260px}
