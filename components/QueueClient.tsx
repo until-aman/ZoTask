@@ -102,6 +102,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     document.addEventListener("keydown", onKey); document.addEventListener("click", onClick);
     return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("click", onClick); };
   }, [pop, modal]);
+  // Clicking a task goes straight to its review sheet; Ctrl/⌘-click opens it in a new tab. Details stay in the row menu.
+  const openSheet = (id: number, newTab = false) => { if (newTab) window.open(`/review/${id}`, "_blank"); else router.push(`/review/${id}`); };
   useEffect(() => { if (open !== null) getHistory(open).then(setHist, () => setHist([])); }, [open]);
 
   const setDate = (d: string) => {
@@ -307,8 +309,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               const sev = g.open ? (bucket(t) === "r" ? "var(--red)" : bucket(t) === "a" ? "var(--amber)" : "var(--green)") : "transparent";
               return (
                 <div key={t.id}>
-                  <div className="qrow" role="group" tabIndex={0} aria-label={`${t.t}, ${t.p}: press Enter for details`} data-open={open === t.id || undefined} style={{ ["--sev" as string]: sev }}
-                    onClick={(e) => { if ((e.target as HTMLElement).closest("input,.rowmenu")) return; setOpen(t.id); }} onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") setOpen(t.id); }}>
+                  <div className="qrow" role="group" tabIndex={0} aria-label={`${t.t}, ${t.p}: press Enter to open the review sheet`} data-open={open === t.id || undefined} style={{ ["--sev" as string]: sev }}
+                    onClick={(e) => { if ((e.target as HTMLElement).closest("input,.rowmenu")) return; openSheet(t.id, e.metaKey || e.ctrlKey); }} onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") openSheet(t.id, e.metaKey || e.ctrlKey); }}>
                     <span><input type="checkbox" aria-label="Select" checked={sel.has(t.id)} onChange={(e) => { const s = new Set(sel); if (e.target.checked) s.add(t.id); else s.delete(t.id); setSel(s); }} /></span>
                     <div style={{ minWidth: 0 }}>
                       <div className="tname">{t.t}{t.crit && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}</div>
