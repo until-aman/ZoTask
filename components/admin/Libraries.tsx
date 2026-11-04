@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { addCategory, applyClusterSheet, archiveCategory, archiveCluster, deleteChecklistPreset, previewClusterSheet, deleteSchedulePreset, moveCategory, PresetItem, saveChecklistPreset, saveCluster, saveCounts, saveSchedulePreset } from "@/app/admin-actions";
 import { DAYS, describeWhen, ItemCard } from "@/components/TemplateEditor";
 import { Table } from "@/components/cc/parts";
+import { Person } from "@/components/ui/TableKit";
 import { readWorkbook } from "@/app/map-actions";
 import { parseCsv } from "@/lib/sheet";
 import { xlsx } from "@/lib/xlsx-write";
@@ -177,6 +178,11 @@ export function Clusters({ rows, cities, props, reviewers, auditors, cbms, notif
   const [reading, setReading] = useState(false);
   const [edit, setEdit] = useState<{ id: number | null; name: string; city_id: number; reviewer_id: number | null; auditor_id: number | null; properties: number[] } | null>(null);
   const name = (l: { id: number; name: string }[], id: number | null) => l.find((x) => x.id === id)?.name ?? "—";
+  // A cluster's CBMs: everyone who is CBM of one of its properties, and how many properties have none.
+  const cbmsOf = (c: Cluster) => {
+    const ps = props.filter((p) => p.cluster_id === c.id);
+    return { names: [...new Set(ps.map((p) => cbms.find((x) => x.id === p.cbm_id)?.name).filter((n): n is string => !!n))].sort(), none: ps.filter((p) => !p.cbm_id).length };
+  };
   function download() {
     const people = [...reviewers.map((p) => ({ ...p, email: null, access_role: "reviewer" })), ...auditors.map((p) => ({ ...p, email: null, access_role: "auditor" })), ...cbms.map((p) => ({ ...p, access_role: "cbm" }))];
     const data = sheetRows({ cities, clusters: rows, properties: props, people });
@@ -230,12 +236,17 @@ export function Clusters({ rows, cities, props, reviewers, auditors, cbms, notif
         <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={() => setEdit(null)}>Cancel</button>
           <button type="button" className="btn primary sm" onClick={async () => { if (await run(saveCluster(edit.id, edit))) setEdit(null); }}>Save cluster</button></div>
       </div>}
-      <Table<Cluster> name="Clusters" rows={rows.filter((c) => (tab === "archived") === !!c.archived)} rowKey={(c) => c.id} search={(c) => `${c.name} ${c.city} ${c.props ?? ""}`} cols={[
+      <Table<Cluster> name="Clusters" rows={rows.filter((c) => (tab === "archived") === !!c.archived)} rowKey={(c) => c.id} search={(c) => `${c.name} ${c.city} ${c.props ?? ""} ${cbmsOf(c).names.join(" ")}`} cols={[
         { key: "name", label: "Cluster", value: (c) => c.name, sticky: true, render: (c) => <b>{c.name}</b> },
         { key: "city", label: "City", value: (c) => c.city },
         { key: "n", label: "Properties", num: true, value: (c) => c.n, render: (c) => <span title={c.props ?? ""}>{c.n}</span> },
         { key: "rv", label: "Reviewer", person: true, value: (c) => name(reviewers, c.reviewer_id) },
         { key: "au", label: "Auditor", person: true, value: (c) => name(auditors, c.auditor_id) },
+        { key: "cbm", label: "CBM", value: (c) => cbmsOf(c).names.join(", "), render: (c) => {
+          const { names, none } = cbmsOf(c);
+          return <div className="grid" style={{ gap: 4 }}>{names.map((n) => <Person key={n} name={n} />)}
+            {none > 0 && <span className="small muted">{names.length ? `${none} without CBM` : "No CBM"}</span>}</div>;
+        } },
       ]} actions={(c) => [
         { label: "Edit", hidden: !!c.archived, onClick: () => setEdit({ id: c.id, name: c.name, city_id: c.city_id, reviewer_id: c.reviewer_id, auditor_id: c.auditor_id, properties: props.filter((p) => p.cluster_id === c.id).map((p) => p.id) }) },
         { label: c.archived ? "Restore" : "Archive", danger: !c.archived, onClick: () => run(archiveCluster(c.id, !c.archived)) },
