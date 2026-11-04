@@ -184,7 +184,8 @@ export async function triggerTask(templateId: number, propertyId: number): Promi
 
 export type TemplateItemInput = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; guide?: string | null };
 export type TemplateInput = Omit<E.Template, "id"> & { items: TemplateItemInput[]; properties: number[] };
-export async function saveTemplate(id: number | null, t: TemplateInput): Promise<Result> {
+/** Saves a task's setup. A new task's id comes back so the editor can confirm it and link to it. */
+export async function saveTemplate(id: number | null, t: TemplateInput): Promise<Result & { id?: number }> {
   const u = await requireUser();
   if (!can.admin(u)) return { ok: false, error: "Only admins can edit task setup." };
   let newId = id;
@@ -223,8 +224,7 @@ export async function saveTemplate(id: number | null, t: TemplateInput): Promise
     });
     return "Saved. New tasks follow this setup from the next window.";
   });
-  if (r.ok && !id) redirect(`/admin/templates/${newId}`);
-  return r;
+  return r.ok ? { ...r, id: newId ?? undefined } : r;
 }
 
 export async function getTaskDetail(instanceId: number) {

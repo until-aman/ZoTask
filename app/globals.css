@@ -1277,3 +1277,11 @@ table.aq .cmt{max-width:320px;overflow:visible;text-overflow:clip;white-space:no
 .cu-list{border:1px solid var(--line2);border-radius:var(--r);padding:6px 10px;font-size:13px}
 .cu-list summary{cursor:pointer;font-weight:600}
 .cu-list ul{margin:6px 0 2px;padding-left:20px;max-height:220px;overflow:auto;display:grid;gap:2px}
+/* Task saved: confirmation pop-up */
+.te-done{width:min(480px,100%);text-align:center;justify-items:center}
+.te-done h2{margin:0 0 4px;font-size:20px}
+.te-done p{margin:0}
+.te-done .row2{width:100%}
+.te-done-ic{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--green-soft);color:var(--green-ink);font-size:24px;font-weight:700}
+.te-done-facts{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.te-done-facts li{padding:5px 10px;border:1px solid var(--line2);border-radius:999px;font-size:13px;background:var(--sunken)}
