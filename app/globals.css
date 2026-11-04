@@ -1285,3 +1285,6 @@ table.aq .cmt{max-width:320px;overflow:visible;text-overflow:clip;white-space:no
 .te-done-ic{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--green-soft);color:var(--green-ink);font-size:24px;font-weight:700}
 .te-done-facts{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
 .te-done-facts li{padding:5px 10px;border:1px solid var(--line2);border-radius:999px;font-size:13px;background:var(--sunken)}
+/* A note across the top of a page (Week offs on the review sheet). */
+.banner{background:var(--sunken);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 14px;font-size:14px}
+.banner.warn{background:var(--amber-soft);border-color:transparent;color:var(--amber-ink)}

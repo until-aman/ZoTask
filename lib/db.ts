@@ -44,6 +44,7 @@ async function init(): Promise<Client> {
     ["clusters", "reviewer_id", "INTEGER"], ["clusters", "auditor_id", "INTEGER"], ["clusters", "archived", "INTEGER NOT NULL DEFAULT 0"],
     ["map_sites", "gender", "TEXT"], ["map_sites", "details", "TEXT"], ["submissions", "location_src", "TEXT"], ["template_items", "guide", "TEXT"],
     ["users", "archived", "INTEGER NOT NULL DEFAULT 0"],
+    ["instances", "wk", "TEXT"], ["instances", "wk_why", "TEXT"], ["instances", "wk_closed_at", "INTEGER"],
   ];
   const have = new Map<string, string[]>();
   for (const [table, col, type] of added) {

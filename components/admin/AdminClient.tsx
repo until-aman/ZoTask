@@ -1,5 +1,6 @@
 "use client";
 // Admin: task setup (with bulk actions), the libraries tasks draw on, and properties and people.
+import WeekOffs from "./WeekOffs";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,8 +15,9 @@ export type Tpl = { id: number; name: string; category: string; op_role: string;
   events: string; days: string; once_date: string | null; review_required: number };
 export type Prop = { id: number; name: string; cluster: string; city: string; cbm: string | null; cbm_id: number | null; staff: number; city_id: number; cluster_id: number };
 type Lib = { checklists: Checklist[]; schedules: Schedule[]; categories: Category[]; counts: Count[]; clusters: Cluster[]; cities: { id: number; name: string }[];
-  reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; cbms: { id: number; name: string; email: string | null }[] };
-const TABS: [string, string][] = [["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"], ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"]];
+  reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; cbms: { id: number; name: string; email: string | null }[];
+  off: import("@/lib/offdays").OffCfg; today: string; wkCounts: { must: number; auto: number; closed: number } };
+const TABS: [string, string][] = [["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"], ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"], ["weekoffs", "Week offs"]];
 const ROLE_NAME: Record<string, string> = { admin: "Admin", reviewer: "Reviewers", auditor: "Auditors", cbm: "CBMs", ground: "Ground team" };
 const when = (t: Tpl) => describeWhen(t);
 
@@ -135,6 +137,7 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
       {tab === "categories" && <Categories rows={lib.categories} notify={setToast} />}
       {tab === "counts" && <Counts rows={lib.counts} notify={setToast} />}
       {tab === "clusters" && <Clusters rows={lib.clusters} cities={lib.cities} props={props} reviewers={lib.reviewers} auditors={lib.auditors} cbms={lib.cbms} notify={setToast} />}
+      {tab === "weekoffs" && <WeekOffs cfg={lib.off} today={lib.today} counts={lib.wkCounts} notify={setToast} />}
       {tab === "people" && <>
         <FilterBar search={q} setSearch={setQ} searchLabel="Search properties" chips={city ? [{ key: "city", label: <>City: <b>{city}</b></>, clear: () => setCity("") }] : []}
           panel={<Field label="City"><select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>} />

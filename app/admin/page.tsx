@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { boot } from "@/lib/boot";
 import { can } from "@/lib/auth";
-import { all } from "@/lib/db";
+import { all, one } from "@/lib/db";
+import { loadOff } from "@/lib/engine";
+import { isoDate } from "@/lib/time";
 import { geo } from "@/lib/queries";
 import TriggerForm from "@/components/TriggerForm";
 import AdminClient, { Tpl } from "@/components/admin/AdminClient";
@@ -12,6 +14,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
   const u = await boot();
   if (!can.admin(u)) redirect("/");
   const tab = (await searchParams).tab ?? "tasks";
+  const off = await loadOff(true);
   const templates = await all<Tpl>(
     `SELECT t.*, (SELECT count(*) FROM template_properties tp WHERE tp.template_id=t.id) props, r.name reviewer, a.name auditor
      FROM templates t LEFT JOIN users r ON r.id=t.reviewer_id LEFT JOIN users a ON a.id=t.auditor_id ORDER BY t.id`);
@@ -35,6 +38,10 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
     cities: await all<{ id: number; name: string }>("SELECT id, name FROM cities ORDER BY name"),
     reviewers: staff.filter((x) => x.access_role === "reviewer"), auditors: staff.filter((x) => x.access_role === "auditor"),
     cbms: await all<{ id: number; name: string; email: string | null }>("SELECT id, name, email FROM users WHERE access_role='cbm' AND archived=0 ORDER BY name"),
+    off, today: isoDate(Date.now()),
+    wkCounts: (await one<{ must: number; auto: number; closed: number }>(
+      `SELECT count(*) FILTER (WHERE wk='must' AND status IN ('review','resub')) must, count(*) FILTER (WHERE wk='auto' AND status IN ('review','resub')) auto,
+        count(*) FILTER (WHERE wk_closed_at>=? AND status='done') closed FROM instances`, Date.now() - off.pullbackDays * 86_400_000))!,
   };
   return (
     <AdminClient tab={tab} templates={templates} props={props} people={people} views={await viewsFor(u.id, "admin")} lib={lib}>

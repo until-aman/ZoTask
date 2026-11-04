@@ -7,6 +7,7 @@ export type Row = {
   id: number; template_id: number; property_id: number; task_date: string; window_start_at: number; window_end_at: number; late_until_at: number;
   status: string; attempt: number; status_since: number; first_submitted_at: number | null; last_submitted_at: number | null;
   first_decision: string | null; closed_at: number | null; source: string;
+  wk: string | null; wk_why: string | null; wk_closed_at: number | null;
   task: string; category: string; op_role: string; criticality: string; review_sla_h: number; audit_sla_h: number; attempts_allowed: number;
   window_start: string; window_end: string;
   property: string; cluster: string; city: string;
@@ -45,10 +46,19 @@ export async function geo() {
      JOIN clusters cl ON cl.id=p.cluster_id JOIN cities c ON c.id=cl.city_id LEFT JOIN users u ON u.id=p.cbm_id ORDER BY c.name, cl.name, p.name`);
 }
 
-export async function eventsFor(instanceId: number) {
-  return await all<{ id: number; at: number; type: string; detail: string; actor: string | null }>(
+// Decisions by the central team. CBMs and the ground team see them signed by the team, not the person, so a check by
+// hand and a task closed by weekend sampling read the same to them; the sampling note itself is never shown to them.
+const TEAM: Record<string, string> = { passed: "Review team", changes_requested: "Review team", reopened: "Review team", reassigned: "Review team",
+  audit_passed: "Audit team", audit_failed: "Audit team", flags_closed: "Audit team", flags_reopened: "Audit team" };
+const CENTRAL_ONLY = ["weekend_closed"];
+export const isCentralRole = (role: string) => ["admin", "reviewer", "auditor"].includes(role);
+
+export async function eventsFor(instanceId: number, viewerRole = "admin") {
+  const ev = await all<{ id: number; at: number; type: string; detail: string; actor: string | null }>(
     `SELECT e.id, e.at, e.type, e.detail, u.name actor FROM events e LEFT JOIN users u ON u.id=e.actor_id
      WHERE e.instance_id=? ORDER BY e.at, e.id`, instanceId);
+  if (isCentralRole(viewerRole)) return ev;
+  return ev.filter((e) => !CENTRAL_ONLY.includes(e.type)).map((e) => (TEAM[e.type] ? { ...e, actor: TEAM[e.type] } : e));
 }
 
 export { STATUS_LABEL, STATUS_PILL } from "./statuses";

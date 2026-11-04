@@ -93,6 +93,17 @@ export async function closeFlags(instanceId: number, accept: boolean): Promise<R
   });
 }
 
+/** Takes a task closed by weekend sampling back into review (reviewers, within the pull-back window). */
+export async function pullBackTask(instanceId: number): Promise<Result> {
+  const u = await requireUser();
+  return guard(async () => {
+    if (!["reviewer", "admin"].includes(u.access_role)) throw new Error("Only reviewers can pull tasks back.");
+    if ((await taskInScope(u, instanceId)) === null) throw new Error("That task isn't in your properties.");
+    await E.pullBack(instanceId, u.id, Date.now());
+    return "Back in review";
+  });
+}
+
 export async function reopenTask(instanceId: number): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
@@ -262,7 +273,7 @@ export async function getHistory(instanceId: number) {
   const u = await requireUser();
   if ((await taskInScope(u, instanceId)) === null) return [];
   const { eventsFor } = await import("@/lib/queries");
-  return eventsFor(instanceId);
+  return eventsFor(instanceId, u.access_role);
 }
 
 export async function raiseEscalation(x: import("@/lib/escalations").EscInput): Promise<Result & { id?: number }> {

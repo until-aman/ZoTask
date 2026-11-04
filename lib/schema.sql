@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS instances (
   attempt INTEGER NOT NULL DEFAULT 0,
   first_submitted_at INTEGER, last_submitted_at INTEGER, status_since INTEGER NOT NULL,
   first_decision TEXT, closed_at INTEGER, source TEXT NOT NULL DEFAULT 'schedule',
+  wk TEXT, wk_why TEXT, wk_closed_at INTEGER,     -- submitted on a reviewer day off: 'must' | 'auto', why, and when it closed by itself
   UNIQUE (template_id, property_id, task_date, source)
 );
 CREATE INDEX IF NOT EXISTS ix_inst_status ON instances(status);

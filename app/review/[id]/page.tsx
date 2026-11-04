@@ -4,8 +4,9 @@ import Link from "next/link";
 import { boot } from "@/lib/boot";
 import { taskInScope } from "@/lib/auth";
 import { all, one } from "@/lib/db";
-import { itemsFor, missingEvidence } from "@/lib/engine";
-import { rows, eventsFor, STATUS_LABEL, STATUS_PILL } from "@/lib/queries";
+import { itemsFor, loadOff, missingEvidence } from "@/lib/engine";
+import { autoCloseAt } from "@/lib/offdays";
+import { rows, eventsFor, isCentralRole, STATUS_LABEL, STATUS_PILL } from "@/lib/queries";
 import { fmtDate, fmtDateTime, fmtDur } from "@/lib/time";
 import ReviewForm from "@/components/ReviewForm";
 import Timeline from "@/components/Timeline";
@@ -28,6 +29,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
     "SELECT f.* FROM review_flags f JOIN reviews r ON r.id=f.review_id WHERE r.instance_id=?", id);
   const latest = subs[subs.length - 1];
   const missing = latest ? (await missingEvidence(latest.id, r.template_id)).map((m) => m.id) : [];
+  const off = await loadOff();
   const staff = await one<{ ideal_hk: number; ideal_shk: number }>("SELECT ideal_hk, ideal_shk FROM staffing WHERE property_id=?", r.property_id);
 
   const mode =
@@ -51,6 +53,12 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
         </div>
         <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
       </div>
+      {isCentralRole(u.access_role) && r.wk && ["review", "resub"].includes(r.status) && <div className={`banner ${r.wk === "must" ? "warn" : ""}`} role="note">
+          <b>Submitted on a reviewer day off.</b>{" "}
+          {r.wk === "must" ? <>Must check: {r.wk_why}.</> : <>Optional check. If nobody checks it, it closes by itself on {fmtDateTime(autoCloseAt(off, r.last_submitted_at ?? r.status_since))}.</>}
+          {" "}The CBM doesn&apos;t see this note.
+        </div>}
+      {isCentralRole(u.access_role) && r.wk_closed_at && <div className="banner" role="note"><b>Closed by weekend sampling</b> on {fmtDateTime(r.wk_closed_at)}, not checked by hand. The CBM doesn&apos;t see this note.</div>}
       <div className="card">
         <dl className="kv">
           <dt>Assignee</dt><dd>{r.assignee} · {r.op_role}</dd>
@@ -72,7 +80,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
       {mode === "waive" && <ReviewForm instanceId={id} mode="waive" items={[]} latest={{}} previous={null} prevFlags={[]} auditFlags={[]} missing={[]} />}
       <div className="card">
         <h2>History</h2>
-        <Timeline events={await eventsFor(id)} />
+        <Timeline events={await eventsFor(id, u.access_role)} />
       </div>
     </div>
   );

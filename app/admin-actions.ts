@@ -183,3 +183,14 @@ export async function deleteTasks(ids: number[]) {
     return out.charAt(0).toUpperCase() + out.slice(1) + ".";
   });
 }
+
+// Reviewer week offs
+export async function saveOffDays(v: import("@/lib/offdays").OffCfg) {
+  return admin(async () => {
+    const { normOff, setOffCache } = await import("@/lib/offdays");
+    const c = normOff(v);
+    await run("INSERT OR REPLACE INTO meta (k, v) VALUES ('offdays', ?)", JSON.stringify(c));
+    setOffCache(c);
+    return c.on ? "Week offs saved." : "Week offs turned off. Every day counts towards review time limits.";
+  });
+}
