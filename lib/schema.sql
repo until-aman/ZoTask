@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS template_items (
   photo_allowed INTEGER NOT NULL DEFAULT 1, note_allowed INTEGER NOT NULL DEFAULT 1,  -- allowed = shown; required = compulsory
   count_of TEXT,                                  -- kind=count: HK or SHK, checked against the property's ideal count
   options TEXT,                                   -- kind=choice: JSON list of answers to pick from, e.g. ["Yes","No","N/A"]
+  option_rules TEXT,                              -- kind=choice: what each option makes compulsory, e.g. {"Yes":{"photo":true},"No":{"note":true}}
   guide TEXT                                      -- for the reviewer: what to check and how
 );
 CREATE TABLE IF NOT EXISTS template_properties (template_id INTEGER NOT NULL, property_id INTEGER NOT NULL, PRIMARY KEY (template_id, property_id));

@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { saveTemplate, TemplateInput, TemplateItemInput } from "@/app/actions";
 import { saveChecklistPreset } from "@/app/admin-actions";
 import { SearchPick } from "@/components/ui/Filters";
-import { DEFAULT_OPTIONS, cleanOptions } from "@/lib/answers";
+import { DEFAULT_OPTIONS, cleanOptionRules, cleanOptions, type OptRules } from "@/lib/answers";
 
 type T = Omit<TemplateInput, "items" | "properties">;
 type It = TemplateItemInput;
@@ -31,8 +31,8 @@ const DEFAULTS: T = {
 // Grow a one-line textarea to fit its text, so long checklist items are never cut off.
 const fit = (el: HTMLTextAreaElement | null) => { if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight + 2}px`; } };
 // A Yes / No item opens as an Options item with Yes and No, so more answers (N/A …) can be added to it.
-const asOptions = (i: { kind: string; options?: unknown }) => (i.kind === "yesno" ? { kind: "choice", options: [...DEFAULT_OPTIONS] }
-  : { kind: i.kind, options: i.kind === "choice" ? cleanOptions(i.options) : null });
+const asOptions = (i: { kind: string; options?: unknown; option_rules?: unknown }) => (i.kind === "yesno" ? { kind: "choice", options: [...DEFAULT_OPTIONS], option_rules: null }
+  : { kind: i.kind, options: i.kind === "choice" ? cleanOptions(i.options) : null, option_rules: i.kind === "choice" ? cleanOptionRules(i.option_rules, cleanOptions(i.options)) : null });
 const blank = (): It => ({ label: "", kind: "check", photo_allowed: true, photo_required: false, note_allowed: true, note_required: false, count_of: null });
 const parse = <X,>(s: string | null | undefined, d: X): X => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 const rule = (allowed: boolean, required: boolean) => (required ? "required" : allowed ? "optional" : "off");
@@ -101,7 +101,7 @@ export function ItemCard({ ix, it, last, notes, onChange, onMove, onRemove }: {
           </div>
         ))}
       </div>
-      {it.kind === "choice" && <OptionsField ix={ix} options={it.options ?? []} onChange={(options) => onChange({ options })} />}
+      {it.kind === "choice" && <OptionsField ix={ix} options={it.options ?? []} rules={it.option_rules ?? {}} onChange={(options, option_rules) => onChange({ options, option_rules })} />}
       {notes && (
         <details className="te-guide">
           <summary>{it.guide ? "Reviewer notes" : "+ Reviewer notes"}</summary>
@@ -113,9 +113,14 @@ export function ItemCard({ ix, it, last, notes, onChange, onMove, onRemove }: {
 }
 
 /** The answers a CBM picks from for an "Options" item: chips to rename or remove, a box to add more, and quick sets. */
-function OptionsField({ ix, options, onChange }: { ix: number; options: string[]; onChange: (o: string[]) => void }) {
+function OptionsField({ ix, options, rules, onChange: set }: { ix: number; options: string[]; rules: OptRules; onChange: (o: string[], r: OptRules) => void }) {
   const [add, setAdd] = useState("");
+  const onChange = (o: string[], r: OptRules = rules) => set(o, r);
   const push = () => { const o = cleanOptions([...options, ...add.split(",")]); if (o.length !== options.length) onChange(o); setAdd(""); };
+  // Renaming an option keeps what it makes compulsory.
+  const rename = (j: number, v: string) => { const r = { ...rules }; const old = options[j]; if (r[old]) { r[v] = r[old]; delete r[old]; } onChange(options.map((x, k) => (k === j ? v : x)), r); };
+  const toggle = (o: string, k: "photo" | "note") => onChange(options, { ...rules, [o]: { ...rules[o], [k]: !rules[o]?.[k] } });
+  const named = cleanOptions(options);
   const few = cleanOptions(options).length < 2;
   return (
     <div className="te-choice">
@@ -124,7 +129,7 @@ function OptionsField({ ix, options, onChange }: { ix: number; options: string[]
         {options.map((o, j) => (
           <span key={j} className="chip te-chip" role="listitem">
             <input value={o} aria-label={`Option ${j + 1}`} style={{ width: `${Math.max(2, o.length) + 1.5}ch` }} maxLength={40}
-              onChange={(e) => onChange(options.map((x, k) => (k === j ? e.target.value : x)))}
+              onChange={(e) => rename(j, e.target.value)}
               onBlur={() => onChange(cleanOptions(options))} />
             <button type="button" aria-label={`Remove ${o || "option"}`} onClick={() => onChange(options.filter((_, k) => k !== j))}>×</button>
           </span>
@@ -138,16 +143,30 @@ function OptionsField({ ix, options, onChange }: { ix: number; options: string[]
       <div className="row2 small" style={{ gap: 10 }}>
         <span className="muted">Quick sets:</span>
         {[["Yes", "No"], ["Yes", "No", "N/A"], ["Good", "Average", "Poor"], ["Working", "Not working"]].map((q) => (
-          <button key={q.join()} type="button" className="link small" onClick={() => onChange(q)}>{q.join(" / ")}</button>
+          <button key={q.join()} type="button" className="link small" onClick={() => onChange(q, {})}>{q.join(" / ")}</button>
         ))}
       </div>
+      {named.length > 0 && (
+        <div className="te-optrules" role="group" aria-label={`What each option of item ${ix + 1} makes compulsory`}>
+          <span className="te-opt" style={{ display: "block" }}>When the CBM picks an option, make compulsory</span>
+          {named.map((o) => (
+            <div key={o} className="te-optrule">
+              <span className="te-optname">{o}</span>
+              <div className="te-days">
+                <button type="button" aria-pressed={!!rules[o]?.photo} onClick={() => toggle(o, "photo")}>Photo</button>
+                <button type="button" aria-pressed={!!rules[o]?.note} onClick={() => toggle(o, "note")}>Note</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {few && <div className="small t-r">Add at least two options.</div>}
     </div>
   );
 }
 
 export default function TemplateEditor({ id, initial, initialItems, selected, geo, reviewers, auditors, people, categories, checklists, schedules }: {
-  id: number | null; initial: (T & { id: number }) | null; initialItems: (Omit<It, "photo_allowed" | "photo_required" | "note_allowed" | "note_required" | "options"> & { photo_allowed: number; photo_required: number; note_allowed: number; note_required: number; options?: string | null })[];
+  id: number | null; initial: (T & { id: number }) | null; initialItems: (Omit<It, "photo_allowed" | "photo_required" | "note_allowed" | "note_required" | "options" | "option_rules"> & { photo_allowed: number; photo_required: number; note_allowed: number; note_required: number; options?: string | null; option_rules?: string | null })[];
   selected: number[]; geo: { id: number; city: string; cluster: string; property: string }[];
   reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; people: Person[];
   categories: string[]; checklists: ChecklistPreset[]; schedules: SchedulePreset[];
@@ -195,7 +214,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     if (!p) return;
     if (!force && items.some((i) => i.label.trim())) return setPending(p);
     setPending(null);
-    setItems(parse<Partial<It>[]>(p.items, []).map((i) => ({ ...blank(), ...i, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, ...asOptions({ kind: i.kind ?? "check", options: i.options }) })));
+    setItems(parse<Partial<It>[]>(p.items, []).map((i) => ({ ...blank(), ...i, photo_allowed: !!i.photo_allowed, photo_required: !!i.photo_required, note_allowed: !!i.note_allowed, note_required: !!i.note_required, ...asOptions({ kind: i.kind ?? "check", options: i.options, option_rules: i.option_rules }) })));
   }
   function loadSchedule(sid: string) {
     const s = schedules.find((x) => String(x.id) === sid);

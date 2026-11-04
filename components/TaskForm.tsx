@@ -1,13 +1,13 @@
 "use client";
 import { fmtTime } from "@/lib/time";
-import { answerIssue, choicesFor, nonNegative } from "@/lib/answers";
+import { answerIssue, choicesFor, needs, nonNegative } from "@/lib/answers";
 import { tryUpload } from "./upload";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { startTask, submitTask, type Where } from "@/app/actions";
 import Photo from "./Photo";
 
-type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null; options?: string | null };
+type Item = { id: number; label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null; options?: string | null; option_rules?: string | null };
 type Prev = { item_id: number; checked: number; value: string | null; note: string | null; photos: string };
 type Flag = { id: number; item_id: number; reason: string; comment: string | null };
 type Ans = { checked: boolean; value: string; note: string; photos: string[]; reply: string };
@@ -99,6 +99,8 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
   // What's still missing per item. Shown under each item once Submit was pressed, or as soon as an item has been touched.
   const issues = Object.fromEntries(items.map((it) => [it.id, answerIssue(it, ans[it.id], flags.some((f) => f.item_id === it.id))]));
   const problems = items.filter((it) => issues[it.id]);
+  // With Start/Stop on, nothing can be filled in until the task is started.
+  const locked = !!timer?.startStop && status !== "changes" && !startedAt;
   const [tried, setTried] = useState(false);
 
   async function onSubmit() {
@@ -138,10 +140,12 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
         <div className="err" style={{ fontWeight: 600 }}>The reviewer sent this back. Fix the flagged items and reply to each flag. This will be attempt {attempt + 1} of {attemptsAllowed}{attempt + 1 === attemptsAllowed ? ", your last one" : ""}.</div>
       )}
       {status === "notsub" && <div className="err" style={{ fontWeight: 600 }}>The window has closed. You can still submit, but it will count as late.</div>}
-      <div className="items">
+      {locked && <div className="info" role="status"><i>!</i><span>Tap Start task first. The checklist unlocks once the task is started.</span></div>}
+      <fieldset className="items" disabled={locked} aria-disabled={locked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, opacity: locked ? 0.55 : 1 }}>
       {items.map((it) => {
         const a = ans[it.id];
         const flag = flags.find((f) => f.item_id === it.id);
+        const need = needs(it, a);
         return (
           <div key={it.id} id={`item-${it.id}`} className={`item${flag ? " flagged" : ""}${tried && issues[it.id] ? " missing" : ""}`}>
             <div className="row2">
@@ -152,8 +156,8 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
                 </label>
               ) : <b>{it.label}</b>}
               <span className="spacer" />
-              {it.photo_required ? <span className={`pill${tried && !a.photos.length ? " r" : ""}`}>Photo compulsory</span> : null}
-              {it.note_required ? <span className={`pill${tried && !a.note.trim() ? " r" : ""}`}>Note compulsory</span> : null}
+              {need.photo ? <span className={`pill${tried && !a.photos.length ? " r" : ""}`}>Photo compulsory</span> : null}
+              {need.note ? <span className={`pill${tried && !a.note.trim() ? " r" : ""}`}>Note compulsory</span> : null}
             </div>
             {flag && <div className="small warn">Flagged: {flag.reason}{flag.comment ? ` · “${flag.comment}”` : ""}</div>}
             <div className="ansrow">
@@ -163,7 +167,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
             </div>}
             {it.kind === "number" && <input type="text" inputMode="decimal" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value) })} style={{ width: 140 }} aria-label={it.label} placeholder="0 or more" />}
             {it.kind === "text" && <textarea value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} aria-label={it.label} />}
-            {!!(it.photo_allowed || it.photo_required) && <div className="photos">
+            {!!(it.photo_allowed || need.photo) && <div className="photos">
               {a.photos.map((p, ix) => (
                 <span key={p + ix} style={{ position: "relative" }}>
                   <Photo name={p} />
@@ -182,23 +186,23 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
             </div>
             {failed[it.id] && <div className="small warn" role="alert">{failed[it.id]}</div>}
             {tried && issues[it.id] && <div className="small t-r" role="alert">{issues[it.id]}</div>}
-            {!!(it.note_allowed || it.note_required || (it.kind === "check" && !a.checked)) && <input type="text" placeholder={it.note_required ? "Note (compulsory)" : it.kind === "check" && !a.checked ? "Not done? Say why" : "Note (optional)"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />}
+            {!!(it.note_allowed || need.note || (it.kind === "check" && !a.checked)) && <input type="text" placeholder={need.note ? "Note (compulsory)" : it.kind === "check" && !a.checked ? "Not done? Say why" : "Note (optional)"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />}
             {flag && <input type="text" placeholder="Reply to the reviewer" value={a.reply} onChange={(e) => set(it.id, { reply: e.target.value })} />}
           </div>
         );
       })}
-      </div>
+      </fieldset>
       {property.geofence && (
         <div className="row2">
-          <button type="button" className="btn" onClick={checkLocation}>Validate location</button>
-          <button type="button" className="link small" onClick={() => setLoc({ ok: null, distance: null, where: "simulated", msg: "Demo: location skipped. The reviewer will see it was simulated." })}>Simulate being on site (demo)</button>
+          <button type="button" className="btn" disabled={locked} onClick={checkLocation}>Validate location</button>
+          <button type="button" className="link small" disabled={locked} onClick={() => setLoc({ ok: null, distance: null, where: "simulated", msg: "Demo: location skipped. The reviewer will see it was simulated." })}>Simulate being on site (demo)</button>
           <span className={`small ${loc.ok === false ? "warn" : "muted"}`}>{loc.msg}</span>
         </div>
       )}
       {problems.length > 0 && <div className="info"><i>!</i>{problems.length} item{problems.length > 1 ? "s are" : " is"} still incomplete. Compulsory photos and notes, and an answer to every question, are needed to submit.</div>}
       {err && <div className="err">{err}</div>}
       <div className="row2">
-        <button type="button" className="btn primary" disabled={busy || pending > 0} onClick={onSubmit}>{busy ? "Submitting…" : pending ? `Uploading ${pending} photo${pending > 1 ? "s" : ""}…` : status === "changes" ? "Resubmit" : "Submit"}</button>
+        <button type="button" className="btn primary" disabled={busy || pending > 0 || locked} onClick={onSubmit}>{busy ? "Submitting…" : pending ? `Uploading ${pending} photo${pending > 1 ? "s" : ""}…` : status === "changes" ? "Resubmit" : "Submit"}</button>
       </div>
     </div>
   );

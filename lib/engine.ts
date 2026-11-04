@@ -16,7 +16,7 @@ export type Template = {
 };
 export type Item = {
   id: number; template_id: number; pos: number; label: string; kind: string; photo_required: number; note_required: number;
-  photo_allowed: number; note_allowed: number; count_of: string | null; guide?: string | null; options?: string | null;
+  photo_allowed: number; note_allowed: number; count_of: string | null; guide?: string | null; options?: string | null; option_rules?: string | null;
 };
 export const list = <T = number>(s: string | null | undefined): T[] => { try { const v = JSON.parse(s || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
 export type Instance = {

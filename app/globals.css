@@ -1301,3 +1301,8 @@ table.aq .cmt{max-width:320px;overflow:visible;text-overflow:clip;white-space:no
 .time24 select{flex:1 1 0;min-width:64px}
 .seg.seg-wrap{flex-wrap:wrap;max-width:100%}
 .item.missing{border-color:var(--red);box-shadow:inset 3px 0 0 var(--red)}
+
+.te-optrules{display:grid;gap:6px;margin-top:4px}
+.te-optrule{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.te-optname{min-width:110px;font-size:13px;font-weight:600;color:var(--fg)}
+.te-optrule .te-days button{font-size:12px;padding:4px 10px}

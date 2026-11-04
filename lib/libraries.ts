@@ -13,9 +13,9 @@ export async function seedLibraries() {
   }
   for (const [pos, c] of [...new Set(templates.map((t) => t.category))].entries()) await run("INSERT OR IGNORE INTO task_categories (name, pos) VALUES (?,?)", c, pos);
   for (const t of templates) {
-    const items = await all<{ label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null; options: string | null }>(
-      "SELECT label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, options FROM template_items WHERE template_id=? AND pos<1000 ORDER BY pos", t.id);
-    await run("INSERT INTO checklist_presets (title, items) VALUES (?,?)", t.name, JSON.stringify(items.map((i) => ({ ...i, options: i.options ? JSON.parse(i.options) : null }))));
+    const items = await all<{ label: string; kind: string; photo_required: number; note_required: number; photo_allowed: number; note_allowed: number; count_of: string | null; options: string | null; option_rules: string | null }>(
+      "SELECT label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, options, option_rules FROM template_items WHERE template_id=? AND pos<1000 ORDER BY pos", t.id);
+    await run("INSERT INTO checklist_presets (title, items) VALUES (?,?)", t.name, JSON.stringify(items.map((i) => ({ ...i, options: i.options ? JSON.parse(i.options) : null, option_rules: i.option_rules ? JSON.parse(i.option_rules) : null }))));
   }
   for (const [name, frequency, days, start, end] of [
     ["Daily morning", "daily", [], "09:00", "10:00"],

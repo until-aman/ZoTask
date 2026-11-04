@@ -6,7 +6,7 @@ import { requireUser, can, inScope, taskInScope, requireTasks } from "@/lib/auth
 import { all, one, run, tx } from "@/lib/db";
 import * as E from "@/lib/engine";
 import { km } from "@/lib/geo";
-import { answerIssue, cleanOptions } from "@/lib/answers";
+import { answerIssue, cleanOptionRules, cleanOptions } from "@/lib/answers";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function guard(fn: () => Promise<string | void>): Promise<Result> {
@@ -40,6 +40,9 @@ export async function submitTask(instanceId: number, answers: E.AnswerInput[], w
       const d = Math.round(km(site as { lat: number; lng: number }, where) * 1000);
       loc = { ok: d <= site.geofence_m, distance: d, source: "gps" };
     }
+    // With Start/Stop on, the task must have been started first (a resubmission doesn't need a new start).
+    if (i.status !== "changes" && (await one<{ s: number }>("SELECT start_stop s FROM templates WHERE id=?", i.template_id))?.s
+      && !(await one("SELECT 1 FROM events WHERE instance_id=? AND type='started'", instanceId))) throw new Error("Tap Start task before filling in and submitting this task.");
     // Every item complete: compulsory photos and notes, an answer to each question, no negative numbers.
     const items = await E.itemsFor(i.template_id);
     const flagged = new Set(i.status === "changes" ? (await all<{ item_id: number }>(
@@ -201,7 +204,7 @@ export async function triggerTask(templateId: number, propertyId: number): Promi
   });
 }
 
-export type TemplateItemInput = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; guide?: string | null; options?: string[] | null };
+export type TemplateItemInput = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; guide?: string | null; options?: string[] | null; option_rules?: import("@/lib/answers").OptRules | null };
 export type TemplateInput = Omit<E.Template, "id"> & { items: TemplateItemInput[]; properties: number[] };
 /** Saves a task's setup. A new task's id comes back so the editor can confirm it and link to it. */
 export async function saveTemplate(id: number | null, t: TemplateInput): Promise<Result & { id?: number }> {
@@ -232,9 +235,10 @@ export async function saveTemplate(id: number | null, t: TemplateInput): Promise
       const existing = await all<{ id: number }>("SELECT id FROM template_items WHERE template_id=? ORDER BY pos", newId);
       for (const [pos, it] of t.items.entries()) {
         const rules = [it.label, it.kind, it.photo_required, it.note_required, it.photo_allowed || it.photo_required, it.note_allowed || it.note_required, it.kind === "count" ? it.count_of ?? "HK" : null, it.guide?.trim() || null,
-          it.kind === "choice" ? JSON.stringify(cleanOptions(it.options)) : null];
-        if (existing[pos]) await run("UPDATE template_items SET label=?, kind=?, photo_required=?, note_required=?, photo_allowed=?, note_allowed=?, count_of=?, guide=?, options=?, pos=? WHERE id=?", ...rules, pos, existing[pos].id);
-        else await run("INSERT INTO template_items (label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, guide, options, template_id, pos) VALUES (?,?,?,?,?,?,?,?,?,?,?)", ...rules, newId, pos);
+          it.kind === "choice" ? JSON.stringify(cleanOptions(it.options)) : null,
+          it.kind === "choice" && Object.keys(cleanOptionRules(it.option_rules, cleanOptions(it.options))).length ? JSON.stringify(cleanOptionRules(it.option_rules, cleanOptions(it.options))) : null];
+        if (existing[pos]) await run("UPDATE template_items SET label=?, kind=?, photo_required=?, note_required=?, photo_allowed=?, note_allowed=?, count_of=?, guide=?, options=?, option_rules=?, pos=? WHERE id=?", ...rules, pos, existing[pos].id);
+        else await run("INSERT INTO template_items (label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, guide, options, option_rules, template_id, pos) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", ...rules, newId, pos);
       }
       for (const ex of existing.slice(t.items.length)) {
         const used = await one("SELECT 1 FROM answers WHERE item_id=? LIMIT 1", ex.id);

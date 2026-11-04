@@ -9,7 +9,7 @@ before(ready);
 const yes = (r: { ok: boolean }) => assert.equal(r.ok, true, JSON.stringify(r));
 const status = async (id: number) => (await one<{ status: string }>("SELECT status FROM instances WHERE id=?", id))!.status;
 
-async function freshTask() {
+async function newTask() {
   // An event task at property 1 starts now, assigned to someone at the property.
   const t = { id: await handTask([1]) };
   await one("UPDATE templates SET audit_rate=1, attempts_allowed=3 WHERE id=? RETURNING id", t.id);
@@ -19,6 +19,12 @@ async function freshTask() {
   const items = await E.itemsFor(i.template_id);
   const answers = items.map((it) => ({ itemId: it.id, checked: true, value: it.kind === "yesno" ? "No" : "5", note: "ok", photos: it.photo_required ? ["x.jpg"] : [] }));
   return { ...i, items, answers };
+}
+/** A fresh task the assignee has already started (tasks have Start/Stop on by default). */
+async function freshTask() {
+  const t = await newTask();
+  await one("INSERT INTO events (instance_id, at, actor_id, type, detail) VALUES (?,?,?,'started','Started the task') RETURNING id", t.id, Date.now(), t.assignee_id);
+  return t;
 }
 
 test("full lifecycle with rework and audit", async () => {
@@ -117,4 +123,34 @@ test("a reviewer can pass an item with missing evidence, and the history says so
   assert.equal(await status(t.id), "audit");
   const ev = (await one<{ detail: string }>("SELECT detail FROM events WHERE instance_id=? AND type='passed'", t.id))!;
   assert.match(ev.detail, /accepted without evidence: Area clean/);
+});
+
+test("with Start/Stop on, a task can't be submitted before it's started", async () => {
+  const t = await newTask();
+  signInAs(t.assignee_id);
+  const r = await A.submitTask(t.id, t.answers, "simulated");
+  assert.equal(r.ok, false);
+  assert.match(r.ok ? "" : r.error, /Start task/);
+  yes(await A.startTask(t.id));
+  yes(await A.submitTask(t.id, t.answers, "simulated"));
+});
+
+test("an option can make a photo or a note compulsory", async () => {
+  const { answerIssue } = await import("@/lib/answers");
+  const it = { id: 1, kind: "choice", options: ["Yes", "No", "N/A"], option_rules: { Yes: { photo: true }, No: { note: true } } };
+  assert.match(answerIssue(it, { value: "Yes", photos: [] })!, /photo.*"Yes"/);
+  assert.equal(answerIssue(it, { value: "Yes", photos: ["a.jpg"] }), null);
+  assert.match(answerIssue(it, { value: "No", note: "" })!, /note.*"No"/);
+  assert.equal(answerIssue(it, { value: "No", note: "Lift stuck on 3rd floor" }), null);
+  assert.equal(answerIssue(it, { value: "N/A" }), null);
+  // Saved with the task, and kept only for options that exist.
+  const src = (await one<{ id: number }>("SELECT id FROM templates WHERE trigger='scheduled' ORDER BY id LIMIT 1"))!.id;
+  const base = (await one<A.TemplateInput & { id: number }>("SELECT * FROM templates WHERE id=?", src))!;
+  const props = (await all<{ property_id: number }>("SELECT property_id FROM template_properties WHERE template_id=?", src)).map((p) => p.property_id);
+  signInAs(1);
+  const made = await A.saveTemplate(null, { ...base, name: "Lift check", description: "Lift", properties: props, items: [{ label: "Lift working?", kind: "choice",
+    photo_allowed: true, photo_required: false, note_allowed: true, note_required: false, count_of: null, options: ["Yes", "No"], option_rules: { Yes: { photo: true }, No: { note: true }, Gone: { note: true } } }] });
+  assert.ok(made.ok && made.id, JSON.stringify(made));
+  const row = (await one<{ option_rules: string }>("SELECT option_rules FROM template_items WHERE template_id=?", made.id))!;
+  assert.deepEqual(JSON.parse(row.option_rules), { Yes: { photo: true }, No: { note: true } });
 });

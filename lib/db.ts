@@ -40,7 +40,7 @@ async function init(): Promise<Client> {
     ["templates", "description", "TEXT"], ["templates", "events", "TEXT NOT NULL DEFAULT '[]'"], ["templates", "days", "TEXT NOT NULL DEFAULT '[]'"],
     ["templates", "once_date", "TEXT"], ["templates", "start_stop", "INTEGER NOT NULL DEFAULT 1"], ["templates", "geofence_m", "INTEGER NOT NULL DEFAULT 200"],
     ["templates", "ideal_minutes", "INTEGER"], ["templates", "review_required", "INTEGER NOT NULL DEFAULT 1"], ["templates", "assignees", "TEXT NOT NULL DEFAULT '[]'"],
-    ["template_items", "photo_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "note_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "count_of", "TEXT"], ["template_items", "options", "TEXT"],
+    ["template_items", "photo_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "note_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "count_of", "TEXT"], ["template_items", "options", "TEXT"], ["template_items", "option_rules", "TEXT"],
     ["clusters", "reviewer_id", "INTEGER"], ["clusters", "auditor_id", "INTEGER"], ["clusters", "archived", "INTEGER NOT NULL DEFAULT 0"],
     ["map_sites", "gender", "TEXT"], ["map_sites", "details", "TEXT"], ["submissions", "location_src", "TEXT"], ["template_items", "guide", "TEXT"],
     ["users", "archived", "INTEGER NOT NULL DEFAULT 0"], ["users", "week_off", "TEXT NOT NULL DEFAULT '[]'"], ["users", "backup_id", "INTEGER"],
