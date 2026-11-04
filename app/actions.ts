@@ -140,7 +140,7 @@ export async function waiveTask(instanceId: number, reason: string): Promise<Res
 export async function remindTasks(ids: number[]): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
-    if (!can.queue(u)) throw new Error("Only CBMs and the central team can send reminders.");
+    if (u.access_role === "ground") throw new Error("Only CBMs and the central team can send reminders.");
     await requireTasks(u, ids);
     const { people, skipped } = await E.remind(ids, u.id, Date.now());
     return `Reminder logged for ${people} ${people === 1 ? "person" : "people"}${skipped ? ` · ${skipped} skipped, already reminded in the last 4h` : ""}`;

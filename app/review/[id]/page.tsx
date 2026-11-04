@@ -2,7 +2,7 @@ import { actionLabel } from "@/lib/statuses";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { boot } from "@/lib/boot";
-import { taskInScope } from "@/lib/auth";
+import { can, taskInScope } from "@/lib/auth";
 import { all, one } from "@/lib/db";
 import { itemsFor, loadOff, missingEvidence } from "@/lib/engine";
 import { autoCloseAt } from "@/lib/offdays";
@@ -44,7 +44,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
 
   return (
     <div className="page">
-      <Link href="/queue" className="crumb">‹ Review Queue</Link>
+      {can.queue(u) ? <Link href="/queue" className="crumb">‹ Review Queue</Link> : <Link href="/tasks" className="crumb">‹ My Tasks</Link>}
       <div className="phead">
         <div>
           <h1>{r.task}</h1>

@@ -9,6 +9,6 @@ export const maxDuration = 60;
 
 export default async function MapPage() {
   const u = await boot();
-  if (!can.dashboard(u)) redirect("/tasks");
+  if (!can.map(u)) redirect("/");
   return <PropertyMap data={await mapData()} admin={can.admin(u)} />;
 }

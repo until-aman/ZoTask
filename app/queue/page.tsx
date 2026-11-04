@@ -15,7 +15,7 @@ const FIX_SLA_H = 24, ANSWER_SLA_H = 48;
 
 export default async function Queue({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const u = await boot();
-  if (!can.queue(u)) redirect("/tasks");
+  if (!can.queue(u)) redirect("/");
   const sp = await searchParams;
   const props = await scopeProps(u);
   const now = Date.now();
