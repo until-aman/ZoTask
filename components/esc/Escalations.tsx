@@ -399,7 +399,7 @@ function PhotoAdd({ photos, setPhotos }: { photos: string[]; setPhotos: (p: stri
 
 function RaiseForm({ d, close, onDone }: { d: EscData; close: () => void; onDone: (msg: string, id?: number) => void }) {
   const t = d.fromTask;
-  const guessDept = (c?: string) => (!c ? "R&M" : /house|hk/i.test(c) ? "Housekeeping" : /sales/i.test(c) ? "Sales" : /facil|oper/i.test(c) ? "R&M" : "Other");
+  const guessDept = (c?: string) => (!c ? "R&M" : /house|hk|facil|clean/i.test(c) ? "HK & Facilities" : /stock|store|inventor|warehouse/i.test(c) ? "Warehouse" : /procure|sourc|vendor/i.test(c) ? "Sourcing" : /r&m|repair|mainten/i.test(c) ? "R&M" : "Central Support");
   const [department, setDepartment] = useState(guessDept(t?.category));
   const [propertyIds, setPropertyIds] = useState<number[]>(t ? [t.property_id] : []);
   const [title, setTitle] = useState(t ? `${t.task} - ${t.property}` : "");

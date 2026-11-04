@@ -6,7 +6,7 @@ import { geo } from "./queries";
 import { logEvent } from "./engine";
 import { notify } from "./notify";
 
-export const DEPARTMENTS = ["R&M", "Housekeeping", "Staffing & HR", "Procurement", "Owner relations", "Sales", "IT & Tech", "Other"];
+export const DEPARTMENTS = ["R&M", "HK & Facilities", "Warehouse", "Sourcing", "Central Support"];
 export const ESC_STATUS: Record<string, string> = { open: "Yet to start", wip: "In progress", done: "Closed", dropped: "Dropped" };
 export const ESC_PILL: Record<string, string> = { open: "a", wip: "b", done: "g", dropped: "" };
 export const PRIORITY: Record<string, string> = { high: "High", medium: "Medium", low: "Low" };
@@ -14,9 +14,11 @@ export const PRIORITY: Record<string, string> = { high: "High", medium: "Medium"
 export const PRIORITY_DAYS: Record<string, number> = { high: 1, medium: 3, low: 7 };
 /** Usual contact per department, offered when raising. Any name and email can be typed instead. */
 export const TEAMS: Record<string, [string, string]> = {
-  "R&M": ["R&M team", "rm@zolostays.com"], Housekeeping: ["Housekeeping lead", "hk.ops@zolostays.com"],
-  "Staffing & HR": ["HR team", "hr@zolostays.com"], Procurement: ["Procurement team", "procurement@zolostays.com"],
-  "Owner relations": ["Owner relations", "owners@zolostays.com"], Sales: ["Sales head", "sales@zolostays.com"], "IT & Tech": ["Tech support", "tech@zolostays.com"],
+  "R&M": ["Akhilesh K and Taya", "akhilesh.k@zolostays.com"],
+  "HK & Facilities": ["Ankush", "ankush.k@zolostays.com"],
+  Warehouse: ["Ashwanath", "aswanath.r@zolostays.com"],
+  Sourcing: ["Pradeep Skarya", "pradeep.s@zolostays.com"],
+  "Central Support": ["Akhileshwar Singh", "akhileshwar.s@zolostays.com"],
 };
 export const isOpen = (s: string) => s === "open" || s === "wip";
 export const canRaise = (u: User) => ["admin", "reviewer", "auditor", "cbm"].includes(u.access_role);
@@ -153,20 +155,20 @@ export async function seedEscalations(now = Date.now()) {
   const pick = <T,>(a: T[]) => a[Math.floor(R() * a.length)];
   const ITEMS: [string, string, string, string][] = [
     ["R&M", "Long-pending R&M tickets", "Open R&M tickets older than 2 weeks across the cluster. Residents are following up daily.", "high"],
-    ["Housekeeping", "HK staff without uniform", "2 HK staff have been without uniform for almost a month due to shortage of uniforms.", "medium"],
-    ["Staffing & HR", "Shortage of 1 HK staff", "As per the CBM workflow 5 HK staff should be on site but only 4 are there.", "high"],
-    ["Procurement", "Large dustbins needed", "Garbage is stored in front of the property without a dustbin because the vendor collects it there.", "medium"],
-    ["Owner relations", "Cracked tiles in model room", "CBM asked the owner to fix it. Owner asked for 15 days.", "low"],
+    ["HK & Facilities", "HK staff without uniform", "2 HK staff have been without uniform for almost a month due to shortage of uniforms.", "medium"],
+    ["Central Support", "Shortage of 1 HK staff", "As per the CBM workflow 5 HK staff should be on site but only 4 are there.", "high"],
+    ["Warehouse", "Large dustbins needed", "Garbage is stored in front of the property without a dustbin because the vendor collects it there.", "medium"],
+    ["R&M", "Cracked tiles in model room", "CBM asked the owner to fix it. Owner asked for 15 days.", "low"],
     ["R&M", "Washing machine repair", "The washing machine is leaking water and not in working condition.", "high"],
     ["R&M", "Kitchen walls need painting", "The kitchen walls are in a very bad condition and need to be painted.", "low"],
-    ["Procurement", "Microwave fully rusted", "Microwave in the pantry is rusted and unsafe to use.", "medium"],
-    ["Housekeeping", "Model room deep cleaning", "The bathroom commode and tiles need deep cleaning before visits.", "medium"],
-    ["Staffing & HR", "HK staff on leave, no cover", "No HK at the property since the only HK went on leave.", "high"],
-    ["Sales", "Review rating dropped", "Google rating went from 4.3 to 4.0 in two weeks. Need a plan for resident reviews.", "low"],
-    ["IT & Tech", "Biometric attendance not syncing", "Attendance device has not synced for 3 days, attendance can't be verified.", "medium"],
+    ["Sourcing", "Microwave fully rusted", "Microwave in the pantry is rusted and unsafe to use.", "medium"],
+    ["HK & Facilities", "Model room deep cleaning", "The bathroom commode and tiles need deep cleaning before visits.", "medium"],
+    ["Central Support", "HK staff on leave, no cover", "No HK at the property since the only HK went on leave.", "high"],
+    ["Central Support", "Review rating dropped", "Google rating went from 4.3 to 4.0 in two weeks. Need a plan for resident reviews.", "low"],
+    ["Central Support", "Biometric attendance not syncing", "Attendance device has not synced for 3 days, attendance can't be verified.", "medium"],
     ["R&M", "Water leakage on 3rd floor", "Seepage from the terrace into two rooms on the 3rd floor after rain.", "high"],
-    ["Housekeeping", "Garbage not cleared on time", "Garbage check failed 4 times this week. Vendor timing does not match the shift.", "medium"],
-    ["Procurement", "Room tagging pending", "Room tags missing for new rooms, residents can't find rooms.", "low"],
+    ["HK & Facilities", "Garbage not cleared on time", "Garbage check failed 4 times this week. Vendor timing does not match the shift.", "medium"],
+    ["Warehouse", "Room tagging pending", "Room tags missing for new rooms, residents can't find rooms.", "low"],
   ];
   const instFor = async (pid: number, day: string) => (await one<{ id: number }>("SELECT id FROM instances WHERE property_id=? AND task_date=? ORDER BY random() LIMIT 1", pid, day))?.id ?? null;
   await tx(async () => {
@@ -176,7 +178,7 @@ export async function seedEscalations(now = Date.now()) {
       const p = pick(props), multi = R() < 0.2 ? [p.id, pick(props).id] : [p.id];
       const by = pick(raisers);
       const cbm = users.find((x) => x.id === p.cbm_id);
-      const [owner, email] = dept === "Other" || R() < 0.15 ? [cbm?.name ?? "CBM", cbm?.email ?? ""] : TEAMS[dept];
+      const [owner, email] = R() < 0.15 ? [cbm?.name ?? "CBM", cbm?.email ?? ""] : TEAMS[dept];
       const due = addDays(isoDate(created), PRIORITY_DAYS[prio] + Math.floor(R() * 3));
       const age = (now - created) / DAY;
       const roll = R();
