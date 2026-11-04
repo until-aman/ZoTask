@@ -8,8 +8,16 @@ CREATE TABLE IF NOT EXISTS properties (
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, email TEXT,
   access_role TEXT NOT NULL CHECK (access_role IN ('admin','reviewer','auditor','cbm','ground')),
-  op_role TEXT, archived INTEGER NOT NULL DEFAULT 0  -- archived people keep their history but can't sign in or be picked
+  op_role TEXT, archived INTEGER NOT NULL DEFAULT 0, -- archived people keep their history but can't sign in or be picked
+  week_off TEXT NOT NULL DEFAULT '[]',           -- the person's own weekly days off, 0 = Sunday … 6 = Saturday
+  backup_id INTEGER                              -- who covers their tasks when they're off
 );
+-- A person's leave: whole days, from and to inclusive (IST dates).
+CREATE TABLE IF NOT EXISTS leaves (
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), from_date TEXT NOT NULL, to_date TEXT NOT NULL,
+  note TEXT, by_id INTEGER REFERENCES users(id), at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS leaves_user ON leaves (user_id, to_date);
 CREATE TABLE IF NOT EXISTS user_properties (user_id INTEGER NOT NULL, property_id INTEGER NOT NULL, PRIMARY KEY (user_id, property_id));
 
 CREATE TABLE IF NOT EXISTS templates (
@@ -43,6 +51,7 @@ CREATE TABLE IF NOT EXISTS template_items (
   photo_allowed INTEGER NOT NULL DEFAULT 1, note_allowed INTEGER NOT NULL DEFAULT 1,  -- allowed = shown; required = compulsory
   count_of TEXT,                                  -- kind=count: HK or SHK, checked against the property's ideal count
   options TEXT,                                   -- kind=choice: JSON list of answers to pick from, e.g. ["Yes","No","N/A"]
+  option_rules TEXT,                              -- kind=choice: what each option makes compulsory, e.g. {"Yes":{"photo":true},"No":{"note":true}}
   guide TEXT                                      -- for the reviewer: what to check and how
 );
 CREATE TABLE IF NOT EXISTS template_properties (template_id INTEGER NOT NULL, property_id INTEGER NOT NULL, PRIMARY KEY (template_id, property_id));

@@ -6,7 +6,7 @@ import { requireUser, can, inScope, taskInScope, requireTasks } from "@/lib/auth
 import { all, one, run, tx } from "@/lib/db";
 import * as E from "@/lib/engine";
 import { km } from "@/lib/geo";
-import { cleanOptions } from "@/lib/answers";
+import { answerIssue, cleanOptionRules, cleanOptions } from "@/lib/answers";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function guard(fn: () => Promise<string | void>): Promise<Result> {
@@ -40,7 +40,17 @@ export async function submitTask(instanceId: number, answers: E.AnswerInput[], w
       const d = Math.round(km(site as { lat: number; lng: number }, where) * 1000);
       loc = { ok: d <= site.geofence_m, distance: d, source: "gps" };
     }
-    await E.submit(instanceId, u.id, answers, loc, Date.now());
+    // With Start/Stop on, the task must have been started first (a resubmission doesn't need a new start).
+    if (i.status !== "changes" && (await one<{ s: number }>("SELECT start_stop s FROM templates WHERE id=?", i.template_id))?.s
+      && !(await one("SELECT 1 FROM events WHERE instance_id=? AND type='started'", instanceId))) throw new Error("Tap Start task before filling in and submitting this task.");
+    // Every item complete: compulsory photos and notes, an answer to each question, no negative numbers.
+    const items = await E.itemsFor(i.template_id);
+    const flagged = new Set(i.status === "changes" ? (await all<{ item_id: number }>(
+      "SELECT f.item_id FROM review_flags f WHERE f.review_id=(SELECT id FROM reviews WHERE instance_id=? ORDER BY decided_at DESC LIMIT 1)", instanceId)).map((f) => f.item_id) : []);
+    const byItem = new Map(answers.map((a) => [a.itemId, a]));
+    const bad = items.map((it, ix) => [ix + 1, it, answerIssue(it, byItem.get(it.id), flagged.has(it.id))] as const).filter(([, , w]) => w);
+    if (bad.length) throw new Error(`${bad.length === 1 ? "1 item isn't" : `${bad.length} items aren't`} complete. ${bad.slice(0, 3).map(([n, it, w]) => `Item ${n} (${it.label}): ${w}.`).join(" ")}`);
+    await E.submit(instanceId, u.id, answers.map((a) => ({ ...a, value: a.value?.trim() ?? a.value, note: a.note?.trim() ?? a.note })), loc, Date.now());
     return "Submitted";
   });
 }
@@ -60,6 +70,8 @@ export async function reviewTask(instanceId: number, decision: "pass" | "changes
   const u = await requireUser();
   return guard(async () => {
     if (!["reviewer", "admin"].includes(u.access_role)) throw new Error("Only reviewers can review tasks.");
+    if (decision === "changes" && !flags.length) throw new Error("Mark at least one item as Needs change.");
+    if (decision === "changes" && flags.some((f) => !f.comment?.trim())) throw new Error("Add a comment to every flagged item so the CBM knows what to fix.");
     await E.reviewDecision(instanceId, u.id, decision, flags, comment, Date.now(), openedAt);
     return decision === "pass" ? "Passed" : "Sent back for changes";
   });
@@ -69,6 +81,7 @@ export async function auditTask(instanceId: number, decision: "pass" | "fail", f
   const u = await requireUser();
   return guard(async () => {
     if (!["auditor", "admin"].includes(u.access_role)) throw new Error("Only auditors can audit tasks.");
+    if (decision === "fail" && flags.some((f) => !f.comment?.trim())) throw new Error("Add a comment to every flagged item so the CBM knows what to fix.");
     await E.auditDecision(instanceId, u.id, decision, flags, comment, Date.now());
     return decision === "pass" ? "Audit passed" : "Audit failed, flags sent to the CBM";
   });
@@ -194,7 +207,7 @@ export async function triggerTask(templateId: number, propertyId: number): Promi
   });
 }
 
-export type TemplateItemInput = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; guide?: string | null; options?: string[] | null };
+export type TemplateItemInput = { label: string; kind: string; photo_allowed: boolean; photo_required: boolean; note_allowed: boolean; note_required: boolean; count_of: string | null; guide?: string | null; options?: string[] | null; option_rules?: import("@/lib/answers").OptRules | null };
 export type TemplateInput = Omit<E.Template, "id"> & { items: TemplateItemInput[]; properties: number[] };
 /** Saves a task's setup. A new task's id comes back so the editor can confirm it and link to it. */
 export async function saveTemplate(id: number | null, t: TemplateInput): Promise<Result & { id?: number }> {
@@ -225,9 +238,10 @@ export async function saveTemplate(id: number | null, t: TemplateInput): Promise
       const existing = await all<{ id: number }>("SELECT id FROM template_items WHERE template_id=? ORDER BY pos", newId);
       for (const [pos, it] of t.items.entries()) {
         const rules = [it.label, it.kind, it.photo_required, it.note_required, it.photo_allowed || it.photo_required, it.note_allowed || it.note_required, it.kind === "count" ? it.count_of ?? "HK" : null, it.guide?.trim() || null,
-          it.kind === "choice" ? JSON.stringify(cleanOptions(it.options)) : null];
-        if (existing[pos]) await run("UPDATE template_items SET label=?, kind=?, photo_required=?, note_required=?, photo_allowed=?, note_allowed=?, count_of=?, guide=?, options=?, pos=? WHERE id=?", ...rules, pos, existing[pos].id);
-        else await run("INSERT INTO template_items (label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, guide, options, template_id, pos) VALUES (?,?,?,?,?,?,?,?,?,?,?)", ...rules, newId, pos);
+          it.kind === "choice" ? JSON.stringify(cleanOptions(it.options)) : null,
+          it.kind === "choice" && Object.keys(cleanOptionRules(it.option_rules, cleanOptions(it.options))).length ? JSON.stringify(cleanOptionRules(it.option_rules, cleanOptions(it.options))) : null];
+        if (existing[pos]) await run("UPDATE template_items SET label=?, kind=?, photo_required=?, note_required=?, photo_allowed=?, note_allowed=?, count_of=?, guide=?, options=?, option_rules=?, pos=? WHERE id=?", ...rules, pos, existing[pos].id);
+        else await run("INSERT INTO template_items (label, kind, photo_required, note_required, photo_allowed, note_allowed, count_of, guide, options, option_rules, template_id, pos) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", ...rules, newId, pos);
       }
       for (const ex of existing.slice(t.items.length)) {
         const used = await one("SELECT 1 FROM answers WHERE item_id=? LIMIT 1", ex.id);
@@ -299,4 +313,50 @@ export async function updateEscalation(id: number, p: import("@/lib/escalations"
   const u = await requireUser();
   const X = await import("@/lib/escalations");
   return guard(async () => `ESC-${id}: ${await X.update(u, id, p, Date.now())}`);
+}
+
+// Team leave: a person's own weekly days off, leave and backup. Changes move affected tasks straight away.
+async function afterAway() {
+  const n = await E.coverAway(Date.now(), true);
+  return n ? ` ${n} task${n > 1 ? "s" : ""} moved to cover or excused.` : "";
+}
+export async function saveWeekOff(userId: number, week: number[], backupId: number | null): Promise<Result> {
+  const u = await requireUser();
+  return guard(async () => {
+    const T = await import("@/lib/team");
+    const p = await T.personFor(u, userId);
+    const days = [...new Set(week.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+    if (days.length > 3) throw new Error("Pick at most 3 weekly days off.");
+    if (backupId !== null && !(await T.backupOptions(u, p)).includes(backupId)) throw new Error("Pick a backup with the same role.");
+    await run("UPDATE users SET week_off=?, backup_id=? WHERE id=?", JSON.stringify(days), backupId, userId);
+    return `Saved ${p.name}'s week off and backup.${await afterAway()}`;
+  });
+}
+export async function addLeave(userId: number, from: string, to: string, note: string): Promise<Result> {
+  const u = await requireUser();
+  return guard(async () => {
+    const T = await import("@/lib/team");
+    const { addDays, isoDate } = await import("@/lib/time");
+    const p = await T.personFor(u, userId);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to || from)) throw new Error("Pick the leave dates.");
+    const end = to || from;
+    if (end < from) throw new Error("The last day must be on or after the first day.");
+    if (end < addDays(isoDate(Date.now()), -7)) throw new Error("That leave is more than a week ago.");
+    if (end > addDays(from, 92)) throw new Error("Leave can be at most 3 months at a time.");
+    if (await one("SELECT 1 FROM leaves WHERE user_id=? AND from_date<=? AND to_date>=?", userId, end, from)) throw new Error(`${p.name} already has leave on some of those days.`);
+    await run("INSERT INTO leaves (user_id, from_date, to_date, note, by_id, at) VALUES (?,?,?,?,?,?)", userId, from, end, note.trim().slice(0, 80) || null, u.id, Date.now());
+    return `Added leave for ${p.name}.${await afterAway()}`;
+  });
+}
+export async function removeLeave(leaveId: number): Promise<Result> {
+  const u = await requireUser();
+  return guard(async () => {
+    const T = await import("@/lib/team");
+    const l = await one<{ user_id: number }>("SELECT user_id FROM leaves WHERE id=?", leaveId);
+    if (!l) throw new Error("That leave was already removed.");
+    const p = await T.personFor(u, l.user_id);
+    await run("DELETE FROM leaves WHERE id=?", leaveId);
+    await E.loadAway(true);
+    return `Removed the leave for ${p.name}. Tasks already moved stay with whoever has them.`;
+  });
 }

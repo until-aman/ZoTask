@@ -38,6 +38,15 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
   const [busy, setBusy] = useState(false);
   const flagList = Object.entries(flags).filter(([, v]) => v).map(([k, v]) => ({ itemId: Number(k), reason: v!.reason, comment: v!.comment }));
   const actOn = mode === "review" || mode === "audit";
+  // Every item gets a verdict, OK or Needs change, before the task-level decision. Items missing evidence start flagged.
+  const [okd, setOkd] = useState<Set<number>>(new Set());
+  const decided = (id: number) => okd.has(id) || !!flags[id];
+  const left = items.filter((it) => !decided(it.id)).length;
+  const noComment = flagList.filter((f) => !f.comment.trim()).length;
+  const markOk = (id: number) => { setFlags({ ...flags, [id]: undefined }); setOkd(new Set(okd).add(id)); };
+  const markFlag = (id: number) => { const o = new Set(okd); o.delete(id); setOkd(o); setFlags({ ...flags, [id]: flags[id] ?? { reason: REASONS[1], comment: "" } }); };
+  const ready = actOn && left === 0 && noComment === 0;
+  const blocker = left ? `Check every item first: ${left} of ${items.length} still need OK or Needs change.` : noComment ? `Add a comment to ${noComment === 1 ? "the flagged item" : `all ${noComment} flagged items`} so the CBM knows what to fix.` : "";
 
   async function go(p: Promise<{ ok: boolean; error?: string; msg?: string }>) {
     setBusy(true); setErr("");
@@ -63,7 +72,7 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
       <div className="row2">
         <h2 style={{ margin: 0 }}>{mode === "audit" ? "Audit" : "Review"} sheet</h2>
         <span className="spacer" />
-        {actOn && <span className="small muted">Mark each item OK or flag it with a reason.</span>}
+        {actOn && <span className="small muted"><b>{items.length - left} of {items.length}</b> items checked</span>}
       </div>
       <div className="items">
       {items.map((it) => {
@@ -71,15 +80,15 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
         const pf = prevFlags.find((x) => x.item_id === it.id);
         const af = auditFlags.find((x) => x.item_id === it.id);
         return (
-          <div key={it.id} className={`item${f || af ? " flagged" : ""}`}>
+          <div key={it.id} className={`item${f || af ? " flagged" : ""}${actOn && okd.has(it.id) ? " rv-ok" : ""}`}>
             <div className="row2">
               <b>{it.label}</b>
               {missing.includes(it.id) && (f ? <span className="pill r">Missing evidence</span> : actOn ? <span className="pill a">Missing evidence · accepted</span> : <span className="pill r">Missing evidence</span>)}
               <span className="spacer" />
               {actOn && (
-                <div className="seg">
-                  <button type="button" aria-pressed={!f} onClick={() => setFlags({ ...flags, [it.id]: undefined })} title={missing.includes(it.id) ? "Accept this item even though its evidence is missing" : undefined}>OK</button>
-                  <button type="button" aria-pressed={!!f} onClick={() => setFlags({ ...flags, [it.id]: f ?? { reason: REASONS[1], comment: "" } })}>Flag</button>
+                <div className="seg rv-seg" role="group" aria-label={`Verdict for ${it.label}`}>
+                  <button type="button" data-k="ok" aria-pressed={okd.has(it.id)} onClick={() => markOk(it.id)} title={missing.includes(it.id) ? "Accept this item even though its evidence is missing" : undefined}>✓ OK</button>
+                  <button type="button" data-k="flag" aria-pressed={!!f} onClick={() => markFlag(it.id)}>Needs change</button>
                 </div>
               )}
             </div>
@@ -96,7 +105,8 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
                 <select value={f.reason} onChange={(e) => setFlags({ ...flags, [it.id]: { ...f, reason: e.target.value } })} aria-label="Reason">
                   {REASONS.map((r) => <option key={r}>{r}</option>)}
                 </select>
-                <input type="text" placeholder="What needs fixing?" value={f.comment} onChange={(e) => setFlags({ ...flags, [it.id]: { ...f, comment: e.target.value } })} style={{ flex: 1 }} />
+                <input type="text" placeholder="What needs fixing? (compulsory)" value={f.comment} onChange={(e) => setFlags({ ...flags, [it.id]: { ...f, comment: e.target.value } })} style={{ flex: 1 }}
+                  className={f.comment.trim() ? "" : "rv-need"} aria-label={`What needs fixing in ${it.label}`} />
               </div>
             )}
           </div>
@@ -105,15 +115,20 @@ export default function ReviewForm({ instanceId, mode, items, latest, previous, 
       </div>
       {actOn && <input type="text" placeholder="Overall comment (optional)" value={comment} onChange={(e) => setComment(e.target.value)} />}
       {err && <div className="err">{err}</div>}
+      {actOn && <div className={`rv-decide${ready ? " ready" : ""}`}>
+        <div className="small">{ready ? (flagList.length ? <>All items checked. <b>{flagList.length}</b> need{flagList.length === 1 ? "s" : ""} a change, so the task goes back to the CBM.</> : <>All items checked and OK.</>) : <span className="t-r">{blocker}</span>}</div>
+        <div className="row2">
+          {mode === "review" && <>
+            <button className="btn primary" disabled={busy || !ready || flagList.length > 0} title={flagList.length ? "Some items need a change" : blocker} onClick={() => go(reviewTask(instanceId, "pass", [], comment, opened))}>All good: pass task</button>
+            <button className="btn danger" disabled={busy || !ready || !flagList.length} title={!flagList.length ? "No item is marked Needs change" : blocker} onClick={() => go(reviewTask(instanceId, "changes", flagList, comment, opened))}>Changes required{flagList.length ? ` (${flagList.length})` : ""}</button>
+          </>}
+          {mode === "audit" && <>
+            <button className="btn primary" disabled={busy || !ready || flagList.length > 0} onClick={() => go(auditTask(instanceId, "pass", [], comment))}>All good: audit pass</button>
+            <button className="btn danger" disabled={busy || !ready || !flagList.length} onClick={() => go(auditTask(instanceId, "fail", flagList, comment))}>Audit fail{flagList.length ? ` (${flagList.length})` : ""}</button>
+          </>}
+        </div>
+      </div>}
       <div className="row2">
-        {mode === "review" && <>
-          <button className="btn primary" disabled={busy || flagList.length > 0} title={flagList.length ? "Clear the flags to pass" : ""} onClick={() => go(reviewTask(instanceId, "pass", [], comment, opened))}>Pass</button>
-          <button className="btn danger" disabled={busy || !flagList.length} onClick={() => go(reviewTask(instanceId, "changes", flagList, comment, opened))}>Request changes ({flagList.length})</button>
-        </>}
-        {mode === "audit" && <>
-          <button className="btn primary" disabled={busy || flagList.length > 0} onClick={() => go(auditTask(instanceId, "pass", [], comment))}>Audit pass</button>
-          <button className="btn danger" disabled={busy || !flagList.length} onClick={() => go(auditTask(instanceId, "fail", flagList, comment))}>Audit fail ({flagList.length})</button>
-        </>}
         {mode === "closeflags" && <>
           <button className="btn primary" disabled={busy} onClick={() => go(closeFlags(instanceId, true))}>Accept answers and close</button>
           <button className="btn danger" disabled={busy} onClick={() => go(closeFlags(instanceId, false))}>Send back to CBM</button>
