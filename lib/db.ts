@@ -18,7 +18,7 @@ export const REMOTE = process.env.TURSO_DATABASE_URL || process.env.DATABASE_URL
 const TOKEN = process.env.TURSO_AUTH_TOKEN || env.find(([k]) => k.endsWith("_AUTH_TOKEN") && !k.startsWith("BLOB"))?.[1];
 
 type Conn = Pick<Client, "execute">;
-type G = { __zotaskDb?: Promise<Client> };
+type G = { __tasktrailDb?: Promise<Client> };
 const g = globalThis as G;
 // Where queries go: the open transaction inside tx(), or the in-memory database while seeding. Otherwise the main client.
 const scope = new AsyncLocalStorage<Conn>();
@@ -27,7 +27,7 @@ const schema = () => fs.readFileSync(path.join(process.cwd(), "lib", "schema.sql
 function open(): Client {
   if (REMOTE) return createClient({ url: REMOTE, authToken: TOKEN });
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  return createClient({ url: `file:${path.join(DATA_DIR, "zotask.db")}` });
+  return createClient({ url: `file:${path.join(DATA_DIR, "tasktrail.db")}` });
 }
 
 async function init(): Promise<Client> {
@@ -67,6 +67,16 @@ async function init(): Promise<Client> {
       if (stmts.length) await c.batch(["PRAGMA defer_foreign_keys = ON", ...stmts], "write");
     }
   } catch (e) { console.error("Task list update failed; will retry on the next start", e); }
+  // The app was renamed from ZoTask to TaskTrail: task guides and names saved under the old name follow, once.
+  try {
+    if (!(await c.execute("SELECT v FROM meta WHERE k='renamed_tasktrail'")).rows.length) await c.batch([
+      "UPDATE template_items SET guide=replace(guide,'ZoTask','TaskTrail') WHERE guide LIKE '%ZoTask%'",
+      "UPDATE template_items SET label=replace(label,'ZoTask','TaskTrail') WHERE label LIKE '%ZoTask%'",
+      "UPDATE templates SET name=replace(name,'ZoTask','TaskTrail') WHERE name LIKE '%ZoTask%'",
+      "UPDATE templates SET description=replace(description,'ZoTask','TaskTrail') WHERE description LIKE '%ZoTask%'",
+      { sql: "INSERT OR REPLACE INTO meta (k, v) VALUES ('renamed_tasktrail', ?)", args: [String(Date.now())] },
+    ], "write");
+  } catch (e) { console.error("Renaming saved text failed; will retry on the next start", e); }
   // The live database only: the sample data's reviewers, properties and escalations give way to the real ones.
   if (REMOTE) {
     try { await c.batch([...await scope.run(c, removeSampleReviewers), ...await scope.run(c, removeSampleEscalations), ...await scope.run(c, removeOldEscalations)], "write"); }
@@ -119,7 +129,7 @@ async function seedInto(target: Client) {
 }
 
 export function db(): Promise<Client> {
-  return (g.__zotaskDb ??= init().catch((e) => { g.__zotaskDb = undefined; throw e; }));
+  return (g.__tasktrailDb ??= init().catch((e) => { g.__tasktrailDb = undefined; throw e; }));
 }
 
 const norm = (p: unknown[]) => p.map((v) => (v === undefined ? null : typeof v === "boolean" ? (v ? 1 : 0) : v)) as InValue[];

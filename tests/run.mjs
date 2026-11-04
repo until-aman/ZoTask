@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const only = process.argv.slice(2);
 const files = fs.readdirSync(path.join(root, "tests")).filter((f) => f.endsWith(".test.ts") && (!only.length || only.some((o) => f.includes(o))));
-const out = fs.mkdtempSync(path.join(os.tmpdir(), "zotask-test-"));
+const out = fs.mkdtempSync(path.join(os.tmpdir(), "tasktrail-test-"));
 const alias = {
   name: "alias",
   setup(b) {

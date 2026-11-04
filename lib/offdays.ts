@@ -114,12 +114,12 @@ export function personOffWhy(p: PersonOff | undefined, date: string): string | n
   return p.week.includes(weekday(date)) ? "Weekly off" : null;
 }
 export const personOff = (p: PersonOff | undefined, date: string) => personOffWhy(p, date) !== null;
-type GA = { __zotaskAway?: { at: number; m: Map<number, PersonOff> } };
+type GA = { __tasktrailAway?: { at: number; m: Map<number, PersonOff> } };
 const ga = globalThis as GA;
 /** Everyone with their own days off or a backup, as last loaded. */
-export const awayMap = (): Map<number, PersonOff> => ga.__zotaskAway?.m ?? new Map();
-export function setAwayCache(m: Map<number, PersonOff>) { ga.__zotaskAway = { at: Date.now(), m }; }
-export const awayCacheFresh = () => !!ga.__zotaskAway && Date.now() - ga.__zotaskAway.at < 30_000;
+export const awayMap = (): Map<number, PersonOff> => ga.__tasktrailAway?.m ?? new Map();
+export function setAwayCache(m: Map<number, PersonOff>) { ga.__tasktrailAway = { at: Date.now(), m }; }
+export const awayCacheFresh = () => !!ga.__tasktrailAway && Date.now() - ga.__tasktrailAway.at < 30_000;
 /** The settings for one person's clock: the team's days off plus their own. */
 export function forPerson(c: OffCfg, userId: number | null | undefined): OffCfg {
   const p = userId ? awayMap().get(userId) : undefined;
@@ -138,9 +138,9 @@ export function coverFor(m: Map<number, PersonOff>, userId: number, date: string
 }
 
 // The settings are read often (every page and every time-limit check), so they're cached for a short while.
-type G = { __zotaskOff?: { at: number; c: OffCfg } };
+type G = { __tasktrailOff?: { at: number; c: OffCfg } };
 const g = globalThis as G;
 /** The settings as last loaded (defaults before the first load). */
-export const offCfg = (): OffCfg => g.__zotaskOff?.c ?? DEFAULT_OFF;
-export function setOffCache(c: OffCfg) { g.__zotaskOff = { at: Date.now(), c }; }
-export const offCacheFresh = () => !!g.__zotaskOff && Date.now() - g.__zotaskOff.at < 30_000;
+export const offCfg = (): OffCfg => g.__tasktrailOff?.c ?? DEFAULT_OFF;
+export function setOffCache(c: OffCfg) { g.__tasktrailOff = { at: Date.now(), c }; }
+export const offCacheFresh = () => !!g.__tasktrailOff && Date.now() - g.__tasktrailOff.at < 30_000;

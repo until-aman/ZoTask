@@ -1,6 +1,6 @@
-# ZoTask (local clone)
+# TaskTrail (local clone)
 
-A working clone of ZoTask, Zolo's recurring-operations task platform: scheduled and event-triggered tasks, ground-team checklists with photos and location checks, central review, audit sampling, task history, and an operations command-center dashboard. It ships with sample Zolo data (4 cities, 7 clusters, 14 properties, about 60 people) and 14 days of simulated history, so every screen has something to show.
+A working clone of TaskTrail, Zolo's recurring-operations task platform: scheduled and event-triggered tasks, ground-team checklists with photos and location checks, central review, audit sampling, task history, and an operations command-center dashboard. It ships with sample Zolo data (4 cities, 7 clusters, 14 properties, about 60 people) and 14 days of simulated history, so every screen has something to show.
 
 ## Run it
 
@@ -11,11 +11,11 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and pick anyone on the sign-in page to see ZoTask from their side. The database is created and seeded on first load in `data/zotask.db`. Run `npm run reset` to wipe it and start fresh from today's date.
+Open http://localhost:3000 and pick anyone on the sign-in page to see TaskTrail from their side. The database is created and seeded on first load in `data/tasktrail.db`. Run `npm run reset` to wipe it and start fresh from today's date.
 
 For a production build: `npm run build && npm start`.
 
-Run the tests with `npm test`. Each test file gets a fresh seeded database and runs with the clock on UTC (like Vercel), calling the real server actions as different people. All dates and times in ZoTask are India Standard Time, whatever zone the server runs in (`lib/time.ts`).
+Run the tests with `npm test`. Each test file gets a fresh seeded database and runs with the clock on UTC (like Vercel), calling the real server actions as different people. All dates and times in TaskTrail are India Standard Time, whatever zone the server runs in (`lib/time.ts`).
 
 ## Put it online (Vercel + Turso, free plans)
 
@@ -73,4 +73,4 @@ Not included yet: real notifications (reminders are logged in history only), SSO
 
 ## Browser prototype
 
-`node web/build.mjs` builds `web/dist/zotask.html`, a single file that runs the same pages and engine in the browser on an in-memory SQLite database (sql.js). It's what the shareable prototype link is built from; nothing persists between reloads.
+`node web/build.mjs` builds `web/dist/tasktrail.html`, a single file that runs the same pages and engine in the browser on an in-memory SQLite database (sql.js). It's what the shareable prototype link is built from; nothing persists between reloads.

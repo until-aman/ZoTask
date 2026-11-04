@@ -1,4 +1,4 @@
-# ZoTask design theme
+# TaskTrail design theme
 
 One look for every screen. It is modelled on a clean finance dashboard: a white page, big bold section titles over a thin rule, plain metric blocks instead of boxed cards, one purple accent, soft status badges, and charts that compare the current period (purple) with the previous one (gray).
 

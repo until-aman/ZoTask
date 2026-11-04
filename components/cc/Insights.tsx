@@ -122,7 +122,7 @@ export function Reasons({ d }: { d: CC }) {
   const max = Math.max(1, ...d.reasons.map((r) => r.ids.length));
   const groups = [...new Set(d.reasons.map((r) => r.group))].map((g) => ({ g, ids: [...new Set(d.reasons.filter((r) => r.group === g).flatMap((r) => r.ids))] }));
   return (
-    <Sec title="Why tasks get sent back" tip={<InfoTip title="Why tasks get sent back" rows={[["Count", "Tasks sent back for that reason in the period. One task can have more than one reason"], ["% of reviewed", `Share of the ${d.reviewedTotal} tasks reviewed in the period`], ["Most affected", "Property with the most of these"]]} note="New: ZoTask doesn't collect reasons today. This prototype adds a reason picker to the review step." />}
+    <Sec title="Why tasks get sent back" tip={<InfoTip title="Why tasks get sent back" rows={[["Count", "Tasks sent back for that reason in the period. One task can have more than one reason"], ["% of reviewed", `Share of the ${d.reviewedTotal} tasks reviewed in the period`], ["Most affected", "Property with the most of these"]]} note="New: TaskTrail doesn't collect reasons today. This prototype adds a reason picker to the review step." />}
       right={<span className="small"><N ids={d.reasonsTotal} title="All tasks sent back" /> tasks <span className="muted">· {d.prevHasData ? `${d.reasonsPrevTotal} before` : "no earlier data"}</span></span>}>
       {!d.reasons.length ? <p className="muted">No tasks were sent back in this period.</p> : <>
         <div className="row2 small">{groups.map((g) => <span key={g.g} className="chipn"><N ids={g.ids} title={`${g.g} problems`} /> {g.g}</span>)}</div>

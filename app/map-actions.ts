@@ -40,7 +40,7 @@ async function locate(url: string): Promise<{ lat: number; lng: number } | null>
     // A cookie-consent stop keeps the real address in "continue".
     const cont = u.hostname.startsWith("consent.") && u.searchParams.get("continue");
     if (cont) { at = cont; continue; }
-    const res = await fetch(u, { redirect: "manual", signal: AbortSignal.timeout(8000), headers: { "User-Agent": "Mozilla/5.0 (ZoTask property map)", "Accept-Language": "en-IN,en" } }).catch(() => null);
+    const res = await fetch(u, { redirect: "manual", signal: AbortSignal.timeout(8000), headers: { "User-Agent": "Mozilla/5.0 (TaskTrail property map)", "Accept-Language": "en-IN,en" } }).catch(() => null);
     const next = res?.headers.get("location");
     res?.body?.cancel().catch(() => {});
     if (!next) return null;
@@ -86,7 +86,7 @@ export async function saveMapSites(rows: SiteInput[]): Promise<Result> {
       }
     });
     revalidatePath("/", "layout");
-    return { ok: true, saved: good.length, linked, msg: `Saved ${good.length} propert${good.length === 1 ? "y" : "ies"}${linked ? `, ${linked} matched to ZoTask` : ""}.` };
+    return { ok: true, saved: good.length, linked, msg: `Saved ${good.length} propert${good.length === 1 ? "y" : "ies"}${linked ? `, ${linked} matched to TaskTrail` : ""}.` };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }

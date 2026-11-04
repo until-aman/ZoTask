@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/storage";
 // Left menu: search, then screens and folding groups. On phones it becomes a scrolling row under the brand.
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -17,7 +18,7 @@ const ICONS: Record<string, React.ReactNode> = {
 };
 
 export type NavItem = { href: string; label: string; icon?: string; children?: { href: string; label: string }[] };
-const OPEN_KEY = "zt-nav-open";
+const OPEN_KEY = "tt-nav-open";
 const Chev = ({ open }: { open: boolean }) => <svg className="nchev" width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><path d={open ? "M5 12.5l5-5 5 5" : "M5 7.5l5 5 5-5"} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 
 /** Left menu: a search box, then screens and groups that fold open. On phones it becomes a scrolling row under the brand. */
@@ -62,7 +63,7 @@ export default function Nav({ links }: { links: NavItem[] }) {
         <input type="search" placeholder="Search menu…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search menu"
           onKeyDown={(e) => { if (e.key === "Enter" && first) { router.push(first); setQ(""); } if (e.key === "Escape") setQ(""); }} />
       </label>
-      <nav className="nav" aria-label="ZoTask">
+      <nav className="nav" aria-label="TaskTrail">
         {shown.map((l) => {
           const icon = ICONS[l.icon ?? l.href];
           if (!l.children) {

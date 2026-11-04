@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/storage";
 // The pieces every table shares, so all lists look and work the same:
 // a Columns picker, an Export menu (CSV or Excel, this page or all rows), initials avatars and a ⋯ menu per row.
 import { ReactNode, useEffect, useRef, useState } from "react";
@@ -26,7 +27,7 @@ const CHEV_I = "M6 8l4 4 4-4";
 
 /** Hidden columns for one table, remembered in this browser. Columns marked `hidden` start hidden. */
 export function useHiddenCols(table: string, startHidden: string[] = []): [Set<string>, (key: string) => void] {
-  const key = `zotask.cols.${table}`;
+  const key = `tasktrail.cols.${table}`;
   const [hidden, set] = useState<Set<string>>(() => new Set(startHidden));
   useEffect(() => { try { const v = localStorage.getItem(key); if (v) set(new Set(JSON.parse(v))); } catch { /* storage blocked */ } }, [key]);
   const toggle = (k: string) => set((h) => {
@@ -112,8 +113,8 @@ export function useClearOnRowMenu(clear: () => void) {
   ref.current = clear;
   useEffect(() => {
     const on = () => ref.current();
-    window.addEventListener("zt:rowmenu", on);
-    return () => window.removeEventListener("zt:rowmenu", on);
+    window.addEventListener("tt:rowmenu", on);
+    return () => window.removeEventListener("tt:rowmenu", on);
   }, []);
 }
 
@@ -137,7 +138,7 @@ export function RowMenu({ actions, label = "Row actions" }: { actions: RowAction
     if (open) return close();
     const r = e.currentTarget.getBoundingClientRect(), up = window.innerHeight - r.bottom < 40 * list.length + 40;
     setPos({ right: Math.max(8, window.innerWidth - r.right), ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
-    window.dispatchEvent(new Event("zt:rowmenu"));
+    window.dispatchEvent(new Event("tt:rowmenu"));
     setOpen(true);
   };
   if (!list.length) return null;

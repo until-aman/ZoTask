@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/storage";
 // "‹ Back" at the top of a detail page: goes back to exactly where the person came from (same tab, filters and page),
 // and names that page. Opened straight from a link, it goes to the usual list instead.
 import { useEffect, useState } from "react";
@@ -7,7 +8,7 @@ import Link from "next/link";
 
 const NAMES: [RegExp, string][] = [[/^\/queue/, "Review Queue"], [/^\/tasks\/?$/, "My Tasks"], [/^\/dashboard/, "Review Dashboard"], [/^\/compare/, "Compare"],
   [/^\/escalations/, "Escalations"], [/^\/admin\/?$/, "Admin"], [/^\/map/, "Map"], [/^\/review\//, "the review sheet"], [/^\/tasks\/\d/, "the task"]];
-const KEY = "zt-nav";
+const KEY = "tt-nav";
 
 /** Remembers the page before this one, for BackLink. Mounted once in the app frame. */
 export function NavMemory() {

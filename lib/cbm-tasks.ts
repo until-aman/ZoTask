@@ -1,4 +1,4 @@
-// The task list: the CBM tasks from "Zo-Tasks for CBM.xlsx" (3 Nov 2026). It replaced every earlier task.
+// The task list: the CBM tasks from the CBM task sheet (3 Nov 2026). It replaced every earlier task.
 // The list itself is in cbm-tasks.json; each item keeps the reviewer's "what to check / how" notes from the sheet.
 import type { InStatement } from "@libsql/client";
 import { all, run } from "./db";

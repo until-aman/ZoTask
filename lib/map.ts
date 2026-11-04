@@ -1,4 +1,4 @@
-// Map tab data: every Zolo property with a location, plus task health for the ones ZoTask runs.
+// Map tab data: every Zolo property with a location, plus task health for the ones TaskTrail runs.
 import { all } from "./db";
 
 export type Pin = {
@@ -6,7 +6,7 @@ export type Pin = {
   address: string; status: string; beds: number | null; propertyId: number | null; cluster: string; cbm: string;
   /** Men, women or co-living (from the sheet), and whether a full profile was uploaded. */
   gender: string; hasDetails: boolean;
-  /** Last 7 days, ZoTask properties only. */
+  /** Last 7 days, TaskTrail properties only. */
   health: { due: number; onTime: number | null; overdue: number } | null;
 };
 export type MapData = { pins: Pin[]; missing: { id: number; name: string; city: string }[]; uploaded: number; updatedAt: number | null };
@@ -37,7 +37,7 @@ export async function mapData(now = Date.now()): Promise<MapData> {
       gender: s.gender ?? "", hasDetails: !!s.has_details,
     };
   });
-  // ZoTask properties not in the sheet still show, from their own saved location.
+  // TaskTrail properties not in the sheet still show, from their own saved location.
   const linked = new Set(sites.map((s) => s.property_id));
   for (const p of props) {
     if (linked.has(p.id) || p.lat === null || p.lng === null) continue;

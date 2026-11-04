@@ -1,8 +1,9 @@
 "use client";
+import "@/lib/storage";
 // Hides the left menu to a thin icon rail. It also hides by itself after a minute without use, so screens get the full width.
 import { useEffect, useState } from "react";
 
-const KEY = "zt-side-mini", IDLE_MS = 60_000;
+const KEY = "tt-side-mini", IDLE_MS = 60_000;
 
 export default function SideToggle() {
   const [mini, setMini] = useState(false);

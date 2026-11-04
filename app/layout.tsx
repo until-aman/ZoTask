@@ -5,7 +5,7 @@ import { currentUser, can } from "@/lib/auth";
 import Shell from "@/components/Shell";
 import type { NavItem } from "@/components/Nav";
 
-export const metadata = { title: "ZoTask", description: "Recurring operations tasks for Zolo properties" };
+export const metadata = { title: "TaskTrail", description: "Recurring operations tasks for Zolo properties" };
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

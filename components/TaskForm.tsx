@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/storage";
 import { fmtTime } from "@/lib/time";
 import { answerIssue, choicesFor, needs, nonNegative } from "@/lib/answers";
 import { tryUpload } from "./upload";
@@ -44,7 +45,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
   const set = (id: number, patch: Partial<Ans>) => setAns((s) => ({ ...s, [id]: { ...s[id], ...patch } }));
 
   // Unsent answers are kept on this phone, so a refresh, a call or a dropped connection doesn't lose them.
-  const KEY = `zotask.draft.${instanceId}.${attempt}`;
+  const KEY = `tasktrail.draft.${instanceId}.${attempt}`;
   const [restored, setRestored] = useState(false);
   const loaded = useRef(false);
   useEffect(() => {

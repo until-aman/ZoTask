@@ -92,7 +92,7 @@ export default function CompareReport({ rep: r, close }: { rep: Rep; close: () =
       </div>
       <article className="rpt" onClick={(ev) => ev.stopPropagation()}>
         <header className="rpt-head">
-          <div className="rpt-brand"><span className="logo">Ω</span>ZoTask</div>
+          <div className="rpt-brand"><span className="logo">T</span>TaskTrail</div>
           <h1>{r.title}</h1>
           <div className="rpt-names">{r.names.map((n, i) => <span key={n}><i style={{ background: r.colors[i] }} />{n}</span>)}</div>
           <dl className="rpt-meta"><div><dt>Period</dt><dd>{r.period}</dd></div><div><dt>Generated</dt><dd>{r.generated}</dd></div><div><dt>Counting</dt><dd>Each task counted once</dd></div></dl>
@@ -149,7 +149,7 @@ export default function CompareReport({ rep: r, close }: { rep: Rep; close: () =
             {p.actions.length > 0 && <div className="rpt-act"><h3>Next steps</h3><ol>{p.actions.map((a) => <li key={a}>{a}</li>)}</ol></div>}
           </section>
         ))}
-        <footer className="rpt-foot">ZoTask · {r.title} · {r.period}</footer>
+        <footer className="rpt-foot">TaskTrail · {r.title} · {r.period}</footer>
       </article>
     </div>
   );
