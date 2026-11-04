@@ -108,6 +108,8 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
   const [step, setStep] = useState(0);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  // After the final save: a pop-up confirming the task was created or its changes saved.
+  const [done, setDone] = useState<{ created: boolean; id: number } | null>(null);
   const set = <K extends keyof T>(k: K, v: T[K]) => setT((x) => ({ ...x, [k]: v }));
   const setItem = (ix: number, patch: Partial<It>) => setItems((xs) => xs.map((x, i) => (i === ix ? { ...x, ...patch } : x)));
   const moveItem = (ix: number, d: number) => setItems((xs) => { const ys = [...xs]; const j = ix + d; if (j < 0 || j >= ys.length) return xs; [ys[ix], ys[j]] = [ys[j], ys[ix]]; return ys; });
@@ -146,11 +148,18 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
     setBusy(true);
     const r = await saveTemplate(id, { ...t, event_name: events[0] ?? null, weekday: days[0] ?? null, items: items.filter((i) => i.label.trim()), properties: props });
     setBusy(false);
+    if (r.ok && !next && r.id) { setMsg(null); setDone({ created: !id, id: r.id }); router.refresh(); return; }
     setMsg(r.ok ? { ok: true, text: r.msg ?? "Saved" } : { ok: false, text: r.error });
     if (r.ok && next) setStep((s) => Math.min(s + 1, STEPS.length - 1));
     router.refresh();
   }
   const last = step === STEPS.length - 1;
+  // A new task now has an address of its own, so further edits save to it.
+  function keepEditing() {
+    const d = done;
+    setDone(null);
+    if (d?.created) router.replace(`/admin/templates/${d.id}`);
+  }
   async function savePreset(title: string) {
     const r = await saveChecklistPreset(null, title, items);
     setMsg(r.ok ? { ok: true, text: r.msg ?? "Saved" } : { ok: false, text: r.error });
@@ -433,6 +442,30 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
         </div>
         {step < 5 && <div className="te-side">{summary}</div>}
       </div>
+      {done && (
+        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="te-done-h" onKeyDown={(e) => { if (e.key === "Escape") keepEditing(); }}>
+          <div className="mcard te-done">
+            <span className="te-done-ic" aria-hidden="true">✓</span>
+            <div>
+              <h2 id="te-done-h">{done.created ? "Task created" : "Changes saved"}</h2>
+              <p className="muted">{done.created ? <><b>{t.name}</b> is set up and added to the task list.</> : <>Your changes to <b>{t.name}</b> are saved.</>}</p>
+            </div>
+            <ul className="te-done-facts">
+              <li><b>{props.length}</b> propert{props.length === 1 ? "y" : "ies"}</li>
+              <li><b>{filled.length}</b> checklist item{filled.length === 1 ? "" : "s"}</li>
+              <li>{describeWhen(t)}</li>
+              <li>{t.active ? <span className="pill g">Active</span> : <span className="pill">Paused</span>}</li>
+            </ul>
+            <p className="small muted" style={{ margin: 0 }}>New tasks follow this setup from the next window.</p>
+            <div className="row2">
+              <button type="button" className="btn" onClick={keepEditing}>Keep editing</button>
+              {done.created && <a className="btn" href="/admin/templates/new">Create another</a>}
+              <span className="spacer" />
+              <button type="button" className="btn primary" autoFocus onClick={() => router.push("/admin")}>Back to all tasks</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
