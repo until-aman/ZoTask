@@ -239,6 +239,7 @@ export async function coverAway(now: number, force = false): Promise<number> {
 }
 
 export async function sweep(now = Date.now()) {
+  await dropOrphans();
   await generateInstances(isoDate(now), addDays(isoDate(now), 1), now);
   await coverAway(now);
   const c = await loadOff();
@@ -516,13 +517,25 @@ export async function remind(instanceIds: number[], actorId: number, at: number,
   return { people: people.size, skipped, self, peers };
 }
 
-/** Removes not-yet-open runs of a task at properties it no longer covers (with their "created" history). */
+// A scheduled run nobody has submitted yet: still open (or not yet open) and never sent in.
+const UNSENT = "source='schedule' AND attempt=0 AND first_submitted_at IS NULL AND status IN ('upcoming','current','notsub')";
+
+async function dropRuns(ids: number[]) {
+  if (!ids.length) return 0;
+  const iq = ids.join(",");
+  await batch([[`DELETE FROM events WHERE instance_id IN (${iq})`], [`DELETE FROM instances WHERE id IN (${iq})`]]);
+  return ids.length;
+}
+
+/** Removes runs of a task at properties it no longer covers, as long as nobody has submitted them (with their history). */
 export async function dropUpcoming(templateId: number, propertyIds: number[]) {
-  if (!propertyIds.length) return;
+  if (!propertyIds.length) return 0;
   const q = propertyIds.map(() => "?").join(",");
-  const ids = (await all<{ id: number }>(`SELECT id FROM instances WHERE template_id=? AND status='upcoming' AND attempt=0 AND property_id IN (${q})`, templateId, ...propertyIds)).map((x) => x.id);
-  if (!ids.length) return;
-  const iq = ids.map(() => "?").join(",");
-  await run(`DELETE FROM events WHERE instance_id IN (${iq})`, ...ids);
-  await run(`DELETE FROM instances WHERE id IN (${iq})`, ...ids);
+  return dropRuns((await all<{ id: number }>(`SELECT id FROM instances WHERE template_id=? AND ${UNSENT} AND property_id IN (${q})`, templateId, ...propertyIds)).map((x) => x.id));
+}
+
+/** Clears unsent runs left at properties a task was taken off before this rule existed, so they stop counting as to-do and overdue. */
+export async function dropOrphans() {
+  return dropRuns((await all<{ id: number }>(`SELECT i.id FROM instances i WHERE ${UNSENT.replace(/(source|attempt|first_submitted_at|status)/g, "i.$1")}
+    AND NOT EXISTS (SELECT 1 FROM template_properties tp WHERE tp.template_id=i.template_id AND tp.property_id=i.property_id)`)).map((x) => x.id));
 }

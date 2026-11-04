@@ -167,7 +167,7 @@ export async function setTasksActive(ids: number[], active: boolean) {
   });
 }
 /** Sets exactly which properties a task runs at: ticked ones are added, unticked ones removed.
- *  At a removed property, tasks not yet open are dropped; anything already open or done stays for the record. */
+ *  At a removed property, runs nobody has submitted yet are dropped; anything submitted stays for the record. */
 export async function setTaskProperties(id: number, properties: number[]) {
   return admin(async () => {
     const want = new Set(properties.map(Number));

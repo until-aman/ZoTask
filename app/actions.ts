@@ -256,7 +256,7 @@ export async function saveTemplate(id: number | null, t: TemplateInput): Promise
       const before = (await all<{ p: number }>("SELECT property_id p FROM template_properties WHERE template_id=?", newId)).map((x) => x.p);
       await run("DELETE FROM template_properties WHERE template_id=?", newId);
       for (const p of t.properties) await run("INSERT INTO template_properties VALUES (?,?)", newId, p);
-      // Properties taken off the task stop getting it: runs not yet open there are dropped.
+      // Properties taken off the task stop getting it: runs there that nobody has submitted are dropped.
       await E.dropUpcoming(newId!, before.filter((p) => !t.properties.includes(p)));
     });
     return "Saved. New tasks follow this setup from the next window.";
