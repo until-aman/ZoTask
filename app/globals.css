@@ -1389,3 +1389,32 @@ input.rv-need{border-color:var(--red)}
   .nb-pops{top:auto;bottom:16px;right:16px}
 }
 @media print{.topbar,.nb-pops{display:none}}
+
+/* One look for every switch between views on a page (Admin sections, Escalations views): underlined tabs, with the open one clearly marked. */
+.admtabs{position:relative}
+.admtabs button{position:relative;transition:color .15s var(--ease)}
+.admtabs button::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;background:var(--accent);transform:scaleX(0);transition:transform .2s var(--ease)}
+.admtabs button.on{border-bottom-color:transparent}
+.admtabs button.on::after{transform:scaleX(1)}
+.admtabs button:hover:not(.on)::after{transform:scaleX(.4);opacity:.35}
+/* Segmented options: the picked one is filled whether it's marked pressed or selected. */
+.seg [aria-selected="true"],.seg [aria-selected="true"]:hover{background:var(--accent-soft);color:var(--accent-text);font-weight:600}
+.seg button:active{transform:translateY(1px)}
+/* Pages: a footer at the end of each table, never floating over its rows. */
+.pager,.listcard>.pager,.ttable>.pager{position:static;margin:0;width:auto;max-width:none;border:0;border-top:1px solid var(--line2);border-radius:0;box-shadow:none;background:transparent;padding:8px 12px;justify-content:flex-end}
+.pager.plain{border-top:1px solid var(--line2)}
+@media (max-width:560px){.pager{width:auto}}
+/* Escalations summary: repeat properties as small cards. */
+.esc-repeat{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.esc-repeat .card{display:grid;gap:2px;padding:12px 14px;transition:box-shadow .15s var(--ease),transform .15s var(--ease)}
+.esc-repeat .card:hover{box-shadow:var(--e-pop);transform:translateY(-1px)}
+/* A live feel: rows and cards respond to the pointer. */
+.ttable tbody tr,.qrow,.mtrow{transition:background .12s var(--ease)}
+.kpi.click{transition:box-shadow .15s var(--ease),transform .15s var(--ease),border-color .15s var(--ease)}
+.kpi.click:hover{transform:translateY(-1px);box-shadow:var(--e-pop)}
+@media (prefers-reduced-motion:reduce){.kpi.click:hover,.esc-repeat .card:hover{transform:none}}
+/* Escalation tracker: rows stay compact; long text is clamped and shown in full on hover or in the drawer. */
+.esc-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:340px;text-align:left}
+.esc-upd{display:grid;gap:2px;max-width:240px}
+.esc-upd .muted{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.esc-upd{min-width:180px}

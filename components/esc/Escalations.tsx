@@ -120,17 +120,17 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
 
   const cols: Col<Esc>[] = [
     { key: "ref", label: "Ref", value: (r) => r.id, render: (r) => <button type="button" className="link" style={{ whiteSpace: "nowrap" }} onClick={() => setOpen(r.id)}>{r.ref}</button>, csv: (r) => r.ref, sticky: true },
-    { key: "created", label: "Raised on", value: (r) => r.created, render: (r) => day(r.created), csv: (r) => isoDate(r.created) },
-    { key: "dept", label: "Department", value: (r) => r.department },
-    { key: "prop", label: "Property", value: (r) => r.props.map((p) => p.name).join(", "), render: (r) => <span className="wrapcell">{r.props.map((p) => p.name.replace(/^Zolo /, "")).join(", ")}</span> },
-    { key: "cluster", label: "Cluster", value: (r) => [...new Set(r.props.map((p) => p.cluster))].join(", "), hidden: true },
     { key: "title", label: "Issue", value: (r) => r.title, render: (r) => <button type="button" className="esc-title" onClick={() => setOpen(r.id)} title={r.detail}>{r.priority === "high" && <span className="pill r">High</span>} {r.title}</button> },
-    { key: "by", label: "Raised by", person: true, value: (r) => r.raisedBy },
+    { key: "prop", label: "Property", value: (r) => r.props.map((p) => p.name).join(", "), render: (r) => <span className="wrapcell">{r.props.map((p) => p.name.replace(/^Zolo /, "")).join(", ")}</span> },
     { key: "owner", label: "Raised to", value: (r) => r.owner, render: (r) => <Person name={r.owner} sub={r.mailSentAt ? <span title={`Email sent ${when(r.mailSentAt)}`}>✉ Email sent</span> : <span className="t-a" title="Email not marked as sent">No email yet</span>} />, csv: (r) => `${r.owner}${r.ownerEmail ? ` <${r.ownerEmail}>` : ""}` },
     { key: "due", label: "Expected closure", value: (r) => r.due, render: (r) => !r.due ? "—" : <span className={r.overdue ? "t-r" : ""} style={{ fontWeight: r.overdue ? 800 : 400 }}>{dayIso(r.due)}{r.overdue ? ` · ${daysBetween(r.due, d.today)}d late` : isOpen(r.status) && r.due <= soon ? " · due soon" : ""}</span> },
     { key: "status", label: "Status", value: (r) => STATUS[r.status], render: (r) => <span className={`pill ${PILL[r.status]}`}>{STATUS[r.status]}</span> },
-    { key: "age", label: "Days open", num: true, value: (r) => Math.floor(((r.closed ?? d.now) - r.created) / DAY), hidden: true },
     { key: "updated", label: "Last update", value: (r) => r.updated, render: (r) => { const u = r.updates[r.updates.length - 1]; return <div className="small esc-upd"><span>{ago(r.updated, d.now)}</span>{u?.note ? <span className="muted">{u.note}</span> : null}</div>; }, csv: (r) => r.updates[r.updates.length - 1]?.note ?? "" },
+    { key: "dept", label: "Department", value: (r) => r.department },
+    { key: "by", label: "Raised by", person: true, value: (r) => r.raisedBy, hidden: true },
+    { key: "created", label: "Raised on", value: (r) => r.created, render: (r) => day(r.created), csv: (r) => isoDate(r.created), hidden: true },
+    { key: "cluster", label: "Cluster", value: (r) => [...new Set(r.props.map((p) => p.cluster))].join(", "), hidden: true },
+    { key: "age", label: "Days open", num: true, value: (r) => Math.floor(((r.closed ?? d.now) - r.created) / DAY), hidden: true },
     { key: "prio", label: "Priority", value: (r) => PRIO[r.priority], hidden: true },
     { key: "mail", label: "Email subject", value: (r) => r.mailSubject || null, hidden: true },
   ];
@@ -145,10 +145,10 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
         {d.canRaise && <button type="button" className="btn primary" onClick={() => setRaising(true)}>+ Raise escalation</button>}
       </div>
 
-      <div className="seg" role="tablist" style={{ width: "fit-content", maxWidth: "100%" }}>
-        <button type="button" role="tab" aria-selected={tab === "tracker"} onClick={() => setTab("tracker")}>Tracker</button>
-        <button type="button" role="tab" aria-selected={tab === "summary"} onClick={() => setTab("summary")}>Leadership summary</button>
-      </div>
+      <nav className="admtabs" role="tablist" aria-label="Escalation views">
+        <button type="button" role="tab" aria-selected={tab === "tracker"} className={tab === "tracker" ? "on" : ""} onClick={() => setTab("tracker")}>Tracker</button>
+        <button type="button" role="tab" aria-selected={tab === "summary"} className={tab === "summary" ? "on" : ""} onClick={() => setTab("summary")}>Leadership summary</button>
+      </nav>
 
       {tab === "tracker" ? <>
         {bar(false)}
@@ -263,13 +263,13 @@ function Summary({ d, rows, period, show, bar }: { d: EscData; rows: Esc[]; peri
       <Sec title="By who it was raised to" tip={<InfoTip title="By who it was raised to" rows={[["Means", "The team or person who has to act. Shows who is slow to close"]]} />}>
         <Table name="Escalations by owner" rows={byOwner} cols={gcols("Raised to")} rowKey={(s) => s.key} />
       </Sec>
-      <div className="grid g2w">
+      <Sec title="Properties raised most often" tip={<InfoTip title="Properties raised most often" rows={[["Means", `Properties with 2 or more escalations raised in ${pLabel}. Worth a visit`]]} />}>
+        {!repeat.length ? <p className="small muted">No property had more than one escalation in this period.</p> :
+          <div className="esc-repeat">{repeat.map((s) => <div key={s.key} className="card"><b>{s.key}</b><span><C l={s.raised} label={`Raised · ${s.key}`} /> raised</span><small className="muted">{[...new Set(s.raised.map((r) => r.department))].join(", ")}</small></div>)}</div>}
+      </Sec>
+      <div>
         <Sec title="By property" tip={<InfoTip title="By property" rows={[["Means", "An escalation covering two properties counts for both"]]} />}>
           <Table name="Escalations by property" rows={byProp} cols={gcols("Property")} rowKey={(s) => s.key} />
-        </Sec>
-        <Sec title="Properties raised most often" tip={<InfoTip title="Properties raised most often" rows={[["Means", `Properties with 2 or more escalations raised in ${pLabel}. Worth a visit`]]} />}>
-          {!repeat.length ? <p className="small muted">No property had more than one escalation in this period.</p> :
-            <ul className="cmp-list">{repeat.map((s) => <li key={s.key}><b>{s.key}</b>: <C l={s.raised} label={`Raised · ${s.key}`} /> raised <span className="muted">({[...new Set(s.raised.map((r) => r.department))].join(", ")})</span></li>)}</ul>}
         </Sec>
       </div>
       <Sec title="By who raised it" tip={<InfoTip title="By who raised it" rows={[["Means", "Central team members who raised escalations, and how many of theirs are still open"]]} />}>
