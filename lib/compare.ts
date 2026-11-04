@@ -1,4 +1,6 @@
 // Side-by-side comparison of two stakeholders of the same kind, counted per task like the dashboard.
+import { offCfg, waitMs } from "./offdays";
+import { loadOff } from "./engine";
 import { all } from "./db";
 import { HOUR, addDays, isoDate } from "./time";
 import { geo, rows, Row } from "./queries";
@@ -14,6 +16,7 @@ const MAX = 8;
 type Opt = { id: string; label: string; sub?: string };
 
 export async function compareData(u: User, sp: Record<string, string | undefined>, now = Date.now()) {
+  await loadOff();
   const kind = (KINDS.find(([k]) => k === sp.kind)?.[0] ?? "property") as Kind;
   const preset = sp.range ?? "14d";
   const R = M.rangeFor(preset, isoDate(now), sp.from, sp.to);
@@ -110,7 +113,7 @@ export async function compareData(u: User, sp: Record<string, string | undefined
     const v = reviewing(mineRev, backlog, now);
     const extra = await rows(`i.id IN (${uniq(mineRev.map((x) => x.instance_id)).join(",") || 0})`); for (const r of extra) tasks.set(r.id, r);
     const submitted = mine.filter((r) => r.first_submitted_at).map((r) => r.id);
-    const missedRev = mine.filter((r) => REVIEW_ST.includes(r.status) && now - r.status_since > r.review_sla_h * HOUR).map((r) => r.id);
+    const missedRev = mine.filter((r) => REVIEW_ST.includes(r.status) && waitMs(offCfg(), r, now) > r.review_sla_h * HOUR).map((r) => r.id);
     const passedByMe = new Set(mineRev.filter((x) => x.kind === "review" && x.decision === "pass").map((x) => x.instance_id));
     const audited = uniq(audits.filter((x) => passedByMe.has(x.instance_id)).map((x) => x.instance_id));
     const failed = uniq(audits.filter((x) => passedByMe.has(x.instance_id) && x.decision === "fail").map((x) => x.instance_id));

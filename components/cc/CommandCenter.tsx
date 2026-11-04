@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CC, Issue } from "@/lib/command";
 import DashFilters from "@/components/DashFilters";
 import type { SavedView } from "@/components/ui/Filters";
-import { DrillCtx, Drill, Def, DefTip, Mini, Tile, dur, Delta, useDrill } from "./parts";
+import { DrillCtx, Drill, DefTip, Mini, Tile, Delta, useDrill } from "./parts";
 import { DrillDrawer, TaskDrawer } from "./Drawers";
 import ActionQueue from "./ActionQueue";
 import { Compare, Lifecycle, Reasons, Recurring, Trends } from "./Insights";
@@ -15,7 +15,7 @@ import { Cbms, Housekeeping, Properties, Reviewers } from "./Accountability";
 const nice = (d: string) => fmtDate(d);
 const span = (r: { from: string; to: string }) => (r.from === r.to ? nice(r.from) : `${nice(r.from)} – ${nice(r.to)}`);
 
-function Health({ d, part }: { d: CC; part: "top" | "rest" }) {
+function Health({ d }: { d: CC }) {
   const g = d.ground, v = d.review, o = d.outcome;
   const { open } = useDrill();
   const parts: [string, typeof o.done, string, string][] = [["Approved and closed", o.done, "var(--green)", "Approved, and audit done or not needed"],
@@ -23,32 +23,24 @@ function Health({ d, part }: { d: CC; part: "top" | "rest" }) {
     ["Not submitted yet", o.notsub, "var(--amber)", "Past the deadline, grace period still running"], ["Missed", o.missed, "var(--red)", "Grace period ended with nothing submitted"],
     ["Not rectified", o.notrect, "var(--navy)", "All attempts used without a pass"]];
   const due = g.due.n;
-  // Counts only: the change arrow on these compares rates, so leave it off here.
-  const count = (k: typeof g.missed) => ({ ...k, prev: undefined });
+  const share = (n: number, of: number) => (of ? `${Math.round((n / of) * 100)}% of ${of}` : undefined);
   return (
     <div className="grid hbands">
-      {part === "top" ? <section className="card score sumband">
-        <h3>Task completion</h3>
-        <div className="kpis k4">
-          <Tile label="Total tasks" rate={false} k={g.assigned} unitNote="Scheduled in the period" target="In the period"
-            def={{ means: "All tasks scheduled in the period", note: "Cancelled tasks are left out." }} />
-          <Tile label="Completed" rate={false} k={count(g.completed)} unitNote="Submitted at least once" target={g.completed.rate !== null && g.completed.rate !== undefined ? `${g.completed.rate}% of total` : undefined}
-            def={{ means: "Tasks submitted at least once, on time or late", calc: "Submitted tasks ÷ total tasks", note: "Includes tasks still in review." }} />
-          <Tile label="Completed on time" rate={false} k={count(g.onTime)} unitNote="Submitted by the deadline" target={g.onTime.rate !== null && g.onTime.rate !== undefined ? `${g.onTime.rate}% of ${g.due.n} past deadline` : undefined}
-            def={{ means: "Tasks submitted by their deadline", calc: "On time ÷ tasks past deadline" }} />
-          <Tile label="Missed" rate={false} goodUp={false} k={count(g.missed)} unitNote="Never submitted" target={g.missed.rate !== null && g.missed.rate !== undefined ? `${g.missed.rate}% of ${g.due.n} past deadline` : undefined}
-            def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} />
-        </div>
-      </section> : <>
       <section className="card score">
         <h3>Ground team</h3>
-        <div className="kpis k3">
-          <Tile label="Done on time" def={{ means: "Tasks submitted by their deadline", calc: "Submitted on time ÷ tasks past deadline", note: "Cancelled tasks are left out." }} k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline" />
-          <Tile label="Approved first time" def={{ means: "Tasks approved at their first review", calc: "Approved first time ÷ tasks reviewed at least once", note: "Tasks still waiting for a first review are left out." }} k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first review" />
-          <Tile label="Missed" def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} k={g.missed} band={[5, 10]} goodUp={false} target="Target under 5%" unitNote="Never submitted" />
+        <div className="kpis k5">
+          <Tile label="Tasks to be done" rate={false} k={{ ...g.assigned, prev: undefined }} unitNote="Scheduled in the period" target="In the period"
+            def={{ means: "All tasks scheduled in the period", note: "Cancelled tasks are left out." }} />
+          <Tile label="Tasks completed" rate={false} k={{ ...g.completed, prev: undefined }} unitNote="Submitted at least once" target={share(g.completed.n, g.assigned.n)}
+            def={{ means: "Tasks submitted at least once, on time or late", calc: "Submitted tasks ÷ tasks to be done", note: "Includes tasks still in review." }} />
+          <Tile label="Completed on time" k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline"
+            def={{ means: "Tasks submitted by their deadline", calc: "Submitted on time ÷ tasks past deadline", note: "Cancelled tasks are left out." }} />
+          <Tile label="Passed 1st attempt" k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first review"
+            def={{ means: "Tasks approved at their first review", calc: "Approved first time ÷ tasks reviewed at least once", note: "Tasks still waiting for a first review are left out." }} />
+          <Tile label="Tasks missed" k={g.missed} band={[5, 10]} goodUp={false} target="Target under 5%" unitNote="Never submitted"
+            def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} />
         </div>
         <div className="minis">
-          <Mini label="Total tasks" k={g.assigned} def={{ means: "All tasks scheduled in the period", note: "Cancelled tasks are left out." }} />
           <Mini label="Deadline passed" k={g.due} def={{ means: "Tasks whose deadline is over, whether done or not. Not a to-do count", note: "This is the base for On time and Missed. Still to do: Overdue, not done." }} />
           <Mini label="Done late" k={g.late} tone="a" def={{ means: "Submitted, but after the deadline" }} />
           <Mini label="Overdue, not done" k={g.overdue} tone="a" def={{ means: "Past the deadline, not submitted, grace period still running", note: "These can still be saved today. Remind the owner." }} />
@@ -58,15 +50,17 @@ function Health({ d, part }: { d: CC; part: "top" | "rest" }) {
       </section>
       <section className="card score">
         <h3>Reviewers</h3>
-        <div className="kpis k3">
-          <Tile label="Reviewed on time" def={{ means: "Reviewed tasks where every review was on time", calc: "In-time tasks ÷ tasks reviewed in the period", note: "SLA is set per task type, usually 24h from submission. Tasks still waiting are under Pending past SLA." }} k={v.inSla} band={[90, 75]} target="Target 90%+" unitNote="Every review was on time" />
-          <TimeTile label="Usual review wait" t={v.median} band={[12, 24]} def={{ means: "Typical time a task waits for its review", calc: "Middle value, per task, of submission to the reviewer's decision", note: "Each task counted once." }} />
-          <Tile label="Missed reviews" k={v.missed} band={[2, 5]} goodUp={false} target="Target under 2%" unitNote="Not reviewed within the time limit"
+        <div className="kpis k4">
+          <Tile label="Tasks to be reviewed" rate={false} k={{ ...v.requiring, prev: undefined }} unitNote="Reviewed in the period, or waiting now" target="Reviewed + waiting"
+            def={{ means: "Tasks reviewed in the period plus tasks waiting for review now" }} />
+          <Tile label="Tasks reviewed" rate={false} k={{ ...v.reviewed, prev: undefined }} unitNote="Reviewed in the period" target={share(v.reviewed.n, v.requiring.n)}
+            def={{ means: "Tasks reviewed in the period", calc: "Reviewed ÷ tasks to be reviewed", note: "Each task counted once, however many times it was reviewed." }} />
+          <Tile label="Reviewed on time" k={v.inSla} band={[90, 75]} target="Target 90%+" unitNote="Every review was on time"
+            def={{ means: "Reviewed tasks where every review was on time", calc: "On-time tasks ÷ tasks reviewed in the period", note: "The time limit is set per task, usually 24h from submission, and skips reviewer week offs." }} />
+          <Tile label="Reviews missed" k={v.missed} band={[2, 5]} goodUp={false} target="Target under 2%" unitNote="Not reviewed within the time limit"
             def={{ means: "Submitted tasks not reviewed within the time limit, and still not reviewed", calc: "Missed reviews ÷ tasks submitted in the period", note: "Lower is better. Click to see the tasks." }} />
         </div>
         <div className="minis">
-          <Mini label="Reviewed + waiting" k={v.requiring} def={{ means: "Tasks reviewed in the period plus tasks waiting now" }} />
-          <Mini label="Reviewed" k={v.reviewed} def={{ means: "Tasks reviewed in the period", note: "Each task counted once, however many times it was reviewed." }} />
           <Mini label="Reviewed late" k={v.afterSla} tone="a" def={{ means: "Reviewed tasks that were reviewed late", note: "Late if any review on the task took longer than the limit." }} />
           <Mini label="Waiting for review" k={v.pending} def={{ means: "Submitted tasks waiting for review right now" }} />
           <Mini label="Waiting too long" k={v.over} tone="r" def={{ means: "Tasks waiting for review longer than the time limit", note: "These are in Action required." }} />
@@ -86,18 +80,6 @@ function Health({ d, part }: { d: CC; part: "top" | "rest" }) {
             <DefTip label={l} def={{ means: m, calc: `${l} ÷ tasks past deadline` }} k={k} rate /></span>
         ))}</div>
       </section>
-      </>}
-    </div>
-  );
-}
-
-function TimeTile({ label, t, band, def }: { label: string; t: { ms: number | null; prev: number | null; ids: number[] }; band: [number, number]; def: Def }) {
-  const h = t.ms === null ? null : t.ms / 3600_000;
-  const r = h === null ? "" : h <= band[0] ? "g" : h <= band[1] ? "a" : "r";
-  return (
-    <div className="kpi"><span className={`rag ${r}`} title={r === "g" ? "Healthy" : r === "a" ? "Watch" : r === "r" ? "Act now" : "No data"} />
-      <div className="kpi-h"><div className="v">{dur(t.ms)}</div><div className="lab">{label}<DefTip label={label} def={def} target={`Under ${band[0]}h`} /></div></div>
-      <div className="foot"><Delta cur={h === null ? null : Math.round(h)} prev={t.prev === null ? null : Math.round(t.prev / 3600_000)} goodUp={false} unit="h" /><span className="tgt">Under {band[0]}h</span></div>
     </div>
   );
 }
@@ -129,8 +111,7 @@ export default function CommandCenter({ data: d, views, bare }: { data: CC; view
         </div>
         <DashFilters geo={d.geo} cats={d.cats} init={{ range: d.preset, ...d.filters }} range={d.R} mine={d.role === "reviewer" ? d.mine : undefined} reviewers={d.reviewerOpts}
           views={views} bare={bare} notify={setToast} />
-        <Health d={d} part="top" />
-        <Health d={d} part="rest" />
+        <Health d={d} />
 
         <h2 className="band">Action required</h2>
         <ActionQueue issues={d.issues} now={d.now} me={d.userName} canEscalate={d.canEscalate} toast={setToast}

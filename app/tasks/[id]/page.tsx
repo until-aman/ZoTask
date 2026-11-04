@@ -61,7 +61,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       )}
       <div className="card">
         <h2>History</h2>
-        <Timeline events={await eventsFor(id)} />
+        <Timeline events={await eventsFor(id, u.access_role)} />
       </div>
     </div>
   );

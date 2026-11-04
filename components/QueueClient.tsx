@@ -5,7 +5,7 @@ import { addDays, fmtDate, fmtDateTime } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getHistory, reassignReviewer, remindTasks, ViewFilters } from "@/app/actions";
+import { getHistory, pullBackTask, reassignReviewer, remindTasks, ViewFilters } from "@/app/actions";
 import { ColumnsMenu, ExportMenu, Person, RowMenu, useHiddenCols } from "@/components/ui/TableKit";
 import { ActiveChip, DateRow, Field, FilterBar, SearchPick, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
 
@@ -14,15 +14,19 @@ export type QItem = {
   last: boolean; rv: string; au: string; cbm: string; date: string; why: string; win: string; crit: boolean; next: string; mine: boolean;
   /** When it was scheduled for, and its last step (submitted, reviewed...) with the time. */
   schedAt: number; lastL: string; lastAt: number;
+  /** Central team only: submitted on a reviewer day off ("must" check or "auto" close), why, and when it closes by itself. */
+  wk?: "must" | "auto"; wkWhy?: string; wkClose?: number;
+  /** Central team only: closed by weekend sampling, and whether it can still be pulled back. */
+  wkClosedAt?: number; pull?: boolean;
 };
 type Geo = { city: string; cluster: string; property: string; id: number };
 type Ev = { id: number; at: number; type: string; detail: string; actor: string | null };
 
 const GROUPS = [
-  { n: "Waiting on the reviewer", short: "With reviewers", tabs: [["review", "To Review"], ["resub", "Resubmitted"]], open: true, c: "var(--accent)" },
+  { n: "Waiting on the reviewer", short: "With reviewers", tabs: [["review", "To Review"], ["resub", "Resubmitted"], ["weekend", "Weekend"]], open: true, c: "var(--accent)" },
   { n: "Waiting on the auditor", short: "With auditor", tabs: [["audit", "To Audit"], ["flagans", "Flag Answers"]], open: true, c: "var(--navy)" },
   { n: "Waiting on ground team or CBM", short: "With ground team", tabs: [["changes", "Changes Required"], ["notsub", "Not Submitted"], ["auditflag", "Audit Flags"]], open: true, ground: true, c: "var(--amber)" },
-  { n: "Closed", short: "Closed", tabs: [["done", "Done"], ["missed", "Missed"], ["notrect", "Not rectified"], ["waived", "Waived"]], open: false, c: "var(--faint)" },
+  { n: "Closed", short: "Closed", tabs: [["done", "Done"], ["missed", "Missed"], ["notrect", "Not rectified"], ["waived", "Waived"], ["wkclosed", "Auto-closed"]], open: false, c: "var(--faint)" },
 ] as const;
 const grpOf = (k: string) => GROUPS.find((g) => g.tabs.some((t) => t[0] === k))!;
 const tabName = (k: string) => grpOf(k).tabs.find((t) => t[0] === k)![1];
@@ -43,8 +47,13 @@ const over = (t: QItem) => t.sla > 0 && t.h > t.sla;
 const bucket = (t: QItem) => (t.h > 72 ? "r" : t.h >= 24 ? "a" : "g");
 const empty: ViewFilters = { city: [], cluster: [], prop: [], role: [], asg: [], cbm: [], rv: [], mine: false };
 
-export default function QueueClient({ items, geo, views, reviewers, me, canReview, today, initial }: {
+// Tabs only the central team sees: off-day submissions and the ones that closed by themselves.
+const CENTRAL_TABS = ["weekend", "wkclosed"];
+const isWeekend = (t: QItem) => !!t.wk && (t.s === "review" || t.s === "resub");
+
+export default function QueueClient({ items, geo, views, reviewers, me, canReview, isCentral, pullbackDays, today, initial }: {
   items: QItem[]; geo: Geo[]; views: SavedView[]; reviewers: { id: number; name: string }[]; me: string; canReview: boolean; today: string;
+  isCentral: boolean; pullbackDays: number;
   initial: { tab?: string; city?: string[]; cluster?: string[]; prop?: string[]; from?: string; to?: string; bucket?: string; over?: boolean };
 }) {
   const router = useRouter();
@@ -104,15 +113,19 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     (!f.cbm?.length || f.cbm.includes(t.cbm)) && (!f.rv?.length || f.rv.includes(t.rv) || f.rv.includes(t.au)) &&
     words.every((w) => `${t.t} ${t.p} ${t.cluster} ${t.city} ${t.a} ${t.cbm} ${t.rv} ${t.au} ${t.next}`.toLowerCase().includes(w));
   const inDates = (t: QItem) => t.date >= from && t.date <= to;
-  const tasksFor = (k: string) => items.filter((t) => t.s === k && inScope(t) && inDates(t));
+  // Weekend and Auto-closed ignore the date filter: they are whatever is waiting from the days off, however old.
+  const tasksFor = (k: string) => items.filter((t) => inScope(t) && (
+    k === "weekend" ? isWeekend(t) : k === "wkclosed" ? !!t.pull
+      : t.s === k && inDates(t) && !(isCentral && isWeekend(t) && (k === "review" || k === "resub"))));
 
   const g = grpOf(tab);
   const all = tasksFor(tab);
   const cnt = { all: all.length, r: 0, a: 0, g: 0, over: all.filter(over).length } as Record<string, number>;
   all.forEach((t) => cnt[bucket(t)]++);
-  let list = g.open && bk !== "all" ? all.filter((t) => (bk === "over" ? over(t) : bucket(t) === bk)) : all;
+  let list = g.open && bk !== "all" ? all.filter((t) => (bk === "over" ? over(t) : bk === "must" || bk === "auto" ? t.wk === bk : bucket(t) === bk)) : all;
   list = sort ? sortRows(list, sort, (t, k) => k === "task" ? t.t : k === "asg" ? t.a : k === "next" ? t.next || nextStep(t).what : k === "sched" ? t.schedAt : k === "last" ? t.lastAt : k === "wait" ? (g.open ? t.h : t.date) : null)
-    : [...list].sort((a, b) => (g.open ? b.h - a.h : b.date.localeCompare(a.date)));
+    : [...list].sort((a, b) => tab === "weekend" ? (a.wk === b.wk ? (a.wkClose ?? 0) - (b.wkClose ?? 0) : a.wk === "must" ? -1 : 1)
+      : tab === "wkclosed" ? (b.wkClosedAt ?? 0) - (a.wkClosedAt ?? 0) : g.open ? b.h - a.h : b.date.localeCompare(a.date));
   const [size, setSize] = usePageSize();
   const pg = clampPage(page, list.length, size);
   const shown = list.slice(pg * size, pg * size + size);
@@ -132,6 +145,10 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   const locText = f.prop.length ? (f.prop.length === 1 ? f.prop[0] : f.prop.length + " properties") : f.cluster.length ? (f.cluster.length === 1 ? f.cluster[0] : f.cluster.length + " clusters") : f.city.length ? (f.city.length === 1 ? f.city[0] : f.city.length + " cities") : "All properties";
 
   function nextStep(t: QItem) {
+    if (isWeekend(t)) return t.wk === "must"
+      ? { who: t.next, what: "to check", sub: <>Weekend · {t.wkWhy}</> }
+      : { who: "", what: "Optional check", sub: <>Closes by itself {fmtDateTime(t.wkClose!)}</> };
+    if (t.wkClosedAt && t.s === "done") return { who: "", what: "Closed by weekend sampling", sub: t.pull ? <>Can be pulled back until {fmtDateTime(t.wkClosedAt + pullbackDays * 86_400_000)}</> : <>Not checked by hand</> };
     if (t.s === "review" || t.s === "resub") return { who: t.next, what: "to review", sub: over(t) ? <span className="warn">Was due {fmtH(t.h - t.sla)} ago</span> : <>Due in {fmtH(t.sla - t.h)}</> };
     if (t.s === "audit") return { who: t.next, what: "to audit", sub: over(t) ? <span className="warn">Was due {fmtH(t.h - t.sla)} ago</span> : <>Due in {fmtH(t.sla - t.h)}</> };
     if (t.s === "flagans") return { who: t.next, what: "to close flags", sub: <>CBM answered the audit flags</> };
@@ -144,6 +161,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
     return { who: "", what: "Missed", sub: <>Window closed unsubmitted</> };
   }
   function Age({ t }: { t: QItem }) {
+    if (isWeekend(t) && t.wk === "auto") return <div className="age"><div className="l"><span>Optional</span><span /></div><small>Closes {fmtDateTime(t.wkClose!)}</small></div>;
+    if (tab === "wkclosed" && t.wkClosedAt) return <div className="age"><div className="l"><span>{fmtDateTime(t.wkClosedAt)}</span><span /></div><small>{t.pull ? "Can pull back" : "Window passed"}</small></div>;
     if (!grpOf(t.s).open) return <div className="age"><div className="l"><span>{nice(t.date)}</span><span /></div></div>;
     const lim = t.sla || 24, pct = Math.min(100, (t.h / lim) * 100), cls = t.sla ? (t.h > t.sla ? "r" : t.h > t.sla * 0.75 ? "a" : "") : t.h >= 24 ? "r" : "a";
     return (
@@ -169,6 +188,10 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   const openItem = items.find((t) => t.id === open);
   const selIds = [...sel];
 
+  async function pullBack(id: number) {
+    const r = await pullBackTask(id);
+    setToast(r.ok ? r.msg ?? "Back in review" : r.error); if (r.ok) { setOpen(null); router.refresh(); }
+  }
   async function remind(ids: number[]) {
     const r = await remindTasks(ids);
     setToast(r.ok ? r.msg ?? "Done" : r.error); setSel(new Set());
@@ -186,7 +209,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
             {GROUPS.map((gr) => (
               <div key={gr.n} className="qgrp" role="group" aria-label={gr.n} style={{ "--gc": gr.c } as React.CSSProperties}>
                 <span className="qgrp-l" title={gr.n}>{gr.short}</span>
-                <div className="qgrp-b">{gr.tabs.map(([k, label]) => {
+                <div className="qgrp-b">{gr.tabs.filter(([k]) => isCentral || !CENTRAL_TABS.includes(k)).map(([k, label]) => {
                   const l = tasksFor(k); const hot = l.filter(over).length;
                   return (
                     <button key={k} type="button" className={`qpill${hot ? " hot" : ""}`} aria-current={tab === k} onClick={() => { setTab(k); setBk("all"); setSel(new Set()); setPage(0); }}
@@ -213,7 +236,16 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               <Field label="Next step"><label className="switch"><input type="checkbox" checked={f.mine} onChange={(e) => change({ mine: e.target.checked })} /> Waiting on me</label></Field>
             </>} />
 
-          <Stats compact items={g.open ? [
+          <Stats compact items={tab === "weekend" ? [
+            { key: "all", label: "Weekend tasks", value: cnt.all, sub: "submitted on days off", active: bk === "all", onClick: () => { setBk("all"); setPage(0); } },
+            { key: "must", label: "Must check", value: all.filter((t) => t.wk === "must").length, tone: all.some((t) => t.wk === "must" && over(t)) ? "r" : undefined, sub: "critical, flagged or sampled", active: bk === "must", onClick: () => { setBk("must"); setPage(0); } },
+            { key: "auto", label: "Optional", value: all.filter((t) => t.wk === "auto").length, sub: "close by themselves", active: bk === "auto", onClick: () => { setBk("auto"); setPage(0); } },
+            { key: "over", label: "Over SLA", value: cnt.over, tone: cnt.over ? "r" : undefined, sub: "days off not counted", active: bk === "over", onClick: () => { setBk("over"); setPage(0); } },
+          ] : tab === "wkclosed" ? [
+            { key: "all", label: "Auto-closed", value: cnt.all, sub: `can be pulled back for ${pullbackDays} days` },
+            { key: "crit", label: "Critical", value: all.filter((t) => t.crit).length },
+            { key: "props", label: "Properties", value: new Set(all.map((t) => t.p)).size },
+          ] : g.open ? [
             { key: "all", label: "Tasks", value: cnt.all, sub: oldest ? `oldest waiting ${fmtH(oldest)}` : "none waiting", active: bk === "all", onClick: () => { setBk("all"); setPage(0); } },
             { key: "over", label: "Over SLA", value: cnt.over, tone: cnt.over ? "r" : undefined, sub: "past the time limit", active: bk === "over", onClick: () => { setBk("over"); setPage(0); } },
             { key: "r", label: "Waiting 3+ days", value: cnt.r, tone: cnt.r ? "r" : undefined, active: bk === "r", onClick: () => { setBk("r"); setPage(0); } },
@@ -270,6 +302,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                     <RowMenu label={`Actions for ${t.t}`} actions={[
                       { label: "Show details", onClick: () => setOpen(t.id) },
                       { label: "Open review sheet", onClick: () => router.push(`/review/${t.id}`) },
+                      { label: "Pull back for review", hidden: !(canReview && t.pull), onClick: () => pullBack(t.id) },
                       { label: n.who ? `Remind ${n.who.split(" ")[0]}` : "Send reminder", hidden: !g.open, onClick: () => remind([t.id]) },
                       { label: "Reassign reviewer", hidden: !(canReview && ["review", "resub"].includes(t.s)), onClick: () => { setSel(new Set([t.id])); setModal("reassign"); } },
                     ]} />
@@ -321,6 +354,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               </div>
               <div className="df">
                 <Link className="btn primary" href={`/review/${t.id}`}>Open review sheet</Link>
+                {canReview && t.pull && <button type="button" className="btn" onClick={() => pullBack(t.id)}>Pull back for review</button>}
                 {n.who && <button type="button" className="btn" onClick={() => remind([t.id])}>Remind {n.who.split(" ")[0]}</button>}
               </div>
             </aside>

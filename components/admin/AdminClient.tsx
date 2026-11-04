@@ -1,21 +1,23 @@
 "use client";
 // Admin: task setup (with bulk actions), the libraries tasks draw on, and properties and people.
+import WeekOffs from "./WeekOffs";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { copyTasksTo, deleteTasks, setTasksActive } from "@/app/admin-actions";
+import { copyTasksTo, deleteTasks, setTaskProperties, setTasksActive } from "@/app/admin-actions";
 import { describeWhen } from "@/components/TemplateEditor";
 import { Categories, Category, Checklist, Checklists, Cluster, Clusters, Count, Counts, Schedule, Schedules } from "./Libraries";
 import { Table, type Col } from "@/components/cc/parts";
 import { ActiveChip, Field, FilterBar, SavedView, Stats, sameFilters } from "@/components/ui/Filters";
 
 export type Tpl = { id: number; name: string; category: string; op_role: string; trigger: string; event_name: string | null; frequency: string; window_start: string; window_end: string;
-  review_sla_h: number; audit_sla_h: number; attempts_allowed: number; criticality: string; audit_rate: number; active: number; props: number; reviewer: string | null; auditor: string | null;
+  review_sla_h: number; audit_sla_h: number; attempts_allowed: number; criticality: string; audit_rate: number; active: number; props: number; prop_ids: string | null; reviewer: string | null; auditor: string | null;
   events: string; days: string; once_date: string | null; review_required: number };
 export type Prop = { id: number; name: string; cluster: string; city: string; cbm: string | null; cbm_id: number | null; staff: number; city_id: number; cluster_id: number };
 type Lib = { checklists: Checklist[]; schedules: Schedule[]; categories: Category[]; counts: Count[]; clusters: Cluster[]; cities: { id: number; name: string }[];
-  reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; cbms: { id: number; name: string; email: string | null }[] };
-const TABS: [string, string][] = [["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"], ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"]];
+  reviewers: { id: number; name: string }[]; auditors: { id: number; name: string }[]; cbms: { id: number; name: string; email: string | null }[];
+  off: import("@/lib/offdays").OffCfg; today: string; wkCounts: { must: number; auto: number; closed: number } };
+const TABS: [string, string][] = [["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"], ["counts", "HK counts"], ["clusters", "Clusters"], ["people", "Properties & people"], ["weekoffs", "Week offs"]];
 const ROLE_NAME: Record<string, string> = { admin: "Admin", reviewer: "Reviewers", auditor: "Auditors", cbm: "CBMs", ground: "Ground team" };
 const when = (t: Tpl) => describeWhen(t);
 
@@ -28,6 +30,11 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
   const setTab = (k: string) => { setTabState(k); router.replace(k === "tasks" ? "/admin" : `/admin?tab=${k}`); };
   const [sel, setSel] = useState<number[]>([]);
   const [copying, setCopying] = useState<number[] | null>(null);
+  // One task: the panel shows its current properties ticked and saves exactly what's ticked. Several: it only adds.
+  const [copyFor, setCopyFor] = useState<Tpl | null>(null);
+  const idsOf = (t: Tpl) => (t.prop_ids ?? "").split(",").filter(Boolean).map(Number);
+  const editProps = (t: Tpl) => { setCopyFor(t); setSel([t.id]); setCopying(idsOf(t)); };
+  const closeCopy = () => { setCopying(null); setCopyFor(null); };
   const [delAsk, setDelAsk] = useState(false);
   const bulk = async (p: Promise<{ ok: true; msg?: string } | { ok: false; error: string }>) => { const r = await p; setToast(r.ok ? r.msg ?? "Done" : r.error); if (r.ok) { setSel([]); router.refresh(); } return r.ok; };
   const [q, setQ] = useState("");
@@ -100,26 +107,33 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
           { key: "people", label: "People", value: total, sub: people.map((p) => `${p.n} ${ROLE_NAME[p.access_role]?.toLowerCase() ?? p.access_role}`).join(" · ") },
         ]} />
         {copying && <div className="card grid">
-          <div className="row2"><b>Add {sel.length} task{sel.length > 1 ? "s" : ""} to these properties</b><span className="spacer" />
+          <div className="row2">{copyFor ? <b>Properties for {copyFor.name}</b> : <b>Add {sel.length} task{sel.length > 1 ? "s" : ""} to these properties</b>}
+            <span className={copying.length ? "pill b" : "pill r"}>{copying.length} of {props.length} selected</span><span className="spacer" />
             <button type="button" className="link small" onClick={() => setCopying(props.map((p) => p.id))}>All</button><button type="button" className="link small" onClick={() => setCopying([])}>None</button></div>
           <div className="grid g3" style={{ gap: 4 }}>
-            {cities2.map((c) => <div key={c}><b className="small">{c}</b>{props.filter((p) => p.city === c).map((p) => (
+            {cities2.map((c) => <div key={c}><b className="small">{c} <span className="muted">{props.filter((p) => p.city === c && copying.includes(p.id)).length}/{props.filter((p) => p.city === c).length}</span></b>{props.filter((p) => p.city === c).map((p) => (
               <label key={p.id} className="opt"><input type="checkbox" checked={copying.includes(p.id)} onChange={(e) => setCopying(e.target.checked ? [...copying, p.id] : copying.filter((x) => x !== p.id))} />{p.name}</label>))}</div>)}
           </div>
-          <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={() => setCopying(null)}>Cancel</button>
-            <button type="button" className="btn primary sm" disabled={!copying.length} onClick={async () => { if (await bulk(copyTasksTo(sel, copying))) setCopying(null); }}>Add to {copying.length} propert{copying.length === 1 ? "y" : "ies"}</button></div>
+          {copyFor && (() => { const was = idsOf(copyFor), add = copying.filter((p) => !was.includes(p)).length, drop = was.filter((p) => !copying.includes(p)).length;
+            return <p className="small muted" style={{ margin: 0 }}>{add || drop ? `${add} to add · ${drop} to remove. ` : "No changes yet. "}Removed properties stop getting this task; runs already open or done stay in the history.</p>; })()}
+          <div className="row2"><span className="spacer" /><button type="button" className="btn sm" onClick={closeCopy}>Cancel</button>
+            {copyFor
+              ? <button type="button" className="btn primary sm" onClick={async () => { if (await bulk(setTaskProperties(copyFor.id, copying))) closeCopy(); }}>Save properties</button>
+              : <button type="button" className="btn primary sm" disabled={!copying.length} onClick={async () => { if (await bulk(copyTasksTo(sel, copying))) closeCopy(); }}>Add to {copying.length} propert{copying.length === 1 ? "y" : "ies"}</button>}</div>
         </div>}
         <Table name="Task setup" rows={tpl} cols={cols} rowKey={(t) => t.id} actions={(t) => [
           { label: "Edit", onClick: () => router.push(`/admin/templates/${t.id}`) },
           { label: t.active ? "Pause" : "Resume", onClick: () => bulk(setTasksActive([t.id], !t.active)) },
-          { label: "Add to properties", onClick: () => { setSel([t.id]); setCopying([]); } },
+          { label: "Properties…", onClick: () => editProps(t) },
           { label: "Delete", danger: true, confirm: `Delete ${t.name}? If it already ran it is paused instead.`, onClick: () => bulk(deleteTasks([t.id])) },
         ]} query={q} empty="No task types match these filters." toolbar={<span className="bulkbar">
           {sel.length ? <>
             <b>{sel.length} selected</b>
             <button type="button" className="btn sm" onClick={() => bulk(setTasksActive(sel, false))}>Pause</button>
             <button type="button" className="btn sm" onClick={() => bulk(setTasksActive(sel, true))}>Resume</button>
-            <button type="button" className="btn sm" onClick={() => setCopying([])}>Add to properties</button>
+            {sel.length === 1
+              ? <button type="button" className="btn sm" onClick={() => { const t = templates.find((x) => x.id === sel[0]); if (t) editProps(t); }}>Properties…</button>
+              : <button type="button" className="btn sm" onClick={() => { setCopyFor(null); setCopying([]); }}>Add to properties</button>}
             {delAsk ? <span className="row2 small" style={{ gap: 6 }}>Delete {sel.length}? Tasks that already ran are paused instead.
               <button type="button" className="btn sm danger" onClick={() => { setDelAsk(false); void bulk(deleteTasks(sel)); }}>Yes, delete</button>
               <button type="button" className="btn sm" onClick={() => setDelAsk(false)}>No</button></span>
@@ -135,6 +149,7 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
       {tab === "categories" && <Categories rows={lib.categories} notify={setToast} />}
       {tab === "counts" && <Counts rows={lib.counts} notify={setToast} />}
       {tab === "clusters" && <Clusters rows={lib.clusters} cities={lib.cities} props={props} reviewers={lib.reviewers} auditors={lib.auditors} cbms={lib.cbms} notify={setToast} />}
+      {tab === "weekoffs" && <WeekOffs cfg={lib.off} today={lib.today} counts={lib.wkCounts} notify={setToast} />}
       {tab === "people" && <>
         <FilterBar search={q} setSearch={setQ} searchLabel="Search properties" chips={city ? [{ key: "city", label: <>City: <b>{city}</b></>, clear: () => setCity("") }] : []}
           panel={<Field label="City"><select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>} />

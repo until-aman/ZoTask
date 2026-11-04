@@ -1,5 +1,7 @@
 // Operations command center: every number on the dashboard comes from here, with the task ids behind it,
 // so each figure can be opened as a list. Every figure counts tasks, each task once.
+import { offCfg, waitMs } from "./offdays";
+import { loadOff } from "./engine";
 import { all } from "./db";
 import { actionLabel } from "./statuses";
 import { HOUR, addDays, isoDate, dayStart } from "./time";
@@ -85,8 +87,8 @@ export function reviewing(revs: Rv[], backlog: Row[], now: number) {
   for (const x of checks) byTask.set(x.instance_id, [...(byTask.get(x.instance_id) ?? []), x]);
   const reviewed = [...byTask.keys()];
   const inSla = reviewed.filter((id) => byTask.get(id)!.every((x) => x.due_at && x.decided_at <= x.due_at));
-  const pend = backlog.filter((r) => REVIEW_ST.includes(r.status));
-  const over = pend.filter((r) => now - r.status_since > r.review_sla_h * HOUR);
+  const pend = backlog.filter((r) => REVIEW_ST.includes(r.status) && r.wk !== "auto");
+  const over = pend.filter((r) => waitMs(offCfg(), r, now) > r.review_sla_h * HOUR);
   // Wait per task: from the submission to the first decision on it in the period.
   const tat = [...byTask.values()].map((t) => { const f = [...t].sort((a, b) => a.decided_at - b.decided_at)[0]; return f.decided_at - f.submitted_at; });
   const sentBack = reviewed.filter((id) => byTask.get(id)!.some((x) => x.decision === "changes"));
@@ -99,6 +101,7 @@ export function reviewing(revs: Rv[], backlog: Row[], now: number) {
 }
 
 export async function buildCommand(u: User, sp: SP, now = Date.now()) {
+  await loadOff();
   const today = isoDate(now);
   const preset = sp.range ?? "7d";
   const R = M.rangeFor(preset, today, sp.from, sp.to);
@@ -157,7 +160,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
       ...(prevIds ? { prev: prevOf ? pct(prevIds.length, prevOf.length) : prevIds.length } : {}) });
 
   // Review missed: tasks from the period that were submitted but are still unreviewed after their review time limit.
-  const reviewMissed = (list: Row[]) => list.filter((r) => REVIEW_ST.includes(r.status) && now - r.status_since > r.review_sla_h * HOUR).map((r) => r.id);
+  const reviewMissed = (list: Row[]) => list.filter((r) => REVIEW_ST.includes(r.status) && waitMs(offCfg(), r, now) > r.review_sla_h * HOUR).map((r) => r.id);
   const submittedIn = cur.filter((r) => r.first_submitted_at).map((r) => r.id);
   const groundK = {
     assigned: k(gC.assigned, undefined, gP.assigned), due: k(gC.due, undefined, gP.due), completed: k(gC.completed, gC.assigned, gP.completed, gP.assigned),
@@ -192,7 +195,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
 
   const issues: Issue[] = [];
   for (const r of open) {
-    const age = now - r.status_since, crit = r.criticality === "high";
+    const age = waitMs(offCfg(), r, now), crit = r.criticality === "high";
     const base = { key: `i${r.id}`, id: r.id, ids: [r.id], property: r.property, pid: r.property_id, city: r.city, cluster: r.cluster, task: r.task,
       status: r.status, rejections: rejOf.get(r.id) ?? 0, comment: commentOf.get(r.id) ?? null, critical: crit,
       date: r.task_date, win: `${r.window_start}–${r.window_end}`, lastL: actionLabel(r.last_type), lastAt: r.last_at ?? r.status_since,
