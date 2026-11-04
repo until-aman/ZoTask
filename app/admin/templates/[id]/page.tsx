@@ -19,7 +19,7 @@ export default async function EditTemplate({ params }: { params: Promise<{ id: s
   const people = await all<{ id: number; name: string; access_role: string; op_role: string | null; props: string | null }>(
     `SELECT u.id, u.name, u.access_role, u.op_role,
       (SELECT group_concat(p.name, ', ') FROM user_properties up JOIN properties p ON p.id=up.property_id WHERE up.user_id=u.id) props
-     FROM users u ORDER BY u.name`);
+     FROM users u WHERE u.archived=0 ORDER BY u.name`);
   const categories = (await all<{ name: string }>("SELECT name FROM task_categories WHERE archived=0 ORDER BY pos, id")).map((c) => c.name);
   return (
     <div className="page">

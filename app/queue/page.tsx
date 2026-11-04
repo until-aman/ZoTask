@@ -34,7 +34,7 @@ export default async function Queue({ searchParams }: { searchParams: Promise<Re
     };
   });
   const views = await viewsFor(u.id, "queue");
-  const reviewers = await all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' ORDER BY name");
+  const reviewers = await all<{ id: number; name: string }>("SELECT id, name FROM users WHERE access_role='reviewer' AND archived=0 ORDER BY name");
   const g = (await geo()).filter((x) => props.includes(x.id));
   const initial = {
     tab: sp.tab, city: sp.city?.split("|"), cluster: sp.cluster?.split("|"), prop: sp.prop?.split("|"),

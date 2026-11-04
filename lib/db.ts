@@ -8,6 +8,7 @@ import { seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
 import { seedLibraries } from "./libraries";
 import { TASK_LIST_VERSION, taskListDone, taskListStatements } from "./cbm-tasks";
+import { removeSampleReviewers } from "./people";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -42,6 +43,7 @@ async function init(): Promise<Client> {
     ["template_items", "photo_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "note_allowed", "INTEGER NOT NULL DEFAULT 1"], ["template_items", "count_of", "TEXT"],
     ["clusters", "reviewer_id", "INTEGER"], ["clusters", "auditor_id", "INTEGER"], ["clusters", "archived", "INTEGER NOT NULL DEFAULT 0"],
     ["map_sites", "gender", "TEXT"], ["map_sites", "details", "TEXT"], ["submissions", "location_src", "TEXT"], ["template_items", "guide", "TEXT"],
+    ["users", "archived", "INTEGER NOT NULL DEFAULT 0"],
   ];
   const have = new Map<string, string[]>();
   for (const [table, col, type] of added) {
@@ -64,6 +66,11 @@ async function init(): Promise<Client> {
       if (stmts.length) await c.batch(["PRAGMA defer_foreign_keys = ON", ...stmts], "write");
     }
   } catch (e) { console.error("Task list update failed; will retry on the next start", e); }
+  // The live database only: the sample data's reviewers give way to the real ones from the cluster sheet.
+  if (REMOTE) {
+    try { await c.batch(await scope.run(c, removeSampleReviewers), "write"); }
+    catch (e) { console.error("Removing the sample reviewers failed; will retry on the next start", e); }
+  }
   return c;
 }
 

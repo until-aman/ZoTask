@@ -202,7 +202,7 @@ async function pickAuditor(i: Instance, reviewerId: number, at: number) {
   const sub = await latestSubmission(i.id);
   const bad = new Set([reviewerId, sub?.submitted_by, i.assignee_id]);
   if (i.auditor_id && !bad.has(i.auditor_id)) return i.auditor_id;
-  const auditors = await all<{ id: number }>("SELECT id FROM users WHERE access_role='auditor' ORDER BY id");
+  const auditors = await all<{ id: number }>("SELECT id FROM users WHERE access_role='auditor' AND archived=0 ORDER BY id");
   return auditors.find((a) => !bad.has(a.id))?.id ?? auditors[0]?.id ?? null;
 }
 

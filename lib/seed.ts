@@ -7,7 +7,7 @@ import {
 import { DAY, HOUR, addDays, atTime, isoDate } from "./time";
 import { insertTaskList } from "./cbm-tasks";
 
-const GEO: Record<string, Record<string, [string, number, number][]>> = {
+export const GEO: Record<string, Record<string, [string, number, number][]>> = {
   Bangalore: {
     Koramangala: [["Zolo Euphoria for Men", 12.9352, 77.6245], ["Zolo Sheldon's Spot for Men", 12.9279, 77.6271], ["Zolo Arcadia", 12.9338, 77.6142]],
     "HSR Layout": [["Zolo Nest HSR", 12.9116, 77.6474], ["Zolo Crest", 12.9081, 77.6409]],

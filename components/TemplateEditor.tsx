@@ -44,9 +44,9 @@ export function describeWhen(t: Pick<T, "trigger" | "frequency" | "days" | "once
   return `Daily ${time}`;
 }
 
-/** One checklist item: the question on top, then how it is answered, photo and note rules. Shared with the admin checklist library. */
-export function ItemCard({ ix, it, last, onChange, onMove, onRemove }: {
-  ix: number; it: It; last: boolean; onChange: (patch: Partial<It>) => void; onMove?: (d: number) => void; onRemove: () => void;
+/** One checklist item: the question on top, then how it is answered, photo and note rules, and (in tasks) reviewer notes. Shared with the admin checklist library. */
+export function ItemCard({ ix, it, last, notes, onChange, onMove, onRemove }: {
+  ix: number; it: It; last: boolean; notes?: boolean; onChange: (patch: Partial<It>) => void; onMove?: (d: number) => void; onRemove: () => void;
 }) {
   const rules = [["Photo", it.photo_allowed, it.photo_required, (v: string) => onChange({ photo_allowed: v !== "off", photo_required: v === "required" })],
     ["Note", it.note_allowed, it.note_required, (v: string) => onChange({ note_allowed: v !== "off", note_required: v === "required" })]] as const;
@@ -78,6 +78,12 @@ export function ItemCard({ ix, it, last, onChange, onMove, onRemove }: {
           </div>
         ))}
       </div>
+      {notes && (
+        <details className="te-guide">
+          <summary>{it.guide ? "Reviewer notes" : "+ Reviewer notes"}</summary>
+          <textarea value={it.guide ?? ""} onChange={(e) => onChange({ guide: e.target.value })} placeholder="What the reviewer should check, and how" aria-label={`Reviewer notes for item ${ix + 1}`} />
+        </details>
+      )}
     </div>
   );
 }
@@ -333,7 +339,7 @@ export default function TemplateEditor({ id, initial, initialItems, selected, ge
               <button type="button" className="btn primary sm" onClick={() => loadChecklist(String(pending.id), true)}>Replace</button><button type="button" className="btn sm" onClick={() => setPending(null)}>Cancel</button></div>}
             <div className="te-items">
               {items.map((it, ix) => (
-                <ItemCard key={ix} ix={ix} it={it} last={ix === items.length - 1} onChange={(patch) => setItem(ix, patch)}
+                <ItemCard key={ix} ix={ix} it={it} last={ix === items.length - 1} notes onChange={(patch) => setItem(ix, patch)}
                   onMove={(d) => moveItem(ix, d)} onRemove={() => setItems(items.filter((_, i) => i !== ix))} />
               ))}
             </div>

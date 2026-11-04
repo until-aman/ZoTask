@@ -19,8 +19,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
     `SELECT p.id, p.name, cl.name cluster, c.name city, u.name cbm, c.id city_id, cl.id cluster_id,
       (SELECT count(*) FROM user_properties up JOIN users x ON x.id=up.user_id WHERE up.property_id=p.id AND x.access_role='ground') staff
      FROM properties p JOIN clusters cl ON cl.id=p.cluster_id JOIN cities c ON c.id=cl.city_id LEFT JOIN users u ON u.id=p.cbm_id ORDER BY c.name, cl.name, p.name`);
-  const people = await all<{ access_role: string; n: number }>("SELECT access_role, count(*) n FROM users GROUP BY access_role");
-  const staff = await all<{ id: number; name: string; access_role: string }>("SELECT id, name, access_role FROM users WHERE access_role IN ('reviewer','auditor') ORDER BY name");
+  const people = await all<{ access_role: string; n: number }>("SELECT access_role, count(*) n FROM users WHERE archived=0 GROUP BY access_role");
+  const staff = await all<{ id: number; name: string; access_role: string }>("SELECT id, name, access_role FROM users WHERE access_role IN ('reviewer','auditor') AND archived=0 ORDER BY name");
   const lib = {
     checklists: await all<Checklist>("SELECT * FROM checklist_presets ORDER BY title"),
     schedules: await all<Schedule>("SELECT * FROM schedule_presets ORDER BY name"),
