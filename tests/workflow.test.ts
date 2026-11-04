@@ -36,7 +36,9 @@ test("full lifecycle with rework and audit", async () => {
   assert.equal(await status(t.id), "changes");
 
   signInAs(t.assignee_id);
-  yes(await A.submitTask(t.id, t.answers, { lat: prop.lat, lng: prop.lng }));
+  // The flagged item needs a reply before the task can go back.
+  assert.equal((await A.submitTask(t.id, t.answers, { lat: prop.lat, lng: prop.lng })).ok, false);
+  yes(await A.submitTask(t.id, t.answers.map((a, ix) => (ix === 0 ? { ...a, reply: "Retaken in daylight" } : a)), { lat: prop.lat, lng: prop.lng }));
   assert.equal(await status(t.id), "resub");
 
   signInAs(REVIEWER);
@@ -76,11 +78,40 @@ test("P0-7: the server works out the distance; a simulated location is recorded 
   assert.ok(await one("SELECT 1 FROM events WHERE instance_id=? AND type='location_warning'", sim.id));
 });
 
-test("a reviewer can pass an item with missing evidence, and the history says so", async () => {
+test("a task can't be sent with a compulsory photo or note missing, an unanswered question or a negative number", async () => {
   const t = await freshTask();
-  const prop = (await one<{ lat: number; lng: number }>("SELECT lat, lng FROM properties WHERE id=1"))!;
+  await one("UPDATE template_items SET note_required=1 WHERE template_id=(SELECT template_id FROM instances WHERE id=?) AND kind='check' RETURNING id", t.id);
   signInAs(t.assignee_id);
-  yes(await A.submitTask(t.id, t.answers.map((a) => ({ ...a, photos: [] })), { lat: prop.lat, lng: prop.lng }));
+  const send = (f: (a: typeof t.answers[number], ix: number) => object) => A.submitTask(t.id, t.answers.map((a, ix) => ({ ...a, ...f(a, ix) })), "simulated");
+  const noPhoto = await send(() => ({ photos: [] }));
+  assert.equal(noPhoto.ok, false);
+  assert.match(noPhoto.ok ? "" : noPhoto.error, /Area clean.*photo/i);
+  assert.match(String(((await send(() => ({ note: " " }))) as { error?: string }).error), /note/i);
+  assert.match(String(((await send((a, ix) => (ix === 1 ? { value: "" } : {}))) as { error?: string }).error), /Pick an answer/);
+  assert.match(String(((await send((a, ix) => (ix === 1 ? { value: "Maybe" } : {}))) as { error?: string }).error), /one of the options/);
+  assert.match(String(((await send((a, ix) => (ix === 0 ? { checked: false, note: "" } : {}))) as { error?: string }).error), /say|why/i);
+  assert.equal(await status(t.id), "current", "nothing was submitted");
+  yes(await send(() => ({ note: "ok" })));
+});
+
+test("numbers can't be negative", async () => {
+  const { answerIssue, nonNegative } = await import("@/lib/answers");
+  const num = { id: 1, kind: "number" }, cnt = { id: 2, kind: "count" };
+  assert.match(answerIssue(num, { value: "-3" })!, /negative/);
+  assert.equal(answerIssue(num, { value: "0" }), null);
+  assert.equal(answerIssue(num, { value: "2.5" }), null);
+  assert.match(answerIssue(cnt, { value: "2.5" })!, /whole/);
+  assert.match(answerIssue(num, { value: "abc" })!, /Enter a number/);
+  assert.equal(nonNegative("-12"), "12");
+  assert.equal(nonNegative("1.2.3"), "1.23");
+  assert.equal(nonNegative("-4.5", true), "45");
+});
+
+test("a reviewer can pass an item with missing evidence, and the history says so", async () => {
+  // Older submissions (from before evidence was enforced on the form) can still lack evidence.
+  const t = await freshTask();
+  signInAs(t.assignee_id);
+  await E.submit(t.id, t.assignee_id, t.answers.map((a) => ({ ...a, photos: [] })), { ok: true, distance: 0 }, Date.now());
   signInAs(REVIEWER);
   yes(await A.reviewTask(t.id, "pass", [], "Photo upload was broken", Date.now()));
   assert.equal(await status(t.id), "audit");

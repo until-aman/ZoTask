@@ -1,6 +1,6 @@
 "use client";
 import { fmtTime } from "@/lib/time";
-import { choicesFor } from "@/lib/answers";
+import { answerIssue, choicesFor, nonNegative } from "@/lib/answers";
 import { tryUpload } from "./upload";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -96,14 +96,19 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
       { enableHighAccuracy: true, timeout: 10000 });
   }
 
-  const problems = items.filter((it) => {
-    const a = ans[it.id];
-    return (it.kind === "check" ? !a.checked : !a.value) || (!!it.photo_required && !a.photos.length) || (!!it.note_required && !a.note);
-  });
+  // What's still missing per item. Shown under each item once Submit was pressed, or as soon as an item has been touched.
+  const issues = Object.fromEntries(items.map((it) => [it.id, answerIssue(it, ans[it.id], flags.some((f) => f.item_id === it.id))]));
+  const problems = items.filter((it) => issues[it.id]);
+  const [tried, setTried] = useState(false);
 
   async function onSubmit() {
     setErr("");
     if (pending) return setErr("Wait for the photos to finish uploading.");
+    if (problems.length) {
+      setTried(true);
+      document.getElementById(`item-${problems[0].id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return setErr(`${problems.length === 1 ? "1 item needs" : `${problems.length} items need`} attention before you can submit.`);
+    }
     if (property.geofence && !loc.where && !locWarned) {
       setLocWarned(true);
       return setErr("Location hasn't been checked. Validate it, or press Submit again to send without it. The reviewer will see that.");
@@ -138,7 +143,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
         const a = ans[it.id];
         const flag = flags.find((f) => f.item_id === it.id);
         return (
-          <div key={it.id} className={`item${flag ? " flagged" : ""}`}>
+          <div key={it.id} id={`item-${it.id}`} className={`item${flag ? " flagged" : ""}${tried && issues[it.id] ? " missing" : ""}`}>
             <div className="row2">
               {it.kind === "check" ? (
                 <label className="row2" style={{ fontWeight: 700 }}>
@@ -147,16 +152,16 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
                 </label>
               ) : <b>{it.label}</b>}
               <span className="spacer" />
-              {it.photo_required ? <span className="pill">Photo needed</span> : null}
-              {it.note_required ? <span className="pill">Note needed</span> : null}
+              {it.photo_required ? <span className={`pill${tried && !a.photos.length ? " r" : ""}`}>Photo compulsory</span> : null}
+              {it.note_required ? <span className={`pill${tried && !a.note.trim() ? " r" : ""}`}>Note compulsory</span> : null}
             </div>
             {flag && <div className="small warn">Flagged: {flag.reason}{flag.comment ? ` · “${flag.comment}”` : ""}</div>}
             <div className="ansrow">
-            {it.kind === "count" && <label className="small muted">Number of {it.count_of === "SHK" ? "SHKs" : "HKs"} present<input type="number" min={0} value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} style={{ width: 140, display: "block" }} aria-label={it.label} /></label>}
+            {it.kind === "count" && <label className="small muted">Number of {it.count_of === "SHK" ? "SHKs" : "HKs"} present<input type="text" inputMode="numeric" pattern="[0-9]*" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value, true) })} style={{ width: 140, display: "block" }} aria-label={it.label} /></label>}
             {choicesFor(it) && <div className="seg seg-wrap" role="group" aria-label={it.label}>
               {choicesFor(it)!.map((v) => <button key={v} type="button" aria-pressed={a.value === v} onClick={() => set(it.id, { value: v })}>{v}</button>)}
             </div>}
-            {it.kind === "number" && <input type="number" min={0} value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} style={{ width: 140 }} aria-label={it.label} />}
+            {it.kind === "number" && <input type="text" inputMode="decimal" value={a.value} onChange={(e) => set(it.id, { value: nonNegative(e.target.value) })} style={{ width: 140 }} aria-label={it.label} placeholder="0 or more" />}
             {it.kind === "text" && <textarea value={a.value} onChange={(e) => set(it.id, { value: e.target.value })} aria-label={it.label} />}
             {!!(it.photo_allowed || it.photo_required) && <div className="photos">
               {a.photos.map((p, ix) => (
@@ -176,7 +181,8 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
             </div>}
             </div>
             {failed[it.id] && <div className="small warn" role="alert">{failed[it.id]}</div>}
-            {!!(it.note_allowed || it.note_required) && <input type="text" placeholder={it.note_required ? "Note (required)" : "Note (optional)"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />}
+            {tried && issues[it.id] && <div className="small t-r" role="alert">{issues[it.id]}</div>}
+            {!!(it.note_allowed || it.note_required || (it.kind === "check" && !a.checked)) && <input type="text" placeholder={it.note_required ? "Note (compulsory)" : it.kind === "check" && !a.checked ? "Not done? Say why" : "Note (optional)"} value={a.note} onChange={(e) => set(it.id, { note: e.target.value })} />}
             {flag && <input type="text" placeholder="Reply to the reviewer" value={a.reply} onChange={(e) => set(it.id, { reply: e.target.value })} />}
           </div>
         );
@@ -189,7 +195,7 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
           <span className={`small ${loc.ok === false ? "warn" : "muted"}`}>{loc.msg}</span>
         </div>
       )}
-      {problems.length > 0 && <div className="info"><i>!</i>{problems.length} item{problems.length > 1 ? "s are" : " is"} incomplete. The reviewer can't pass a task with missing evidence.</div>}
+      {problems.length > 0 && <div className="info"><i>!</i>{problems.length} item{problems.length > 1 ? "s are" : " is"} still incomplete. Compulsory photos and notes, and an answer to every question, are needed to submit.</div>}
       {err && <div className="err">{err}</div>}
       <div className="row2">
         <button type="button" className="btn primary" disabled={busy || pending > 0} onClick={onSubmit}>{busy ? "Submitting…" : pending ? `Uploading ${pending} photo${pending > 1 ? "s" : ""}…` : status === "changes" ? "Resubmit" : "Submit"}</button>

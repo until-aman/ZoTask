@@ -6,7 +6,7 @@ import { requireUser, can, inScope, taskInScope, requireTasks } from "@/lib/auth
 import { all, one, run, tx } from "@/lib/db";
 import * as E from "@/lib/engine";
 import { km } from "@/lib/geo";
-import { cleanOptions } from "@/lib/answers";
+import { answerIssue, cleanOptions } from "@/lib/answers";
 
 type Result = { ok: true; msg?: string } | { ok: false; error: string };
 async function guard(fn: () => Promise<string | void>): Promise<Result> {
@@ -40,7 +40,14 @@ export async function submitTask(instanceId: number, answers: E.AnswerInput[], w
       const d = Math.round(km(site as { lat: number; lng: number }, where) * 1000);
       loc = { ok: d <= site.geofence_m, distance: d, source: "gps" };
     }
-    await E.submit(instanceId, u.id, answers, loc, Date.now());
+    // Every item complete: compulsory photos and notes, an answer to each question, no negative numbers.
+    const items = await E.itemsFor(i.template_id);
+    const flagged = new Set(i.status === "changes" ? (await all<{ item_id: number }>(
+      "SELECT f.item_id FROM review_flags f WHERE f.review_id=(SELECT id FROM reviews WHERE instance_id=? ORDER BY decided_at DESC LIMIT 1)", instanceId)).map((f) => f.item_id) : []);
+    const byItem = new Map(answers.map((a) => [a.itemId, a]));
+    const bad = items.map((it, ix) => [ix + 1, it, answerIssue(it, byItem.get(it.id), flagged.has(it.id))] as const).filter(([, , w]) => w);
+    if (bad.length) throw new Error(`${bad.length === 1 ? "1 item isn't" : `${bad.length} items aren't`} complete. ${bad.slice(0, 3).map(([n, it, w]) => `Item ${n} (${it.label}): ${w}.`).join(" ")}`);
+    await E.submit(instanceId, u.id, answers.map((a) => ({ ...a, value: a.value?.trim() ?? a.value, note: a.note?.trim() ?? a.note })), loc, Date.now());
     return "Submitted";
   });
 }
