@@ -1,6 +1,7 @@
 "use client";
 // Shared pieces of the command center: the drill-down context, clickable figures, a sortable table and small charts.
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { keyFor, useUrlState } from "@/components/ui/useUrlState";
 import { ColumnsMenu, ExportMenu, Person, RowMenu, useHiddenCols, type RowAction } from "@/components/ui/TableKit";
 import type { K, T } from "@/lib/command";
 import InfoTip from "@/components/InfoTip";
@@ -104,11 +105,16 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, 
   /** The row's ⋯ menu. */
   actions?: (r: R) => RowAction[];
 }) {
-  const [own, setQ] = useState("");
+  // Search, sort and page live in the address, so Back returns to the same spot in the table.
+  const uk = keyFor(name);
+  const [own, setQ] = useUrlState(`${uk}-q`, "");
   const q = query ?? own;
-  const [sort, setSort] = useState(initialSort ?? null);
+  const [sortRaw, setSortRaw] = useUrlState(`${uk}-sort`, initialSort ? `${initialSort.key}${initialSort.dir === -1 ? "-1" : ".1"}` : "");
+  const sort = sortRaw ? { key: sortRaw.replace(/[.-]1$/, ""), dir: (sortRaw.endsWith("-1") ? -1 : 1) as 1 | -1 } : null;
+  const setSort = (x: { key: string; dir: 1 | -1 } | null) => setSortRaw(x ? `${x.key}${x.dir === -1 ? "-1" : ".1"}` : "");
   const [hidden, toggleCol] = useHiddenCols(name, cols.filter((c) => c.hidden).map((c) => c.key));
-  const [page, setPage] = useState(0);
+  const [pg1, setPg1] = useUrlState(`${uk}-pg`, 1);
+  const page = Math.max(0, pg1 - 1), setPage = (n: number) => setPg1(n + 1);
   const [chosen, setSize] = usePageSize();
   const pageSize = fixed ?? chosen;
   const [openRows, setOpenRows] = useState<Set<string | number>>(new Set());
@@ -128,7 +134,8 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, 
     }
     return l;
   }, [rows, q, sort, cols, search]);
-  useEffect(() => setPage(0), [query]);
+  const firstQuery = useRef(query);
+  useEffect(() => { if (query !== firstQuery.current) { firstQuery.current = query; setPage(0); } }, [query]); // eslint-disable-line react-hooks/exhaustive-deps
   const pg = clampPage(page, list.length, pageSize);
   const view = list.slice(pg * pageSize, pg * pageSize + pageSize);
   // Exports carry the columns on screen, as plain values.

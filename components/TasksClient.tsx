@@ -1,5 +1,6 @@
 "use client";
 // My Tasks for the ground team and CBMs: counts per list on top, then search and filters, then the tasks, 20 a page.
+import { urlHas, useUrlPage, useUrlSort, useUrlState } from "@/components/ui/useUrlState";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -22,18 +23,18 @@ const TABS: [string, string][] = [["all", "All pending"], ["now", "Current and u
 
 export default function TasksClient({ lists, tab, range, from, to, today, views }: { lists: Record<string, MyTask[]>; tab: string; range: string; from: string; to: string; today: string; views: SavedView[] }) {
   const router = useRouter();
-  const [q, setQ] = useState("");
-  const [prop, setProp] = useState("");
-  const [cat, setCat] = useState("");
-  const [crit, setCrit] = useState(false);
-  const [sort, setSort] = useState<SortState>(null);
-  const [page, setPage] = useState(0);
+  const [q, setQ] = useUrlState("q", "");
+  const [prop, setProp] = useUrlState("prop", "");
+  const [cat, setCat] = useUrlState("cat", "");
+  const [crit, setCrit] = useUrlState("crit", false);
+  const [sort, setSort] = useUrlSort("sort");
+  const [page, setPage] = useUrlPage("pg");
   const [toast, setToast] = useState("");
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); }, [toast]);
   const current = { prop, cat, crit };
   const apply = (f: Record<string, unknown>) => { setProp(String(f.prop ?? "")); setCat(String(f.cat ?? "")); setCrit(!!f.crit); setPage(0); };
   const def = views.find((v) => v.def);
-  useEffect(() => { if (def && !sameFilters(def.f, current)) apply(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (def && !urlHas(["prop", "cat", "crit"]) && !sameFilters(def.f, current)) apply(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const everything = Object.values(lists).flat();
   const props = [...new Set(everything.map((t) => t.property))].sort(), cats = [...new Set(everything.map((t) => t.category))].sort();
@@ -45,7 +46,12 @@ export default function TasksClient({ lists, tab, range, from, to, today, views 
   const shown = list.slice(pg * size, pg * size + size);
   const nice = (d: string) => fmtDate(d);
   const dateQ = range === "custom" ? `&range=custom&from=${from}&to=${to}` : range === "today" ? "" : `&range=${range}`;
-  const go = (t: string, q = dateQ) => router.push(`/tasks?tab=${t}${q}`);
+  // A new tab or date range starts at page 1; search, filters and sort carry over.
+  const go = (t: string, dq = dateQ) => {
+    const keep = new URLSearchParams(window.location.search);
+    for (const k of ["tab", "range", "from", "to", "date", "pg"]) keep.delete(k);
+    router.push(`/tasks?tab=${t}${dq}${keep.toString() ? `&${keep}` : ""}`);
+  };
   const span = from === to ? nice(from) : `${nice(from)} – ${nice(to)}`;
   const chips: ActiveChip[] = [
     ...(prop ? [{ key: "prop", label: <>Property: <b>{prop}</b></>, clear: () => setProp("") }] : []),

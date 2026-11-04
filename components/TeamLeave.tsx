@@ -2,6 +2,7 @@
 // Team leave: each person's weekly days off, leave and backup. While someone is off, their tasks go to their backup
 // (or a teammate with the same role at that property); with nobody to cover, the task is excused and not counted.
 // Reviews and audits waiting for someone who's off go to their backup; with no backup, their clock pauses.
+import { useUrlState } from "@/components/ui/useUrlState";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addLeave, removeLeave, saveWeekOff } from "@/app/actions";
@@ -23,9 +24,9 @@ type Data = { people: TeamPerson[]; options: Record<number, number[]>; names: Re
 export default function TeamLeave({ data, admin }: { data: Data; admin: boolean }) {
   const router = useRouter();
   const { people, names, today } = data;
-  const [q, setQ] = useState("");
-  const [role, setRole] = useState("");
-  const [show, setShow] = useState<"" | "off" | "nobackup">("");
+  const [q, setQ] = useUrlState("q", "");
+  const [role, setRole] = useUrlState("role", "");
+  const [showRaw, setShowRaw] = useUrlState("show", ""); const show = showRaw as "" | "off" | "nobackup", setShow = (x: "" | "off" | "nobackup") => setShowRaw(x);
   const [edit, setEdit] = useState<number | null>(null);
   const [toast, setToast] = useState("");
   const offToday = (p: TeamPerson) => personOffWhy(offOf(p), today);

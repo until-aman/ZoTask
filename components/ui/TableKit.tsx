@@ -106,6 +106,17 @@ export function Person({ name, sub }: { name: string | null | undefined; sub?: R
   return <span className="person"><Avatar name={name} /><span className="person-t"><span>{name || "Unassigned"}</span>{sub ? <small>{sub}</small> : null}</span></span>;
 }
 
+/** Tables with tick boxes call this so that opening one row's ⋯ menu lets go of the ticked rows: one row is worked on at a time. */
+export function useClearOnRowMenu(clear: () => void) {
+  const ref = useRef(clear);
+  ref.current = clear;
+  useEffect(() => {
+    const on = () => ref.current();
+    window.addEventListener("zt:rowmenu", on);
+    return () => window.removeEventListener("zt:rowmenu", on);
+  }, []);
+}
+
 export type RowAction = { label: string; onClick: () => unknown; danger?: boolean; confirm?: string; hidden?: boolean };
 /** ⋯ at the end of a row with that row's actions. A `confirm` action asks inside the menu before it runs. */
 export function RowMenu({ actions, label = "Row actions" }: { actions: RowAction[]; label?: string }) {
@@ -126,6 +137,7 @@ export function RowMenu({ actions, label = "Row actions" }: { actions: RowAction
     if (open) return close();
     const r = e.currentTarget.getBoundingClientRect(), up = window.innerHeight - r.bottom < 40 * list.length + 40;
     setPos({ right: Math.max(8, window.innerWidth - r.right), ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
+    window.dispatchEvent(new Event("zt:rowmenu"));
     setOpen(true);
   };
   if (!list.length) return null;

@@ -1,13 +1,15 @@
 "use client";
 // Admin: task setup (with bulk actions), the libraries tasks draw on, and properties and people.
+import { urlHas, useUrlState, writeUrl } from "@/components/ui/useUrlState";
 import WeekOffs from "./WeekOffs";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { copyTasksTo, deleteTasks, setTaskProperties, setTasksActive } from "@/app/admin-actions";
 import { describeWhen } from "@/components/TemplateEditor";
 import { Categories, Category, Checklist, Checklists, Cluster, Clusters, Count, Counts, Schedule, Schedules } from "./Libraries";
 import { Table, type Col } from "@/components/cc/parts";
+import { useClearOnRowMenu } from "@/components/ui/TableKit";
 import { ActiveChip, Field, FilterBar, SavedView, Stats, sameFilters } from "@/components/ui/Filters";
 
 export type Tpl = { id: number; name: string; category: string; op_role: string; trigger: string; event_name: string | null; frequency: string; window_start: string; window_end: string;
@@ -25,10 +27,13 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
   tab: string; templates: Tpl[]; props: Prop[]; people: { access_role: string; n: number }[]; views: SavedView[]; lib: Lib; children: React.ReactNode;
 }) {
   const router = useRouter();
-  const [tab, setTabState] = useState(TABS.some(([k]) => k === tab0) ? tab0 : "tasks");
+  // The address is the truth for the tab: on Back the page may come from memory with the first load's tab.
+  const tabUrl = useSearchParams()?.get("tab") ?? tab0;
+  const [tab, setTabState] = useState(TABS.some(([k]) => k === tabUrl) ? tabUrl : "tasks");
   useEffect(() => { if (TABS.some(([k]) => k === tab0)) setTabState(tab0); }, [tab0]);
-  const setTab = (k: string) => { setTabState(k); router.replace(k === "tasks" ? "/admin" : `/admin?tab=${k}`); };
+  const setTab = (k: string) => { setTabState(k); writeUrl({ tab: k === "tasks" ? null : k }); };
   const [sel, setSel] = useState<number[]>([]);
+  useClearOnRowMenu(() => setSel([]));
   const [copying, setCopying] = useState<number[] | null>(null);
   // One task: the panel shows its current properties ticked and saves exactly what's ticked. Several: it only adds.
   const [copyFor, setCopyFor] = useState<Tpl | null>(null);
@@ -37,18 +42,18 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
   const closeCopy = () => { setCopying(null); setCopyFor(null); };
   const [delAsk, setDelAsk] = useState(false);
   const bulk = async (p: Promise<{ ok: true; msg?: string } | { ok: false; error: string }>) => { const r = await p; setToast(r.ok ? r.msg ?? "Done" : r.error); if (r.ok) { setSel([]); router.refresh(); } return r.ok; };
-  const [q, setQ] = useState("");
-  const [cat, setCat] = useState("");
-  const [role, setRole] = useState("");
-  const [trig, setTrig] = useState("");
-  const [state, setState] = useState("");
-  const [city, setCity] = useState("");
+  const [q, setQ] = useUrlState("q", "");
+  const [cat, setCat] = useUrlState("cat", "");
+  const [role, setRole] = useUrlState("role", "");
+  const [trig, setTrig] = useUrlState("trig", "");
+  const [state, setState] = useUrlState("state", "");
+  const [city, setCity] = useUrlState("city", "");
   const [toast, setToast] = useState("");
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); }, [toast]);
   const current = { cat, role, trig, state, city };
   const apply = (f: Record<string, unknown>) => { const g = (k: string) => String(f[k] ?? ""); setCat(g("cat")); setRole(g("role")); setTrig(g("trig")); setState(g("state")); setCity(g("city")); };
   const def = views.find((v) => v.def);
-  useEffect(() => { if (def && !sameFilters(def.f, current)) apply(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (def && !urlHas(["cat", "role", "trig", "state", "city"]) && !sameFilters(def.f, current)) apply(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cats = [...new Set(templates.map((t) => t.category))].sort(), roles = [...new Set(templates.map((t) => t.op_role))].sort(), cities = [...new Set(props.map((p) => p.city))];
   const tpl = templates.filter((t) => (!cat || t.category === cat) && (!role || t.op_role === role) && (!trig || t.trigger === trig)

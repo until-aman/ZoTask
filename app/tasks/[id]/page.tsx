@@ -1,6 +1,7 @@
 import { actionLabel } from "@/lib/statuses";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { boot } from "@/lib/boot";
 import { taskInScope } from "@/lib/auth";
 import { all, one } from "@/lib/db";
@@ -32,7 +33,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="page">
-      <Link href="/tasks" className="crumb">‹ My Tasks</Link>
+      <BackLink href="/tasks" label="My Tasks" />
       <div className="phead">
         <div>
           <h1>{r.task}</h1>

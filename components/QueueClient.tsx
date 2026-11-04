@@ -4,9 +4,10 @@
 import { addDays, fmtDate, fmtDateTime } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { writeUrl } from "@/components/ui/useUrlState";
 import { getHistory, pullBackTask, reassignReviewer, remindTasks, ViewFilters } from "@/app/actions";
-import { ColumnsMenu, ExportMenu, Person, RowMenu, useHiddenCols } from "@/components/ui/TableKit";
+import { ColumnsMenu, ExportMenu, Person, RowMenu, useClearOnRowMenu, useHiddenCols } from "@/components/ui/TableKit";
 import { ActiveChip, DateRow, Field, FilterBar, SearchPick, Pager, clampPage, usePageSize, SavedView, SortHead, SortState, Stats, sortRows } from "@/components/ui/Filters";
 
 export type QItem = {
@@ -57,19 +58,36 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   initial: { tab?: string; city?: string[]; cluster?: string[]; prop?: string[]; from?: string; to?: string; bucket?: string; over?: boolean };
 }) {
   const router = useRouter();
-  const fromLink = !!(initial.tab || initial.city || initial.prop || initial.from);
+  // Everything about the view lives in the address, so Back from a review sheet lands on the same tab, filters, search, page and open task.
+  const sp = useSearchParams();
+  const g0 = (k: string) => sp?.get(k) ?? null, l0 = (k: string) => g0(k)?.split("|").filter(Boolean) ?? [];
+  // On Back the page comes from the browser's memory with the first load's server data, so the address is the truth for the view.
+  if (sp) initial = { ...initial, tab: g0("tab") ?? undefined, city: g0("city") ? l0("city") : undefined, cluster: g0("cluster") ? l0("cluster") : undefined,
+    prop: g0("prop") ? l0("prop") : undefined, from: g0("from") ?? undefined, to: g0("to") ?? undefined, bucket: g0("bucket") ?? undefined, over: g0("over") === "1" };
+  const d0 = g0("d"), sort0 = g0("sort");
+  const fromLink = !!(initial.tab || initial.city || initial.prop || initial.from || d0 || g0("role") || g0("asg") || g0("cbm") || g0("rv") || g0("mine"));
   const defView = views.find((v) => v.def);
-  const [f, setF] = useState<ViewFilters>(() => fromLink ? { ...empty, city: initial.city ?? [], cluster: initial.cluster ?? [], prop: initial.prop ?? [] } : defView ? { ...empty, ...(defView.f as Partial<ViewFilters>) } : empty);
-  const [date, setDateMode] = useState(initial.from ? "custom" : "today");
-  const [from, setFrom] = useState(initial.from ?? today);
-  const [to, setTo] = useState(initial.to ?? today);
+  const [f, setF] = useState<ViewFilters>(() => fromLink ? { ...empty, city: initial.city ?? [], cluster: initial.cluster ?? [], prop: initial.prop ?? [], role: l0("role"), asg: l0("asg"), cbm: l0("cbm"), rv: l0("rv"), mine: g0("mine") === "1" } : defView ? { ...empty, ...(defView.f as Partial<ViewFilters>) } : empty);
+  const dates0: Record<string, [string, string]> = { yday: [addDays(today, -1), addDays(today, -1)], "7d": [addDays(today, -6), today] };
+  const [date, setDateMode] = useState(initial.from ? "custom" : d0 && dates0[d0] ? d0 : "today");
+  const [from, setFrom] = useState(initial.from ?? (d0 && dates0[d0] ? dates0[d0][0] : today));
+  const [to, setTo] = useState(initial.to ?? (d0 && dates0[d0] ? dates0[d0][1] : today));
   const [tab, setTab] = useState(initial.tab ?? "review");
   const [bk, setBk] = useState(initial.bucket ?? (initial.over ? "over" : "all"));
-  const [q, setQ] = useState("");
-  const [sort, setSort] = useState<SortState>(null);
-  const [page, setPage] = useState(0);
+  const [q, setQ] = useState(g0("q") ?? "");
+  const [sort, setSort] = useState<SortState>(sort0 ? { key: sort0.replace(/[.-]1$/, ""), dir: sort0.endsWith("-1") ? -1 : 1 } : null);
+  const [page, setPage] = useState(Math.max(0, Number(g0("pg") ?? 1) - 1) || 0);
   const [sel, setSel] = useState<Set<number>>(new Set());
-  const [open, setOpen] = useState<number | null>(null);
+  const [open, setOpen] = useState<number | null>(g0("open") ? Number(g0("open")) : null);
+  useEffect(() => {
+    const j = (l: string[]) => (l.length ? l.join("|") : null);
+    writeUrl({ tab: tab === "review" ? null : tab, bucket: bk === "all" ? null : bk, over: null,
+      d: date === "today" || date === "custom" ? null : date, from: date === "custom" ? from : null, to: date === "custom" ? to : null,
+      city: j(f.city), cluster: j(f.cluster), prop: j(f.prop), role: j(f.role), asg: j(f.asg), cbm: j(f.cbm), rv: j(f.rv), mine: f.mine ? "1" : null,
+      q: q || null, pg: page ? String(page + 1) : null, sort: sort ? `${sort.key}${sort.dir === -1 ? "-1" : ".1"}` : null, open: open === null ? null : String(open) });
+  }, [tab, bk, date, from, to, f, q, page, sort, open]);
+  // Opening one row's ⋯ menu works on that row only, so any ticked rows are let go.
+  useClearOnRowMenu(() => setSel(new Set()));
   const [pop, setPop] = useState<string | null>(null);
   const [modal, setModal] = useState<"reassign" | null>(null);
   const [toast, setToast] = useState("");

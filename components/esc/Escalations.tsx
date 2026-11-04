@@ -1,5 +1,6 @@
 "use client";
 // Escalation tracker: the central team raises issues with other teams, follows them to closure, and leadership sees the totals.
+import { urlHas, useUrlState } from "@/components/ui/useUrlState";
 import { fmtDay, fmtDate, fmtDateTime, addDays, dayStart, isoDate } from "@/lib/time";
 import { useEffect, useMemo, useState } from "react";
 import { uploadPhoto } from "../upload";
@@ -44,18 +45,18 @@ type Focus = { label: string; ids: number[] } | null;
 
 export default function Escalations({ data: d, views }: { data: EscData; views: SavedView[] }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"tracker" | "summary">("tracker");
-  const [quick, setQuick] = useState<Quick>("open");
-  const [dept, setDept] = useState("");
-  const [city, setCity] = useState("");
-  const [cluster, setCluster] = useState("");
-  const [prop, setProp] = useState("");
-  const [owner, setOwner] = useState("");
-  const [by, setBy] = useState("");
+  const [tabRaw, setTabRaw] = useUrlState("view", "tracker"); const tab = tabRaw as "tracker" | "summary", setTab = (t: "tracker" | "summary") => setTabRaw(t);
+  const [quickRaw, setQuickRaw] = useUrlState("show", "open"); const quick = quickRaw as Quick, setQuick = (k: Quick) => setQuickRaw(k);
+  const [dept, setDept] = useUrlState("dept", "");
+  const [city, setCity] = useUrlState("city", "");
+  const [cluster, setCluster] = useUrlState("cluster", "");
+  const [prop, setProp] = useUrlState("prop", "");
+  const [owner, setOwner] = useUrlState("owner", "");
+  const [by, setBy] = useUrlState("by", "");
   const [period, setPeriod] = useState<Dates>({ k: "30d", from: "", to: "" });
   const [raisedW, setRaisedW] = useState<Dates>({ k: "all", from: "", to: "" });
   const [focus, setFocus] = useState<Focus>(null);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useUrlState("q", "");
   const [open, setOpen] = useState<number | null>(d.openId);
   useEffect(() => { if (d.openId) { setOpen(d.openId); setQuick("all"); } }, [d.openId]);
   const [raising, setRaising] = useState(d.openNew && d.canRaise);
@@ -87,7 +88,7 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
   const current = { dept, city, cluster, prop, owner, by, raised: raisedW.k === "all" ? "" : raisedW.k, ...(raisedW.k === "custom" ? { from: raisedW.from, to: raisedW.to } : {}) };
   const applyF = (f: Record<string, unknown>) => { const g = (k: string) => String(f[k] ?? ""); setDept(g("dept")); setCity(g("city")); setCluster(g("cluster")); setProp(g("prop")); setOwner(g("owner")); setBy(g("by")); setRaisedW({ k: g("raised") || "all", from: g("from"), to: g("to") }); setFocus(null); };
   const def = views.find((v) => v.def);
-  useEffect(() => { if (def && !d.openNew && !sameFilters(def.f, current)) applyF(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (def && !d.openNew && !urlHas(["dept", "city", "cluster", "prop", "owner", "by"]) && !sameFilters(def.f, current)) applyF(def.f); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const propName = d.geo.find((g) => String(g.id) === prop)?.property;
   const chips: ActiveChip[] = [
     ...(focus ? [{ key: "focus", label: <>Showing: <b>{focus.label}</b> ({focus.ids.length})</>, clear: () => setFocus(null) }] : []),

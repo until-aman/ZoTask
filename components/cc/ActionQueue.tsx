@@ -1,5 +1,6 @@
 "use client";
 // Action required: every open problem once, most severe first, with the person who must act and what to do.
+import { useUrlPage, useUrlSort, useUrlState } from "@/components/ui/useUrlState";
 import { fmtAt, fmtDate, fmtDateTime } from "@/lib/time";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -7,7 +8,7 @@ import type { Issue, T } from "@/lib/command";
 import { acknowledgeIssues, remindTasks } from "@/app/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/statuses";
 import { InfoTip, dur, useDrill, CopyModal } from "./parts";
-import { ColumnsMenu, ExportMenu, Person, RowMenu, useHiddenCols } from "@/components/ui/TableKit";
+import { ColumnsMenu, ExportMenu, Person, RowMenu, useClearOnRowMenu, useHiddenCols } from "@/components/ui/TableKit";
 import { ActiveChip, Field, FilterBar, SearchPick, Pager, SortState, clampPage, usePageSize, Stats, nextSort, sortRows } from "@/components/ui/Filters";
 
 const CATS: [Issue["cat"] | "all", string][] = [["all", "All"], ["critical", "Critical"], ["ground", "Ground team overdue"], ["review", "Review SLA breaches"], ["repeat", "Repeated rejections"], ["exception", "Exceptions"]];
@@ -23,14 +24,15 @@ export default function ActionQueue({ issues, now, me, isAdmin = false, canEscal
 }) {
   const router = useRouter();
   const { open } = useDrill();
-  const [cat, setCat] = useState<Issue["cat"] | "all">("all");
-  const [owner, setOwner] = useState("");
-  const [sev, setSev] = useState("");
-  const [q, setQ] = useState("");
-  const [hideAck, setHideAck] = useState(false);
+  const [catRaw, setCatRaw] = useUrlState("aq", "all"); const cat = catRaw as Issue["cat"] | "all", setCat = (c: Issue["cat"] | "all") => setCatRaw(c);
+  const [owner, setOwner] = useUrlState("aq-owner", "");
+  const [sev, setSev] = useUrlState("aq-sev", "");
+  const [q, setQ] = useUrlState("aq-q", "");
+  const [hideAck, setHideAck] = useUrlState("aq-hideack", false);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(0);
-  const [sort, setSort] = useState<SortState>(null);
+  useClearOnRowMenu(() => setSel(new Set()));
+  const [page, setPage] = useUrlPage("aq-pg");
+  const [sort, setSort] = useUrlSort("aq-sort");
   const [size, setSize] = usePageSize();
   const [ho, setHo] = useState<string | null>(null);
   const owners = useMemo(() => [...new Set(issues.map((i) => i.owner))].sort(), [issues]);

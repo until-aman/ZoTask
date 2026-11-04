@@ -1,6 +1,7 @@
 import { actionLabel } from "@/lib/statuses";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import BackLink from "@/components/BackLink";
 import { locationLabel } from "@/lib/geo";
 import { boot } from "@/lib/boot";
 import { can, taskInScope } from "@/lib/auth";
@@ -45,7 +46,7 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
 
   return (
     <div className="page">
-      {can.queue(u) ? <Link href="/queue" className="crumb">‹ Review Queue</Link> : <Link href="/tasks" className="crumb">‹ My Tasks</Link>}
+      {can.queue(u) ? <BackLink href="/queue" label="Review Queue" /> : <BackLink href="/tasks" label="My Tasks" />}
       <div className="phead">
         <div>
           <h1>{r.task}</h1>
