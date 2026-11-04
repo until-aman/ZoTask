@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser, can } from "@/lib/auth";
 import { all, one, run, tx } from "@/lib/db";
+import { dropUpcoming } from "@/lib/engine";
 import { ClusterPlan, planClusters, Snapshot } from "@/lib/cluster-sheet";
 import { fillFromCluster, setPropertyCbm } from "@/lib/people";
 
@@ -157,6 +158,20 @@ export async function setTasksActive(ids: number[], active: boolean) {
   return admin(async () => {
     for (const id of ids) await run("UPDATE templates SET active=? WHERE id=?", active ? 1 : 0, id);
     return `${active ? "Resumed" : "Paused"} ${ids.length} ${ids.length === 1 ? "task" : "tasks"}.`;
+  });
+}
+/** Sets exactly which properties a task runs at: ticked ones are added, unticked ones removed.
+ *  At a removed property, tasks not yet open are dropped; anything already open or done stays for the record. */
+export async function setTaskProperties(id: number, properties: number[]) {
+  return admin(async () => {
+    const want = new Set(properties.map(Number));
+    const have = new Set((await all<{ p: number }>("SELECT property_id p FROM template_properties WHERE template_id=?", id)).map((x) => x.p));
+    const add = [...want].filter((p) => !have.has(p)), drop = [...have].filter((p) => !want.has(p));
+    for (const p of add) await run("INSERT OR IGNORE INTO template_properties VALUES (?,?)", id, p);
+    for (const p of drop) await run("DELETE FROM template_properties WHERE template_id=? AND property_id=?", id, p);
+    await dropUpcoming(id, drop);
+    if (!add.length && !drop.length) return "No changes.";
+    return `Now at ${want.size} propert${want.size === 1 ? "y" : "ies"}${add.length ? ` · ${add.length} added (from the next window)` : ""}${drop.length ? ` · ${drop.length} removed` : ""}.`;
   });
 }
 /** Adds the tasks to more properties. Tasks already there are left as they are. */

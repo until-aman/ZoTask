@@ -427,3 +427,14 @@ export async function remind(instanceIds: number[], actorId: number, at: number)
   });
   return { people: people.size, skipped };
 }
+
+/** Removes not-yet-open runs of a task at properties it no longer covers (with their "created" history). */
+export async function dropUpcoming(templateId: number, propertyIds: number[]) {
+  if (!propertyIds.length) return;
+  const q = propertyIds.map(() => "?").join(",");
+  const ids = (await all<{ id: number }>(`SELECT id FROM instances WHERE template_id=? AND status='upcoming' AND attempt=0 AND property_id IN (${q})`, templateId, ...propertyIds)).map((x) => x.id);
+  if (!ids.length) return;
+  const iq = ids.map(() => "?").join(",");
+  await run(`DELETE FROM events WHERE instance_id IN (${iq})`, ...ids);
+  await run(`DELETE FROM instances WHERE id IN (${iq})`, ...ids);
+}

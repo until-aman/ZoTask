@@ -16,7 +16,8 @@ export default async function Admin({ searchParams }: { searchParams: Promise<Re
   const tab = (await searchParams).tab ?? "tasks";
   const off = await loadOff(true);
   const templates = await all<Tpl>(
-    `SELECT t.*, (SELECT count(*) FROM template_properties tp WHERE tp.template_id=t.id) props, r.name reviewer, a.name auditor
+    `SELECT t.*, (SELECT count(*) FROM template_properties tp WHERE tp.template_id=t.id) props,
+      (SELECT group_concat(tp.property_id) FROM template_properties tp WHERE tp.template_id=t.id) prop_ids, r.name reviewer, a.name auditor
      FROM templates t LEFT JOIN users r ON r.id=t.reviewer_id LEFT JOIN users a ON a.id=t.auditor_id ORDER BY t.id`);
   const props = await all<{ id: number; name: string; cluster: string; city: string; cbm: string | null; cbm_id: number | null; staff: number; city_id: number; cluster_id: number }>(
     `SELECT p.id, p.name, cl.name cluster, c.name city, u.name cbm, p.cbm_id, c.id city_id, cl.id cluster_id,
