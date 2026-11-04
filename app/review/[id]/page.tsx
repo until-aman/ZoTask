@@ -51,7 +51,10 @@ export default async function ReviewSheet({ params }: { params: Promise<{ id: st
           <p className="phead-sub">{r.property} · {r.cluster}, {r.city}</p>
           <p className="phead-sub">Scheduled for <b>{fmtDate(r.task_date)}, {r.window_start}–{r.window_end}</b> · Last action: <b>{actionLabel(r.last_type)}</b>, {fmtDateTime(r.last_at ?? r.status_since)}</p>
         </div>
-        <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
+        <span className="phead-acts">
+          <span className={`pill ${STATUS_PILL[r.status]}`}>{STATUS_LABEL[r.status]}</span>
+          {isCentralRole(u.access_role) && <Link href={`/escalations?task=${r.id}`} className="btn sm danger">Escalate</Link>}
+        </span>
       </div>
       {isCentralRole(u.access_role) && r.wk && ["review", "resub"].includes(r.status) && <div className={`banner ${r.wk === "must" ? "warn" : ""}`} role="note">
           <b>Submitted on a reviewer day off.</b>{" "}

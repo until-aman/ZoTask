@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireUser, can, inScope, taskInScope, requireTasks } from "@/lib/auth";
+import { requireUser, currentUser, can, inScope, taskInScope, requireTasks } from "@/lib/auth";
 import { all, one, run, tx } from "@/lib/db";
 import * as E from "@/lib/engine";
 import { km } from "@/lib/geo";
@@ -142,15 +142,17 @@ export async function remindTasks(ids: number[]): Promise<Result> {
   return guard(async () => {
     if (u.access_role === "ground") throw new Error("Only CBMs and the central team can send reminders.");
     await requireTasks(u, ids);
-    const { people, skipped } = await E.remind(ids, u.id, Date.now());
-    return `Reminder logged for ${people} ${people === 1 ? "person" : "people"}${skipped ? ` · ${skipped} skipped, already reminded in the last 4h` : ""}`;
+    // Reviewers, auditors and CBMs remind the people doing the task; reminding another reviewer or auditor is the admin's call.
+    const { people, skipped, self, peers } = await E.remind(ids, u.id, Date.now(), u.access_role !== "admin");
+    if (!people && !skipped) throw new Error(self ? "That's waiting on you, so there's nobody to remind." : peers ? "Only an admin can remind a reviewer or auditor. You can escalate it instead." : "Nobody to remind on this task.");
+    return `Reminder sent to ${people} ${people === 1 ? "person" : "people"}${skipped ? ` · ${skipped} skipped, already reminded in the last 4h` : ""}${self ? ` · ${self} waiting on you` : ""}${peers ? ` · ${peers} left for an admin` : ""}`;
   });
 }
 
 export async function reassignReviewer(ids: number[], reviewerId: number): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
-    if (!["reviewer", "admin"].includes(u.access_role)) throw new Error("Only reviewers and admins can reassign.");
+    if (u.access_role !== "admin") throw new Error("Only an admin can reassign reviewers.");
     const to = await one<{ access_role: string }>("SELECT access_role FROM users WHERE id=?", reviewerId);
     if (!to || !["reviewer", "admin"].includes(to.access_role)) throw new Error("Pick a reviewer.");
     await tx(async () => { for (const id of ids) await E.reassignReviewer(id, reviewerId, u.id, Date.now()); });
@@ -278,18 +280,6 @@ export async function acknowledgeIssues(ids: number[]): Promise<Result> {
 }
 
 /** Escalates an issue: ground team issues go to the property's CBM, everything else to the operations admin. */
-export async function escalateIssue(id: number, note: string): Promise<Result> {
-  const u = await requireUser();
-  return guard(async () => {
-    if (!["admin", "reviewer", "auditor"].includes(u.access_role)) throw new Error("Only central operations can escalate.");
-    const i = await one<{ status: string; cbm: string | null }>("SELECT i.status, uc.name cbm FROM instances i JOIN properties p ON p.id=i.property_id LEFT JOIN users uc ON uc.id=p.cbm_id WHERE i.id=?", id);
-    if (!i) throw new Error("Task not found.");
-    const to = ["notsub", "changes"].includes(i.status) ? i.cbm ?? "CBM" : (await one<{ name: string }>("SELECT name FROM users WHERE access_role='admin' LIMIT 1"))?.name ?? "Ops Admin";
-    await E.logEvent(id, Date.now(), u.id, "escalated", `Escalated to ${to}${note.trim() ? ` · ${note.trim()}` : ""}`);
-    return `Escalated to ${to}`;
-  });
-}
-
 export async function getHistory(instanceId: number) {
   const u = await requireUser();
   if ((await taskInScope(u, instanceId)) === null) return [];
@@ -359,4 +349,19 @@ export async function removeLeave(leaveId: number): Promise<Result> {
     await E.loadAway(true);
     return `Removed the leave for ${p.name}. Tasks already moved stay with whoever has them.`;
   });
+}
+
+/** The bell: newest notifications, unread count and fresh ones to pop up. Light on purpose: no sweep, it runs every few seconds. */
+export async function myNotifications() {
+  const u = await currentUser();
+  if (!u) return null;
+  const N = await import("@/lib/notify");
+  return N.inbox(u.id, Date.now());
+}
+
+export async function readNotifications(ids: number[] | "all") {
+  const u = await currentUser();
+  if (!u) return;
+  const N = await import("@/lib/notify");
+  await N.markRead(u.id, ids === "all" ? "all" : ids.filter((x) => Number.isInteger(x)), Date.now());
 }

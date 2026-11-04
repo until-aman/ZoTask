@@ -47,5 +47,5 @@ export default async function Queue({ searchParams }: { searchParams: Promise<Re
     from: sp.from, to: sp.to, bucket: sp.bucket, over: sp.over === "1",
   };
   return <QueueClient items={items} geo={g} views={views} reviewers={reviewers} me={u.name}
-    canReview={["reviewer", "admin"].includes(u.access_role)} isCentral={central} pullbackDays={off.pullbackDays} today={isoDate(now)} initial={initial} />;
+    canReview={["reviewer", "admin"].includes(u.access_role)} isAdmin={u.access_role === "admin"} canEscalate={central} isCentral={central} pullbackDays={off.pullbackDays} today={isoDate(now)} initial={initial} />;
 }

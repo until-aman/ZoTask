@@ -4,6 +4,7 @@ import { DAY, isoDate, addDays } from "./time";
 import { User, scopeProps, inScope } from "./auth";
 import { geo } from "./queries";
 import { logEvent } from "./engine";
+import { notify } from "./notify";
 
 export const DEPARTMENTS = ["R&M", "Housekeeping", "Staffing & HR", "Procurement", "Owner relations", "Sales", "IT & Tech", "Other"];
 export const ESC_STATUS: Record<string, string> = { open: "Yet to start", wip: "In progress", done: "Closed", dropped: "Dropped" };
@@ -51,6 +52,7 @@ export async function raise(u: User, x: EscInput, now: number) {
       x.cc.trim() || null, x.mailSubject.trim() || null, x.mailSent ? now : null, x.link.trim() || null, due, JSON.stringify(x.photos), x.instanceId, now, now)).lastInsertRowid);
     for (const p of new Set(x.propertyIds)) await run("INSERT INTO escalation_properties VALUES (?,?)", id, p);
     await run("INSERT INTO escalation_updates (escalation_id, at, by_id, note, status, due_date) VALUES (?,?,?,?,?,?)", id, now, u.id, `Raised to ${x.ownerName.trim()}${x.mailSent ? ", email sent" : ""}`, "open", due);
+    await notify(owner.id, { kind: "escalation", title: `ESC-${id}: ${x.title.trim()}`, body: `${u.name} raised this with you${due ? `, closure expected by ${due}` : ""}`, link: `/escalations?focus=${id}`, actorId: u.id }, now);
     if (x.instanceId) await logEvent(x.instanceId, now, u.id, "escalation_raised", `ESC-${id} to ${x.ownerName.trim()}: ${x.title.trim()}`);
     return id;
   });
@@ -133,7 +135,7 @@ export async function escalationData(u: User, sp: Record<string, string | undefi
   const people = await all<{ id: number; name: string; email: string; access_role: string }>("SELECT id, name, email, access_role FROM users WHERE access_role IN ('admin','cbm','reviewer','auditor') AND archived=0 ORDER BY name");
   return {
     now, today, rows, geo: G, people, teams: TEAMS, departments: DEPARTMENTS,
-    canRaise: canRaise(u), me: u.name, openNew: sp.new === "1" || !!fromTask,
+    canRaise: canRaise(u), me: u.name, openId: rows.some((r) => r.id === Number(sp.focus)) ? Number(sp.focus) : null, openNew: sp.new === "1" || !!fromTask,
     fromTask: fromTask && scope.includes(fromTask.property_id) ? fromTask : null,
   };
 }

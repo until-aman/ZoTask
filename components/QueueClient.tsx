@@ -51,8 +51,8 @@ const empty: ViewFilters = { city: [], cluster: [], prop: [], role: [], asg: [],
 const CENTRAL_TABS = ["weekend", "wkclosed"];
 const isWeekend = (t: QItem) => !!t.wk && (t.s === "review" || t.s === "resub");
 
-export default function QueueClient({ items, geo, views, reviewers, me, canReview, isCentral, pullbackDays, today, initial }: {
-  items: QItem[]; geo: Geo[]; views: SavedView[]; reviewers: { id: number; name: string }[]; me: string; canReview: boolean; today: string;
+export default function QueueClient({ items, geo, views, reviewers, me, canReview, isAdmin, canEscalate, isCentral, pullbackDays, today, initial }: {
+  items: QItem[]; geo: Geo[]; views: SavedView[]; reviewers: { id: number; name: string }[]; me: string; canReview: boolean; isAdmin: boolean; canEscalate: boolean; today: string;
   isCentral: boolean; pullbackDays: number;
   initial: { tab?: string; city?: string[]; cluster?: string[]; prop?: string[]; from?: string; to?: string; bucket?: string; over?: boolean };
 }) {
@@ -73,6 +73,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
   const [pop, setPop] = useState<string | null>(null);
   const [modal, setModal] = useState<"reassign" | null>(null);
   const [toast, setToast] = useState("");
+  // Nobody reminds themselves; reviewers and auditors remind the people doing the task, and only an admin chases another reviewer or auditor.
+  const canRemind = (t: QItem, who: string | null | undefined) => !!who && who !== me && (isAdmin || ["upcoming", "current", "notsub", "changes", "auditflag"].includes(t.s));
   const [hist, setHist] = useState<Ev[]>([]);
 
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); }, [toast]);
@@ -265,7 +267,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               <div className="bulk">
                 <span>{sel.size} selected</span><span className="spacer" />
                 <button type="button" className="btn sm primary" onClick={() => remind(selIds)}>Send reminder</button>
-                {canReview && ["review", "resub"].includes(tab) && <button type="button" className="btn sm" onClick={() => setModal("reassign")}>Reassign reviewer</button>}
+                {isAdmin && ["review", "resub"].includes(tab) && <button type="button" className="btn sm" onClick={() => setModal("reassign")}>Reassign reviewer</button>}
                 <button type="button" className="btn sm" onClick={() => setSel(new Set())}>Clear</button>
               </div>
             )}
@@ -303,8 +305,9 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                       { label: "Show details", onClick: () => setOpen(t.id) },
                       { label: "Open review sheet", onClick: () => router.push(`/review/${t.id}`) },
                       { label: "Pull back for review", hidden: !(canReview && t.pull), onClick: () => pullBack(t.id) },
-                      { label: n.who ? `Remind ${n.who.split(" ")[0]}` : "Send reminder", hidden: !g.open, onClick: () => remind([t.id]) },
-                      { label: "Reassign reviewer", hidden: !(canReview && ["review", "resub"].includes(t.s)), onClick: () => { setSel(new Set([t.id])); setModal("reassign"); } },
+                      { label: `Remind ${n.who?.split(" ")[0]}`, hidden: !g.open || !canRemind(t, n.who), onClick: () => remind([t.id]) },
+                      { label: "Escalate…", danger: true, hidden: !canEscalate, onClick: () => router.push(`/escalations?task=${t.id}`) },
+                      { label: "Reassign reviewer", hidden: !(isAdmin && ["review", "resub"].includes(t.s)), onClick: () => { setSel(new Set([t.id])); setModal("reassign"); } },
                     ]} />
                   </div>
                 </div>
@@ -355,7 +358,8 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
               <div className="df">
                 <Link className="btn primary" href={`/review/${t.id}`}>Open review sheet</Link>
                 {canReview && t.pull && <button type="button" className="btn" onClick={() => pullBack(t.id)}>Pull back for review</button>}
-                {n.who && <button type="button" className="btn" onClick={() => remind([t.id])}>Remind {n.who.split(" ")[0]}</button>}
+                {canRemind(t, n.who) && <button type="button" className="btn" onClick={() => remind([t.id])}>Remind {n.who!.split(" ")[0]}</button>}
+                {canEscalate && <button type="button" className="btn danger" onClick={() => router.push(`/escalations?task=${t.id}`)}>Escalate</button>}
               </div>
             </aside>
           </>

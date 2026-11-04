@@ -146,3 +146,9 @@ CREATE TABLE IF NOT EXISTS map_sites (
   gender TEXT, details TEXT
 );
 CREATE TABLE IF NOT EXISTS photos (name TEXT PRIMARY KEY, type TEXT NOT NULL, data BLOB NOT NULL, at INTEGER NOT NULL);
+-- In-app notifications: reminders and other things that need this person, shown under the bell.
+CREATE TABLE IF NOT EXISTS notifications (
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), at INTEGER NOT NULL, kind TEXT NOT NULL,
+  title TEXT NOT NULL, body TEXT, link TEXT, instance_id INTEGER, actor_id INTEGER REFERENCES users(id), read_at INTEGER, popped_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, id);

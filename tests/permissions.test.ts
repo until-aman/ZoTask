@@ -3,6 +3,7 @@ import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import * as A from "@/app/actions";
 import { signInAs, ready, at, one, all, handTask, ADMIN, REVIEWER } from "./helpers";
+import { run } from "@/lib/db";
 import { taskInScope } from "@/lib/auth";
 
 let p1: Awaited<ReturnType<typeof at>>, p14: Awaited<ReturnType<typeof at>>;
@@ -82,9 +83,11 @@ test("P2-5: escalations need a real priority, department, and a closure date tha
   yes(await A.raiseEscalation(base));
 });
 
-test("P1-7: reviews can only be reassigned to a reviewer who didn't submit the task", async () => {
+test("P1-7: only an admin reassigns reviews, and only to a reviewer who didn't submit the task", async () => {
   const t = (await one<{ id: number }>("SELECT id FROM instances WHERE status='review' LIMIT 1"))!;
   signInAs(REVIEWER);
+  no(await A.reassignReviewer([t.id], 3));
+  signInAs(ADMIN);
   no(await A.reassignReviewer([t.id], p1.ground));
   no(await A.reassignReviewer([t.id], p1.cbm));
   yes(await A.reassignReviewer([t.id], 3));
@@ -92,11 +95,27 @@ test("P1-7: reviews can only be reassigned to a reviewer who didn't submit the t
 });
 
 test("P2-4: ground staff can't send reminders; CBMs only for their own properties", async () => {
-  const t1 = (await one<{ id: number }>("SELECT id FROM instances WHERE property_id=1 AND status='review' LIMIT 1"))!;
-  const t14 = (await one<{ id: number }>("SELECT id FROM instances WHERE property_id=14 AND status='review' LIMIT 1"))!;
+  // A task the ground team is still doing, at each property.
+  const doing = async (prop: number, who: number) => {
+    const t = (await one<{ id: number }>("SELECT id FROM instances WHERE property_id=? ORDER BY id DESC LIMIT 1", prop))!;
+    await run("UPDATE instances SET status='notsub', assignee_id=? WHERE id=?", who, t.id);
+    return t;
+  };
+  const t1 = await doing(1, p1.ground), t14 = await doing(14, p14.ground);
   signInAs(p1.ground);
   no(await A.remindTasks([t1.id]));
   signInAs(p1.cbm);
   no(await A.remindTasks([t14.id]));
   yes(await A.remindTasks([t1.id]));
+});
+
+test("reviewers remind the people doing the task, never themselves; only an admin chases a reviewer", async () => {
+  const rv = (await one<{ id: number; reviewer_id: number }>("SELECT id, reviewer_id FROM instances WHERE status='review' AND reviewer_id IS NOT NULL LIMIT 1"))!;
+  signInAs(rv.reviewer_id);
+  no(await A.remindTasks([rv.id]));
+  const other = (await one<{ id: number }>("SELECT id FROM users WHERE access_role IN ('reviewer','auditor') AND id<>? LIMIT 1", rv.reviewer_id))!;
+  signInAs(other.id);
+  no(await A.remindTasks([rv.id]));
+  signInAs(ADMIN);
+  yes(await A.remindTasks([rv.id]));
 });

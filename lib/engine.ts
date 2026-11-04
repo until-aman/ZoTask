@@ -1,5 +1,6 @@
 // Task lifecycle: instance generation, time-based sweeps, submit, review, audit.
 import { all, batch, one, run, tx } from "./db";
+import { notify, taskTitle } from "./notify";
 import { DAY, HOUR, addDays, atTime, isoDate, weekday } from "./time";
 import { addWork, autoCloseAt, awayCacheFresh, awayMap, coverFor, forPerson, isOff, normOff, offCacheFresh, offCfg, personOffWhy, setAwayCache, setOffCache, type OffCfg, type PersonOff } from "./offdays";
 
@@ -213,6 +214,7 @@ export async function coverAway(now: number, force = false): Promise<number> {
         if (cover) {
           await run("UPDATE instances SET assignee_id=? WHERE id=?", cover, i.id);
           await logEvent(i.id, now, null, "reassigned", `${name(cover)} covering for ${name(i.assignee_id!)} (${why.toLowerCase()})`);
+          if (i.task_date <= today) await notify(cover, { kind: "assigned", title: await taskTitle(i.id), body: `You're covering for ${name(i.assignee_id!)} (${why.toLowerCase()})`, link: `/tasks/${i.id}`, instanceId: i.id }, now);
         } else {
           await setStatus(i.id, "waived", now, ", closed_at=?", now);
           await logEvent(i.id, now, null, "waived", `Not counted: ${name(i.assignee_id!)} was off (${why.toLowerCase()}) and nobody could cover`);
@@ -229,6 +231,7 @@ export async function coverAway(now: number, force = false): Promise<number> {
       if (!cover) continue; // Nobody to cover: the clock pauses on their days off (see waitMs).
       await run(`UPDATE instances SET ${review ? "reviewer_id" : "auditor_id"}=? WHERE id=?`, cover, i.id);
       await logEvent(i.id, now, null, "reassigned", `${review ? "Review" : "Audit"} moved to ${name(cover)}: ${name(who)} is off (${why.toLowerCase()})`);
+      await notify(cover, { kind: "assigned", title: await taskTitle(i.id), body: `${review ? "Review" : "Audit"} moved to you: ${name(who)} is off (${why.toLowerCase()})`, link: `/review/${i.id}`, instanceId: i.id }, now);
       n++;
     }
   });
@@ -390,6 +393,7 @@ export async function reviewDecision(instanceId: number, reviewerId: number, dec
       const exhausted = i.attempt >= t.attempts_allowed;
       await setStatus(instanceId, exhausted ? "notrect" : "changes", at, exhausted ? ", closed_at=?" : "", ...(exhausted ? [at] : []));
       await logEvent(instanceId, at, reviewerId, "changes_requested", flags.map((f) => f.reason).join(", ") + (exhausted ? " · attempts used up, not rectified" : ""));
+      if (!exhausted) await notify(i.assignee_id, { kind: "changes", title: await taskTitle(instanceId), body: `Changes required: ${flags.map((f) => f.reason).join(", ")}`, link: `/tasks/${instanceId}`, instanceId, actorId: reviewerId }, at);
     } else {
       const noEvidence = accepted.length ? ` · accepted without evidence: ${accepted.join("; ")}` : "";
       await pass(i, t, reviewerId, at, noEvidence);
@@ -416,6 +420,8 @@ export async function auditDecision(instanceId: number, auditorId: number, decis
     } else {
       await setStatus(instanceId, "auditflag", at);
       await logEvent(instanceId, at, auditorId, "audit_failed", flags.map((f) => f.reason).join(", ") + " · CBM to answer");
+      const cbm = await one<{ cbm_id: number | null }>("SELECT cbm_id FROM properties WHERE id=?", i.property_id);
+      await notify(cbm?.cbm_id, { kind: "auditflag", title: await taskTitle(instanceId), body: `Audit flags to answer: ${flags.map((f) => f.reason).join(", ")}`, link: `/tasks/${instanceId}`, instanceId, actorId: auditorId }, at);
     }
   });
 }
@@ -483,9 +489,9 @@ export function nextActor(i: Pick<Instance, "status" | "assignee_id" | "reviewer
   }
 }
 
-export async function remind(instanceIds: number[], actorId: number, at: number) {
+export async function remind(instanceIds: number[], actorId: number, at: number, doersOnly = false) {
   const people = new Set<number>();
-  let skipped = 0;
+  let skipped = 0, self = 0, peers = 0;
   await tx(async () => {
     for (const id of instanceIds) {
       // Don't nag: skip a task that already got a reminder in the last 4 hours.
@@ -495,12 +501,18 @@ export async function remind(instanceIds: number[], actorId: number, at: number)
       if (!i) continue;
       const who = nextActor(i, i.cbm_id);
       if (!who) continue;
+      if (who === actorId) { self++; continue; }
+      if (doersOnly && !["upcoming", "current", "notsub", "changes", "auditflag"].includes(i.status)) { peers++; continue; }
       people.add(who);
-      const u = await one<{ name: string }>("SELECT name FROM users WHERE id=?", who);
+      const u = await one<{ name: string; access_role: string }>("SELECT name, access_role FROM users WHERE id=?", who);
       await logEvent(id, at, actorId, "reminder", `Reminder sent to ${u?.name}`);
+      const doer = ["upcoming", "current", "notsub", "changes", "auditflag"].includes(i.status);
+      const what = { current: "Please submit it before the window closes.", upcoming: "It opens soon.", notsub: "It's overdue. Please submit it now.", changes: "Changes are waiting. Please fix and resubmit.",
+        auditflag: "Audit flags are waiting for your answer.", review: "It's waiting for your review.", resub: "A resubmission is waiting for your review.", audit: "It's waiting for your audit.", flagans: "Flag answers are waiting for you to close." }[i.status] ?? "";
+      await notify(who, { kind: "reminder", title: await taskTitle(id), body: what, link: doer && u?.access_role !== "admin" ? `/tasks/${id}` : `/review/${id}`, instanceId: id, actorId }, at);
     }
   });
-  return { people: people.size, skipped };
+  return { people: people.size, skipped, self, peers };
 }
 
 /** Removes not-yet-open runs of a task at properties it no longer covers (with their "created" history). */

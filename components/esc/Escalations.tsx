@@ -56,7 +56,8 @@ export default function Escalations({ data: d, views }: { data: EscData; views: 
   const [raisedW, setRaisedW] = useState<Dates>({ k: "all", from: "", to: "" });
   const [focus, setFocus] = useState<Focus>(null);
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState<number | null>(null);
+  const [open, setOpen] = useState<number | null>(d.openId);
+  useEffect(() => { if (d.openId) { setOpen(d.openId); setQuick("all"); } }, [d.openId]);
   const [raising, setRaising] = useState(d.openNew && d.canRaise);
   const [toast, setToast] = useState("");
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 3500); return () => clearTimeout(t); }, [toast]);

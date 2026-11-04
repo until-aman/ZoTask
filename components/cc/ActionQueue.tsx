@@ -17,8 +17,8 @@ const COLS = [{ key: "sev", label: "Severity", fixed: true }, { key: "issue", la
   { key: "sched", label: "Scheduled" }, { key: "last", label: "Last action" }, { key: "status", label: "Status" }, { key: "over", label: "Over limit" }, { key: "back", label: "Sent back" }, { key: "cmt", label: "Latest comment" }];
 const ago = (now: number, at: number) => `${dur(now - at)} ago`;
 
-export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toast, handover }: {
-  issues: Issue[]; now: number; me: string; canEscalate: boolean; onIssue: (i: Issue) => void; toast: (m: string) => void;
+export default function ActionQueue({ issues, now, me, isAdmin = false, canEscalate, onIssue, toast, handover }: {
+  issues: Issue[]; now: number; me: string; isAdmin?: boolean; canEscalate: boolean; onIssue: (i: Issue) => void; toast: (m: string) => void;
   handover: { closedToday: number[]; tomorrow: number[]; tasks: Record<number, T>; period: string; scope: string };
 }) {
   const router = useRouter();
@@ -132,9 +132,9 @@ export default function ActionQueue({ issues, now, me, canEscalate, onIssue, toa
               {on("cmt") && <td className="cmt" title={i.comment ?? ""}>{i.comment ?? <span className="muted">—</span>}</td>}
               <td className="tdact"><RowMenu label={`Actions for ${i.task}`} actions={i.id ? [
                 { label: "View task", onClick: () => onIssue(i) },
-                { label: `Remind ${i.owner.split(" ")[0]}`, onClick: () => run(remindTasks([i.id!])) },
+                { label: `Remind ${i.owner.split(" ")[0]}`, hidden: i.owner === me || i.owner === "Unassigned" || (!isAdmin && ["Reviewer", "Auditor"].includes(i.ownerRole)), onClick: () => run(remindTasks([i.id!])) },
                 { label: "Acknowledge", hidden: !!i.ack, onClick: () => run(acknowledgeIssues([i.id!])) },
-                { label: "Escalate…", danger: true, hidden: !canEscalate || !!i.esc, onClick: () => onIssue(i) },
+                { label: "Escalate…", danger: true, hidden: !canEscalate || !!i.esc, onClick: () => router.push(`/escalations?task=${i.id}`) },
               ] : [{ label: "View tasks", onClick: () => open({ title: `${i.property}: missed tasks`, ids: i.ids }) }]} /></td>
             </tr>
           ))}</tbody>
