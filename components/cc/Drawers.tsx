@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { T } from "@/lib/command";
 import type { Detail } from "@/lib/detail";
+import { locationLabel } from "@/lib/geo";
 import { getTaskDetail, remindTasks, acknowledgeIssues } from "@/app/actions";
 import { STATUS_LABEL, STATUS_PILL } from "@/lib/statuses";
 import ReviewForm from "@/components/ReviewForm";
@@ -133,7 +134,7 @@ export function TaskDrawer({ id, now, back, close, issue, canEscalate, isAdmin =
             ) : latest ? (
               <div className="grid" style={{ gap: 8 }}>
                 <h3 style={{ margin: 0 }}>Latest submission · attempt {latest.attempt}</h3>
-                <p className="small muted" style={{ margin: 0 }}>By {latest.by_name} · {when(latest.submitted_at)} · {latest.location_src === "simulated" ? <span className="warn">location simulated (demo)</span> : latest.location_ok === null ? "location not checked" : latest.location_ok ? "at the property" : <span className="warn">{latest.distance_m} m away</span>}</p>
+                <p className="small muted" style={{ margin: 0 }}>By {latest.by_name} · {when(latest.submitted_at)} · {(() => { const [t, tone] = locationLabel(latest); return <span className={tone === "g" ? "" : "warn"}>Location: {t.charAt(0).toLowerCase() + t.slice(1)}</span>; })()}</p>
                 {d.items.map((it) => {
                   const a = latest.answers[it.id];
                   return (

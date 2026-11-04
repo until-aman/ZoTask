@@ -74,7 +74,8 @@ CREATE INDEX IF NOT EXISTS ix_inst_date ON instances(task_date);
 CREATE TABLE IF NOT EXISTS submissions (
   id INTEGER PRIMARY KEY, instance_id INTEGER NOT NULL REFERENCES instances(id), attempt INTEGER NOT NULL,
   submitted_by INTEGER REFERENCES users(id), submitted_at INTEGER NOT NULL, location_ok INTEGER, distance_m INTEGER,
-  location_src TEXT                               -- gps (checked on the server) | simulated (demo button) | null (not checked)
+  location_src TEXT,                              -- gps (checked on the server) | approx (device gave only a rough area) | simulated (demo button) | null (not checked)
+  accuracy_m INTEGER                              -- how precise the device said its reading was
 );
 CREATE TABLE IF NOT EXISTS answers (
   id INTEGER PRIMARY KEY, submission_id INTEGER NOT NULL REFERENCES submissions(id), item_id INTEGER NOT NULL REFERENCES template_items(id),

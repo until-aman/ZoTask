@@ -82,6 +82,15 @@ test("P0-7: the server works out the distance; a simulated location is recorded 
   assert.equal(s2.location_ok, null);
   assert.equal(s2.location_src, "simulated");
   assert.ok(await one("SELECT 1 FROM events WHERE instance_id=? AND type='location_warning'", sim.id));
+
+  // A rough reading (a laptop on Wi-Fi or a VPN) can't pass or fail: it's recorded as approximate, with its accuracy.
+  const rough = await freshTask();
+  signInAs(rough.assignee_id);
+  yes(await A.submitTask(rough.id, rough.answers, { lat: 51.5, lng: -0.12, acc: 25000 }));
+  const s3 = (await one<{ location_ok: number | null; location_src: string; accuracy_m: number }>("SELECT location_ok, location_src, accuracy_m FROM submissions WHERE instance_id=?", rough.id))!;
+  assert.equal(s3.location_ok, null);
+  assert.equal(s3.location_src, "approx");
+  assert.equal(s3.accuracy_m, 25000);
 });
 
 test("a task can't be sent with a compulsory photo or note missing, an unanswered question or a negative number", async () => {

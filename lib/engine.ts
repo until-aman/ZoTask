@@ -278,7 +278,7 @@ export async function missingEvidence(submissionId: number, templateId: number):
   });
 }
 
-export type Loc = { ok: boolean | null; distance: number | null; source?: "gps" | "simulated" | null };
+export type Loc = { ok: boolean | null; distance: number | null; source?: "gps" | "approx" | "simulated" | null; accuracy?: number | null };
 export async function submit(instanceId: number, userId: number, answers: AnswerInput[], loc: Loc, at: number) {
   return await tx(async () => {
     const i = (await one<Instance>("SELECT * FROM instances WHERE id=?", instanceId))!;
@@ -286,8 +286,8 @@ export async function submit(instanceId: number, userId: number, answers: Answer
     if (!["current", "notsub", "changes"].includes(i.status)) throw new Error("This task can't be submitted right now.");
     const resub = i.status === "changes";
     const attempt = i.attempt + 1;
-    const s = await run("INSERT INTO submissions (instance_id, attempt, submitted_by, submitted_at, location_ok, distance_m, location_src) VALUES (?,?,?,?,?,?,?)",
-      instanceId, attempt, userId, at, loc.ok === null ? null : loc.ok ? 1 : 0, loc.distance, loc.source ?? (loc.ok === null ? null : "gps"));
+    const s = await run("INSERT INTO submissions (instance_id, attempt, submitted_by, submitted_at, location_ok, distance_m, location_src, accuracy_m) VALUES (?,?,?,?,?,?,?,?)",
+      instanceId, attempt, userId, at, loc.ok === null ? null : loc.ok ? 1 : 0, loc.distance, loc.source ?? (loc.ok === null ? null : "gps"), loc.accuracy ?? null);
     const sid = Number(s.lastInsertRowid);
     for (const a of answers) {
       await run("INSERT INTO answers (submission_id, item_id, checked, value, note, photos, reply) VALUES (?,?,?,?,?,?,?)",
@@ -308,14 +308,15 @@ export async function submit(instanceId: number, userId: number, answers: Answer
     const c = await loadOff();
     const pick = toReview && isOff(c, isoDate(at)) ? await weekendPick(c, i, t, sid, at, loc, resub) : null;
     await run("UPDATE instances SET wk=?, wk_why=? WHERE id=?", pick?.wk ?? null, pick?.why ?? null, instanceId);
-    if (t.geofence && loc.ok === false) await logEvent(instanceId, at, userId, "location_warning", `Submitted ${loc.distance ?? "?"} m from property`);
+    if (t.geofence && loc.ok === false) await logEvent(instanceId, at, userId, "location_warning", `Submitted ${loc.distance == null ? "?" : loc.distance >= 1000 ? `${(loc.distance / 1000).toFixed(1)} km` : `${loc.distance} m`} from property`);
     if (t.geofence && loc.source === "simulated") await logEvent(instanceId, at, userId, "location_warning", "Location simulated, not checked");
+    if (t.geofence && loc.source === "approx") await logEvent(instanceId, at, userId, "location_warning", `Location not verified: the device gave only a rough area (±${Math.round((loc.accuracy ?? 0) / 1000)} km)`);
     return sid;
   });
 }
 
 export async function latestSubmission(instanceId: number) {
-  return await one<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; location_src: string | null }>(
+  return await one<{ id: number; attempt: number; submitted_at: number; submitted_by: number; location_ok: number | null; distance_m: number | null; location_src: string | null; accuracy_m: number | null }>(
     "SELECT * FROM submissions WHERE instance_id=? ORDER BY attempt DESC LIMIT 1", instanceId);
 }
 

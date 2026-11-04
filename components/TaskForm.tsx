@@ -12,7 +12,8 @@ type Prev = { item_id: number; checked: number; value: string | null; note: stri
 type Flag = { id: number; item_id: number; reason: string; comment: string | null };
 type Ans = { checked: boolean; value: string; note: string; photos: string[]; reply: string };
 
-function distance(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+function distance(a: { lat: number; lng: number }, b: { lat: number | null; lng: number | null }) {
+  if (b.lat == null || b.lng == null) return NaN;
   const R = 6371000, rad = Math.PI / 180;
   const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
@@ -21,10 +22,10 @@ function distance(a: { lat: number; lng: number }, b: { lat: number; lng: number
 
 export default function TaskForm({ instanceId, items, status, attempt, attemptsAllowed, prev, flags, property, timer }: {
   instanceId: number; items: Item[]; status: string; attempt: number; attemptsAllowed: number; prev: Prev[]; flags: Flag[];
-  property: { lat: number; lng: number; geofence: boolean; geofenceM: number };
+  property: { lat: number | null; lng: number | null; geofence: boolean; geofenceM: number };
   timer?: { startStop: boolean; startedAt: number | null; idealMinutes: number | null };
 }) {
-  const GEOFENCE_M = property.geofenceM;
+  const GEOFENCE_M = property.geofenceM, ROUGH_M = 1000;
   const router = useRouter();
   const [ans, setAns] = useState<Record<number, Ans>>(() => Object.fromEntries(items.map((it) => {
     const p = prev.find((x) => x.item_id === it.id);
@@ -86,14 +87,20 @@ export default function TaskForm({ instanceId, items, status, attempt, attemptsA
 
   function checkLocation() {
     if (!navigator.geolocation) return setLoc({ ok: null, distance: null, msg: "This browser can't share location.", where: null });
+    if (property.lat == null || property.lng == null) return setLoc({ ok: null, distance: null, msg: "This property has no map location yet, so the distance can't be checked. Ask an admin to set it on the Map.", where: null });
     setLoc({ ...loc, msg: "Checking…" });
+    const far = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${m} m`);
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        const d = distance({ lat: p.coords.latitude, lng: p.coords.longitude }, property);
-        setLoc({ where: { lat: p.coords.latitude, lng: p.coords.longitude }, ok: d <= GEOFENCE_M, distance: d, msg: d <= GEOFENCE_M ? `You're at the property (${d} m away).` : `You're ${d >= 1000 ? (d / 1000).toFixed(1) + " km" : d + " m"} from the property. The reviewer will see a location warning.` });
+        const here = { lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) };
+        const d = distance(here, property);
+        // A laptop or a phone with location services off often gives only a rough area from the internet connection (or a VPN's country),
+        // which can be hundreds or thousands of km out. Say so instead of calling it a real distance.
+        if (here.acc > ROUGH_M) return setLoc({ where: here, ok: null, distance: d, msg: `Your device only gave a rough area (accurate to about ${far(here.acc)}), not your exact spot. Turn on location services or GPS, switch off any VPN, then tap Validate location again. Phones work best.` });
+        setLoc({ where: here, ok: d <= GEOFENCE_M, distance: d, msg: d <= GEOFENCE_M ? `You're at the property (${d} m away).` : `You're ${far(d)} from the property. The reviewer will see a location warning.` });
       },
-      () => setLoc({ ok: null, distance: null, msg: "Location permission was denied.", where: null }),
-      { enableHighAccuracy: true, timeout: 10000 });
+      (e) => setLoc({ ok: null, distance: null, where: null, msg: e.code === 1 ? "Location permission was denied. Allow location for this site in the browser, then try again." : "Couldn't get your location. Check that location services are on, then try again." }),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
   }
 
   // What's still missing per item. Shown under each item once Submit was pressed, or as soon as an item has been touched.

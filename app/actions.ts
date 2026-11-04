@@ -25,7 +25,9 @@ export async function signIn(form: FormData) {
 }
 
 /** Where the person was when submitting: their phone's coordinates, the demo "simulate" button, or nothing. The distance is worked out here, not in the browser. */
-export type Where = { lat: number; lng: number } | "simulated" | null;
+export type Where = { lat: number; lng: number; acc?: number | null } | "simulated" | null;
+/** A reading less precise than this is only a rough area (Wi-Fi, mobile tower or internet connection), not a position, so it can't pass or fail the check. */
+const ROUGH_M = 1000;
 export async function submitTask(instanceId: number, answers: E.AnswerInput[], where: Where): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
@@ -38,7 +40,8 @@ export async function submitTask(instanceId: number, answers: E.AnswerInput[], w
     if (where === "simulated") loc = { ok: null, distance: null, source: "simulated" };
     else if (where && Number.isFinite(where.lat) && Number.isFinite(where.lng) && site.lat !== null && site.lng !== null) {
       const d = Math.round(km(site as { lat: number; lng: number }, where) * 1000);
-      loc = { ok: d <= site.geofence_m, distance: d, source: "gps" };
+      const acc = Number.isFinite(where.acc) && where.acc! > 0 ? Math.round(where.acc!) : null;
+      loc = acc !== null && acc > ROUGH_M ? { ok: null, distance: d, source: "approx", accuracy: acc } : { ok: d <= site.geofence_m, distance: d, source: "gps", accuracy: acc };
     }
     // With Start/Stop on, the task must have been started first (a resubmission doesn't need a new start).
     if (i.status !== "changes" && (await one<{ s: number }>("SELECT start_stop s FROM templates WHERE id=?", i.template_id))?.s
