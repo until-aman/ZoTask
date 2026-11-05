@@ -195,7 +195,7 @@ export function CopyModal({ title, text, file, close, extra }: { title: string; 
     <div className="modal" onClick={close}>
       <div className="mcard wide" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
         <div className="row2"><h2 style={{ margin: 0 }}>{title}</h2><span className="spacer" /><button type="button" className="x" onClick={close} aria-label="Close">×</button></div>
-        <textarea ref={(el) => { ta = el; }} readOnly value={text} style={{ minHeight: 260, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 }} />
+        <textarea ref={(el) => { ta = el; }} readOnly value={text} style={{ minHeight: 260, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 11.5 }} />
         <div className="row2">
           <button type="button" className="btn primary" onClick={() => copy(ta)}>Copy</button>
           {file && <a className="btn" href={`data:${file.endsWith(".csv") ? "text/csv" : "text/markdown"};charset=utf-8,${encodeURIComponent(text)}`} download={file}>Download</a>}

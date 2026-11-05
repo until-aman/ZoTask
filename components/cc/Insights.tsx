@@ -149,7 +149,7 @@ export function Recurring({ d }: { d: CC }) {
       {!d.recurring.length ? <p className="muted">No repeating patterns in this period.</p> : (
         <div className="recur">{d.recurring.map((r, i) => (
           <div key={i} className="att" style={{ gridTemplateColumns: "minmax(0,1fr) auto auto" }}>
-            <div style={{ minWidth: 0 }}><div className="tname" style={{ fontSize: 13.5 }}>{r.title}</div><div className="tsub">{r.sub}</div></div>
+            <div style={{ minWidth: 0 }}><div className="tname" style={{ fontSize: 12.5 }}>{r.title}</div><div className="tsub">{r.sub}</div></div>
             <span className="small muted">{r.owner}</span>
             <N ids={r.ids} title={r.title} className="btn sm">{`${r.ids.length} tasks`}</N>
           </div>
