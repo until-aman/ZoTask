@@ -1,4 +1,4 @@
-<div align="center">
+# TaskTrail
 
 <img src="docs/images/logo.svg" width="64" height="64" alt="TaskTrail logo" />
 
