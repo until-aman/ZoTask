@@ -44,14 +44,15 @@ export async function requireTasks(u: User, ids: number[]) {
 
 // Which screens each role sees (the menu and the pages follow this):
 //   Ops admin:        Review Queue, Analytics, Escalations, Map, Admin (incl. Team leave)
-//   Reviewer/auditor: Review Queue, Analytics, Escalations
-//   CBM:              My Tasks, Analytics, Escalations
-//   Ground team:      My Tasks
+//   Reviewer/auditor: Review Queue, Analytics, Escalations, Map
+//   CBM:              My Tasks, Analytics, Escalations, Map
+//   Ground team:      My Tasks, Map
+// Everyone can view the map; only admins upload locations to it.
 export const can = {
   queue: (u: User) => ["admin", "reviewer", "auditor"].includes(u.access_role),
   dashboard: (u: User) => ["admin", "reviewer", "auditor", "cbm"].includes(u.access_role),
   escalations: (u: User) => ["admin", "reviewer", "auditor", "cbm"].includes(u.access_role),
-  map: (u: User) => u.access_role === "admin",
+  map: (_u: User) => true,
   admin: (u: User) => u.access_role === "admin",
   tasks: (u: User) => ["ground", "cbm"].includes(u.access_role),
 };

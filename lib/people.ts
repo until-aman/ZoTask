@@ -3,6 +3,7 @@ import type { InStatement } from "@libsql/client";
 import { one, run } from "./db";
 import { GEO } from "./seed";
 import { dayStart } from "./time";
+import { SAMPLE_ESCALATIONS } from "./escalations";
 
 /** Tasks that can still be reviewed or audited. */
 const OPEN = "('upcoming','current','notsub','review','resub','changes','audit','auditflag','flagans')";
@@ -121,6 +122,28 @@ export async function removeOldEscalations(): Promise<InStatement[]> {
     `DELETE FROM escalation_properties WHERE escalation_id IN ${E}`,
     `DELETE FROM escalation_updates WHERE escalation_id IN ${E}`,
     `DELETE FROM escalations WHERE id IN ${E}`,
+    { sql: "INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)", args: [key, String(Date.now())] },
+  ];
+}
+
+/**
+ * After the escalations before 4 Nov were cleared, the next start found the list empty and filled it with the
+ * sample escalations again. Those sample rows (matched by their exact sample wording) go, once, with their
+ * updates, property links, bell notices and task-history lines. Escalations people raised are kept.
+ */
+export async function removeReseededSamples(): Promise<InStatement[]> {
+  const key = "reseeded_sample_escalations_removed";
+  if (await one("SELECT v FROM meta WHERE k=?", key)) return [];
+  const details = SAMPLE_ESCALATIONS.map(([, , d]) => d);
+  const marks = details.map(() => "?").join(",");
+  const E = `(SELECT id FROM escalations WHERE detail IN (${marks}))`;
+  const st = (sql: string, times = 1): InStatement => ({ sql, args: Array.from({ length: times }, () => details).flat() });
+  return [
+    st(`DELETE FROM events WHERE type='escalation_raised' AND EXISTS (SELECT 1 FROM escalations e WHERE e.detail IN (${marks}) AND events.detail LIKE 'ESC-' || e.id || ' %')`),
+    st(`DELETE FROM notifications WHERE kind='escalation' AND EXISTS (SELECT 1 FROM escalations e WHERE e.detail IN (${marks}) AND notifications.link = '/escalations?focus=' || e.id)`),
+    st(`DELETE FROM escalation_properties WHERE escalation_id IN ${E}`),
+    st(`DELETE FROM escalation_updates WHERE escalation_id IN ${E}`),
+    st(`DELETE FROM escalations WHERE id IN ${E}`),
     { sql: "INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)", args: [key, String(Date.now())] },
   ];
 }

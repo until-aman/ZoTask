@@ -7,6 +7,10 @@ import { signInAs, ready, one, ADMIN } from "./helpers";
 import { run } from "@/lib/db";
 
 before(ready);
+// Early in the IST day no window has opened yet, so make sure there are open, unsent runs to work with.
+before(async () => {
+  await run(`UPDATE instances SET status='current' WHERE id IN (SELECT id FROM instances WHERE source='schedule' AND attempt=0 AND first_submitted_at IS NULL AND status='upcoming' LIMIT 20)`);
+});
 const OPEN = "source='schedule' AND attempt=0 AND first_submitted_at IS NULL AND status IN ('current','notsub')";
 
 test("unticking a property drops today's unsent runs there, and keeps submitted ones", async () => {
