@@ -8,7 +8,7 @@ import { seed, seedStaffing } from "./seed";
 import { seedEscalations } from "./escalations";
 import { seedLibraries } from "./libraries";
 import { TASK_LIST_VERSION, taskListDone, taskListStatements } from "./cbm-tasks";
-import { removeOldEscalations, removeSampleEscalations, removeSampleReviewers } from "./people";
+import { removeOldEscalations, removeReseededSamples, removeSampleEscalations, removeSampleReviewers } from "./people";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 export const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
@@ -55,7 +55,8 @@ async function init(): Promise<Client> {
   // Databases created before headcounts or escalations existed get sample rows too.
   await scope.run(c, async () => {
     if (!(await one<{ n: number }>("SELECT count(*) n FROM staffing"))!.n) await seedStaffing();
-    if (!(await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n) await seedEscalations();
+    // Never on the live database: there an empty list is real (old ones were cleared on purpose).
+    if (!REMOTE && !(await one<{ n: number }>("SELECT count(*) n FROM escalations"))!.n) await seedEscalations();
     if (!(await one<{ n: number }>("SELECT count(*) n FROM task_categories"))!.n) await seedLibraries();
   });
   // Task list changes go as one batch: a single round trip that the database applies atomically, so a slow or
@@ -79,7 +80,7 @@ async function init(): Promise<Client> {
   } catch (e) { console.error("Renaming saved text failed; will retry on the next start", e); }
   // The live database only: the sample data's reviewers, properties and escalations give way to the real ones.
   if (REMOTE) {
-    try { await c.batch([...await scope.run(c, removeSampleReviewers), ...await scope.run(c, removeSampleEscalations), ...await scope.run(c, removeOldEscalations)], "write"); }
+    try { await c.batch([...await scope.run(c, removeSampleReviewers), ...await scope.run(c, removeSampleEscalations), ...await scope.run(c, removeOldEscalations), ...await scope.run(c, removeReseededSamples)], "write"); }
     catch (e) { console.error("Removing the sample data failed; will retry on the next start", e); }
   }
   return c;

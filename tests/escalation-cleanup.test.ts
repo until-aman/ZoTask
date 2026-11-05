@@ -32,3 +32,15 @@ test("escalations before the cut-off go, with their updates and links; later one
   assert.equal((await all("SELECT id FROM escalations WHERE created_at < ?", cut)).length, 0);
   assert.deepEqual(await removeOldEscalations(), [], "second start does nothing");
 });
+
+test("sample escalations put back after the clean-up go once; ones people raised stay", async () => {
+  const { removeReseededSamples } = await import("@/lib/people");
+  const { SAMPLE_ESCALATIONS } = await import("@/lib/escalations");
+  const by = (await one<{ id: number }>("SELECT id FROM users LIMIT 1"))!.id, now = Date.now();
+  const add = async (detail: string) => Number((await run("INSERT INTO escalations (department, title, detail, priority, status, raised_by, owner_name, created_at, updated_at) VALUES ('R&M','t',?,'medium','open',?,?,?,?)", detail, by, "x", now, now)).lastInsertRowid);
+  const sample = await add(SAMPLE_ESCALATIONS[0][2]), real = await add("Lift stuck on 3rd floor since morning");
+  for (const s of await removeReseededSamples()) typeof s === "string" ? await run(s) : await run(s.sql, ...(s.args as unknown[]));
+  assert.equal(await one("SELECT 1 FROM escalations WHERE id=?", sample), undefined);
+  assert.ok(await one("SELECT 1 FROM escalations WHERE id=?", real));
+  assert.deepEqual(await removeReseededSamples(), [], "runs once");
+});
