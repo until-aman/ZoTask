@@ -1449,3 +1449,55 @@ table.tt td{padding-block:7px}
 .nsearch:focus-within{background:var(--card)}
 input.search{border-radius:999px;background:var(--sunken);border-color:transparent;padding-inline:14px}
 input.search:focus{background:var(--card);border-color:var(--accent)}
+
+/* No sideways scrolling anywhere. Rows of tabs, steps and range buttons wrap onto a second line; tables fit their
+   column (headers wrap) and, on phones, each row becomes a small card of "label  value" lines. */
+.admtabs,.te-steps{flex-wrap:wrap;overflow:visible;row-gap:0}
+.seg{flex-wrap:wrap;max-width:100%}
+.qgrp-b{flex-wrap:wrap;overflow:visible}
+th,.sortbtn{white-space:normal}
+.sortbtn{text-align:inherit}
+.tbl{overflow-x:hidden}
+.tbl>table{width:100%}
+.tbl td{overflow-wrap:anywhere}
+.tbl td.n,.tbl td .pill,.tbl td .btn{overflow-wrap:normal}
+@media (max-width:900px){
+  .nav{flex-wrap:wrap;overflow:visible}
+  .qgrp-b{flex-wrap:wrap;overflow:visible}
+}
+/* Card layout, switched on by components/ui/TableFit.tsx when a table can't fit its column. */
+.tbl.cards{max-height:none}
+.tbl.cards>table,.tbl.cards>table>tbody,.tbl.cards>table>tbody>tr{display:block;width:100%}
+.tbl.cards>table>thead{display:none}
+.tbl.cards>table>tbody>tr{position:relative;padding:10px 14px;border-bottom:1px solid var(--line2)}
+.tbl.cards>table>tbody>tr:hover{box-shadow:none}
+.tbl.cards>table>tbody>tr>td{display:grid;grid-template-columns:minmax(0,32%) minmax(0,1fr);column-gap:12px;row-gap:0;grid-auto-rows:min-content;align-items:start;justify-items:start;width:auto;max-width:none;padding:3px 0;border:0;background:none;text-align:left;white-space:normal}
+.tbl.cards>table>tbody>tr>td>*{grid-column:2}
+.tbl.cards>table>tbody>tr>td::before{content:attr(data-label);grid-column:1;grid-row:1 / span 6;padding-top:1px;color:var(--muted);font-size:12px;font-weight:500}
+.tbl.cards>table>tbody>tr>td:not([data-label]),.tbl.cards>table>tbody>tr>td:first-child{display:block}
+.tbl.cards>table>tbody>tr>td:not([data-label])::before,.tbl.cards>table>tbody>tr>td:first-child::before{content:none}
+.tbl.cards>table>tbody>tr>td:first-child{padding:0 44px 6px 0;font-weight:600;color:var(--fg)}
+.tbl.cards>table>tbody>tr>td:first-child:has(>input[type=checkbox]){position:absolute;left:auto;right:44px;top:10px;padding:0;width:auto;min-height:0}
+.tbl.cards>table>tbody>tr>td.tdact{position:absolute;top:6px;right:6px;width:auto;padding:0;min-height:0}
+.tbl.cards>table>tbody>tr>td.n{text-align:left}
+.tbl.cards>table>tbody>tr.xrow>td{display:block}
+.tbl.cards>table>tbody>tr.xrow>td::before{content:none}
+/* Wide tables need a little less room before they have to turn into cards. */
+.esc-title{min-width:160px}
+.esc-upd{min-width:140px}
+.wrapcell{min-width:110px}
+.tbl th,.tbl td{padding-inline:8px}
+/* Names and roles in table cells wrap rather than widen the column. */
+.tbl td .person,.tbl td .person-t{min-width:0}
+.tbl td .person-t>span,.tbl td .person-t small{white-space:normal;overflow-wrap:break-word}
+.tbl td .person-t>span{min-width:9ch}
+.tbl td .pill{white-space:normal}
+.tbl th.n,.tbl td.n{padding-inline:6px}
+/* With a tick box first, the next cell is the card title. */
+.tbl.cards>table>tbody>tr>td:first-child:has(>input[type=checkbox])+td{display:block;padding:0 72px 6px 0;font-weight:600;color:var(--fg)}
+.tbl.cards>table>tbody>tr>td:first-child:has(>input[type=checkbox])+td::before{content:none}
+/* On wider screens a card uses two columns of "label  value" lines, so it stays short. */
+@media (min-width:700px){
+  .tbl.cards>table>tbody>tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
+  .tbl.cards>table>tbody>tr>td:first-child,.tbl.cards>table>tbody>tr>td:first-child:has(>input[type=checkbox])+td,.tbl.cards>table>tbody>tr.xrow>td{grid-column:1 / -1}
+}

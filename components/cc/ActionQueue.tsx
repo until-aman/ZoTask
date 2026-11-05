@@ -119,7 +119,7 @@ export default function ActionQueue({ issues, now, me, isAdmin = false, canEscal
             <tr key={i.key}>
               <td>{i.id ? <input type="checkbox" checked={sel.has(i.key)} aria-label={`Select ${i.task}`} onChange={() => { const n = new Set(sel); if (n.has(i.key)) n.delete(i.key); else n.add(i.key); setSel(n); }} /> : null}</td>
               <td><span className={`pill ${SEVC[i.sev]}`}>{i.sev}</span></td>
-              <td style={{ minWidth: 200 }}>
+              <td style={{ minWidth: 150 }}>
                 <b>{i.type}</b><div className="tsub" style={{ whiteSpace: "normal" }}>{i.task}</div>
                 {i.esc ? <div className="small warn" style={{ fontWeight: 600 }}>{i.esc.detail.split(" · ")[0]} · {ago(now, i.esc.at)}</div>
                   : i.ack ? <div className="small muted">✓ Acknowledged by {i.ack.by} · {ago(now, i.ack.at)}</div> : null}
