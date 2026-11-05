@@ -1,6 +1,6 @@
 # TaskTrail (local clone)
 
-A working clone of TaskTrail, Zolo's recurring-operations task platform: scheduled and event-triggered tasks, ground-team checklists with photos and location checks, central review, audit sampling, task history, and an operations command-center dashboard. It ships with sample Zolo data (4 cities, 7 clusters, 14 properties, about 60 people) and 14 days of simulated history, so every screen has something to show.
+TaskTrail, a working prototype of Zolo's recurring-operations task platform: scheduled and event-triggered tasks, ground-team checklists with photos and location checks, central review, audit sampling, task history, and an operations command-center dashboard. It ships with sample Zolo data (4 cities, 7 clusters, 14 properties, about 60 people) and 14 days of simulated history, so every screen has something to show.
 
 ## Run it
 
