@@ -175,7 +175,7 @@ It is designed for **cluster business managers (CBMs)** and ground teams who do 
   </tr>
 </table>
 
-Every table shares one toolkit: choose columns, export to **Excel or CSV**, page size, and row actions. Filters can be saved per screen with a default view. Admins can also upload cluster and property sheets (`.xlsx` or CSV) and see properties on a map.
+Every table shares one toolkit: choose columns, export to **Excel or CSV**, page size, and row actions. Filters can be saved per screen with a default view. Admins can also upload cluster and property sheets (`.xlsx` or CSV), and everyone can see properties on the map.
 
 ## How it works
 
@@ -271,11 +271,11 @@ Every figure opens the list of tasks behind it. **Compare** ranks two to eight p
 
 | Role | Sees | Can do |
 |---|---|---|
-| **Ground team** | My Tasks | Fill checklists, upload photos, check location, resubmit flagged items |
-| **CBM** | My Tasks, Analytics, Escalations | Everything above for their properties, answer audit flags, waive tasks, raise escalations |
-| **Central reviewer** | Review Queue, Analytics, Escalations | Pass or flag with reasons, reopen, reassign, remind |
-| **Auditor** | Review Queue (To Audit, Flag Answers), Analytics, Escalations | Audit pass or fail, close or return flag answers |
-| **Admin** | Everything, plus Map and Admin | Task setup, event triggers, checklists, schedules, categories, clusters, properties and people, week offs and leave |
+| **Ground team** | My Tasks, Map | Fill checklists, upload photos, check location, resubmit flagged items |
+| **CBM** | My Tasks, Analytics, Escalations, Map | Everything above for their properties, answer audit flags, waive tasks, raise escalations |
+| **Central reviewer** | Review Queue, Analytics, Escalations, Map | Pass or flag with reasons, reopen, reassign, remind |
+| **Auditor** | Review Queue (To Audit, Flag Answers), Analytics, Escalations, Map | Audit pass or fail, close or return flag answers |
+| **Admin** | Everything, plus Admin | Upload map locations, task setup, event triggers, checklists, schedules, categories, clusters, properties and people, week offs and leave |
 
 CBMs and ground staff only see their own properties. Server actions check scope again before every change (`lib/auth.ts`).
 

@@ -94,7 +94,7 @@ export async function saveMapSites(rows: SiteInput[]): Promise<Result> {
 
 /** The full profile for one pin, loaded when it's opened (descriptions are too large to send with every pin). */
 export async function siteDetails(id: number): Promise<Details | null> {
-  if (!can.dashboard(await requireUser())) return null;
+  if (!can.map(await requireUser())) return null;
   const r = await one<{ details: string | null }>("SELECT details FROM map_sites WHERE id=?", id);
   try { return r?.details ? (JSON.parse(r.details) as Details) : null; } catch { return null; }
 }
