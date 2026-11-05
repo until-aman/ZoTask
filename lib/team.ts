@@ -1,4 +1,5 @@
-// Team leave: each person's own weekly days off, leave and backup. Only admins manage it.
+// Team leave: each person's own weekly days off, leave and backup. Only admins manage it;
+// central reviewers can see it, read-only, for the people at the properties they review.
 import { all, one } from "./db";
 import type { User } from "./auth";
 import { addDays, isoDate } from "./time";
@@ -22,15 +23,34 @@ export async function backupOptions(u: User, target: { id: number; access_role: 
   return u.access_role === "admin" ? same : [];
 }
 
+/** Properties a central reviewer is assigned: the properties in the clusters they review (Admin › Clusters). */
+export async function reviewedProps(u: User): Promise<number[]> {
+  if (u.access_role !== "reviewer") return [];
+  return (await all<{ id: number }>("SELECT p.id FROM properties p JOIN clusters c ON c.id=p.cluster_id WHERE c.reviewer_id=? AND c.archived=0", u.id)).map((x) => x.id);
+}
+
+/** The people this user may see days off for: admins see everyone; a reviewer sees everyone working at their properties. */
+export async function viewableIds(u: User): Promise<number[]> {
+  if (u.access_role === "admin") return manageableIds(u);
+  const props = await reviewedProps(u);
+  if (!props.length) return [];
+  const IN = `(${props.join(",")})`;
+  return (await all<{ id: number }>(
+    `SELECT u.id FROM users u WHERE u.archived=0 AND (u.id IN (SELECT user_id FROM user_properties WHERE property_id IN ${IN})
+       OR u.id IN (SELECT cbm_id FROM properties WHERE id IN ${IN}))`)).map((x) => x.id);
+}
+
 export async function teamData(u: User) {
-  const ids = await manageableIds(u);
+  const ids = await viewableIds(u);
+  const scope = u.access_role === "admin" ? null : await reviewedProps(u);
   const today = isoDate(Date.now());
   if (!ids.length) return { people: [] as TeamPerson[], options: {} as Record<number, number[]>, names: {} as Record<number, string>, today };
   const IN = `(${ids.join(",")})`;
+  const PS = scope ? ` AND p.id IN (${scope.join(",")})` : "";
   const people = await all<{ id: number; name: string; access_role: string; op_role: string | null; week_off: string | null; backup_id: number | null; props: string | null; prop_ids: string | null }>(
     `SELECT u.id, u.name, u.access_role, u.op_role, u.week_off, u.backup_id,
-       (SELECT group_concat(p.name, ', ') FROM properties p WHERE p.id IN (SELECT property_id FROM user_properties WHERE user_id=u.id) OR p.cbm_id=u.id) props,
-       (SELECT group_concat(p.id) FROM properties p WHERE p.id IN (SELECT property_id FROM user_properties WHERE user_id=u.id) OR p.cbm_id=u.id) prop_ids
+       (SELECT group_concat(p.name, ', ') FROM properties p WHERE (p.id IN (SELECT property_id FROM user_properties WHERE user_id=u.id) OR p.cbm_id=u.id)${PS}) props,
+       (SELECT group_concat(p.id) FROM properties p WHERE (p.id IN (SELECT property_id FROM user_properties WHERE user_id=u.id) OR p.cbm_id=u.id)${PS}) prop_ids
      FROM users u WHERE u.id IN ${IN} ORDER BY CASE u.access_role WHEN 'reviewer' THEN 1 WHEN 'auditor' THEN 2 WHEN 'cbm' THEN 3 WHEN 'ground' THEN 4 ELSE 5 END, u.name`);
   const leaves = await all<{ id: number; user_id: number; from_date: string; to_date: string; note: string | null }>(
     `SELECT id, user_id, from_date, to_date, note FROM leaves WHERE user_id IN ${IN} AND to_date>=? ORDER BY from_date`, addDays(today, -30));

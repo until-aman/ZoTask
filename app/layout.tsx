@@ -18,6 +18,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     if (can.dashboard(u)) links.push({ href: "/dashboard", label: "Analytics", icon: "/dashboard", children: [
       { href: "/dashboard", label: "Review Dashboard" }, { href: "/compare", label: "Compare" }] });
     if (can.escalations(u)) links.push({ href: "/escalations", label: "Escalations" });
+    if (can.team(u)) links.push({ href: "/team", label: "Team availability", icon: "/team" });
     if (can.map(u)) links.push({ href: "/map", label: "Map" });
     if (can.admin(u)) links.push({ href: "/admin", label: "Admin", children: [
       ["tasks", "Tasks"], ["checklists", "Checklists"], ["schedules", "Schedules"], ["categories", "Categories"],
