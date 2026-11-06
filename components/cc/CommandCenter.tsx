@@ -29,10 +29,10 @@ function Health({ d }: { d: CC }) {
       <section className="card score">
         <h3>Ground team</h3>
         <div className="kpis k5">
-          <Tile label="Tasks to be done" rate={false} k={{ ...g.assigned, prev: undefined }} unitNote="Scheduled in the period" target="In the period"
-            def={{ means: "All tasks scheduled in the period", note: "Cancelled tasks are left out." }} />
-          <Tile label="Tasks completed" rate={false} k={{ ...g.completed, prev: undefined }} unitNote="Submitted at least once" target={share(g.completed.n, g.assigned.n)}
-            def={{ means: "Tasks submitted at least once, on time or late", calc: "Submitted tasks ÷ tasks to be done", note: "Includes tasks still in review." }} />
+          <Tile label="Deadline passed" rate={false} k={{ ...g.due, prev: undefined }} unitNote="Done or not" target="In the period"
+            def={{ means: "Tasks in the period whose deadline is over, whether done or not", note: "This is the base for On time and Missed. Still to do: Overdue, not done. Cancelled tasks are left out." }} />
+          <Tile label="Tasks completed" rate={false} k={{ ...g.completed, prev: undefined }} unitNote="Submitted at least once" target={g.assigned.n ? `${share(g.completed.n, g.assigned.n)} scheduled` : undefined}
+            def={{ means: "Tasks submitted at least once, on time or late", calc: "Submitted tasks ÷ tasks scheduled in the period", note: "Includes tasks still in review." }} />
           <Tile label="Completed on time" k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline"
             def={{ means: "Tasks submitted by their deadline", calc: "Submitted on time ÷ tasks past deadline", note: "Cancelled tasks are left out." }} />
           <Tile label="Passed 1st attempt" k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first review"
@@ -41,7 +41,7 @@ function Health({ d }: { d: CC }) {
             def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} />
         </div>
         <div className="minis">
-          <Mini label="Deadline passed" k={g.due} def={{ means: "Tasks whose deadline is over, whether done or not. Not a to-do count", note: "This is the base for On time and Missed. Still to do: Overdue, not done." }} />
+          <Mini label="Scheduled" k={g.assigned} def={{ means: "All tasks scheduled in the period, including ones whose deadline hasn't come yet", note: "Cancelled tasks are left out." }} />
           <Mini label="Done late" k={g.late} tone="a" def={{ means: "Submitted, but after the deadline" }} />
           <Mini label="Overdue, not done" k={g.overdue} tone="a" def={{ means: "Past the deadline, not submitted, grace period still running", note: "These can still be saved today. Remind the owner." }} />
           <Mini label="Sent back for fixes" k={g.returned} def={{ means: "Tasks a reviewer sent back for changes at least once" }} />

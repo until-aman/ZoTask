@@ -162,22 +162,18 @@ export default function AdminClient({ tab: tab0, templates, props, people, views
         <TeamLeave data={team} admin embedded />
       </>}
       {tab === "people" && <>
-        <FilterBar search={q} setSearch={setQ} searchLabel="Search properties" chips={city ? [{ key: "city", label: <>City: <b>{city}</b></>, clear: () => setCity("") }] : []}
-          panel={<Field label="City"><select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>} />
-        <div className="grid g2">
-          <section className="grid" style={{ gap: 8 }}>
-            <h2 style={{ margin: 0 }}>Properties</h2>
-            <Table name="Properties" rows={pr} cols={pcols} rowKey={(p) => p.id} query={q} />
-          </section>
-          <section className="grid" style={{ gap: 8 }}>
-            <h2 style={{ margin: 0 }}>People</h2>
-            <Table name="People" rows={people} rowKey={(p) => p.access_role} cols={[
-              { key: "role", label: "Role", value: (p) => ROLE_NAME[p.access_role] ?? p.access_role, sticky: true },
-              { key: "n", label: "People", num: true, value: (p) => p.n },
-            ]} />
-            <p className="small muted" style={{ margin: 0 }}>Roles here are operational roles only (admin, reviewer, auditor, CBM, ground team), not system access roles.</p>
-          </section>
-        </div>
+        {/* One column: headline counts first, then the full property list. */}
+        <Stats compact items={[
+          { key: "props", label: "Properties", value: props.length, sub: `${cities2.length} ${cities2.length === 1 ? "city" : "cities"}${props.some((p) => !p.cbm) ? ` · ${props.filter((p) => !p.cbm).length} without a CBM` : ""}` },
+          ...["reviewer", "auditor", "cbm", "ground", "admin"].map((r) => ({ key: r, label: ROLE_NAME[r], value: people.find((p) => p.access_role === r)?.n ?? 0,
+            sub: r === "ground" && props.reduce((a, p) => a + p.staff, 0) !== (people.find((p) => p.access_role === r)?.n ?? 0) ? `${props.reduce((a, p) => a + p.staff, 0)} placed at properties` : r === "cbm" ? `${new Set(props.map((p) => p.cbm_id).filter(Boolean)).size} running properties` : undefined })),
+        ]} />
+        <section className="card sec">
+          <div className="sech"><h2>Properties</h2></div>
+          <FilterBar search={q} setSearch={setQ} searchLabel="Search properties" chips={city ? [{ key: "city", label: <>City: <b>{city}</b></>, clear: () => setCity("") }] : []}
+            panel={<Field label="City"><select value={city} onChange={(e) => setCity(e.target.value)}><option value="">All cities</option>{cities.map((x) => <option key={x}>{x}</option>)}</select></Field>} />
+          <Table name="Properties" rows={pr} cols={pcols} rowKey={(p) => p.id} query={q} />
+        </section>
       </>}
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
