@@ -45,6 +45,7 @@ function Health({ d }: { d: CC }) {
           <Mini label="Done late" k={g.late} tone="a" def={{ means: "Submitted, but after the deadline" }} />
           <Mini label="Overdue, not done" k={g.overdue} tone="a" def={{ means: "Past the deadline, not submitted, grace period still running", note: "These can still be saved today. Remind the owner." }} />
           <Mini label="Sent back for fixes" k={g.returned} def={{ means: "Tasks a reviewer sent back for changes at least once" }} />
+          <Mini label="Resubmitted" k={g.resubmitted} def={{ means: "Tasks submitted again after a reviewer asked for changes", calc: "Resubmitted ÷ tasks sent back for fixes", note: "A sent-back task that isn't resubmitted is still being fixed, or ran out of time." }} />
           <Mini label="Sent back 2+ times" k={g.repeat} tone="r" def={{ means: "Tasks sent back two or more times", note: "A sign of a training or process problem." }} />
         </div>
       </section>
@@ -64,6 +65,7 @@ function Health({ d }: { d: CC }) {
           <Mini label="Reviewed late" k={v.afterSla} tone="a" def={{ means: "Reviewed tasks that were reviewed late", note: "Late if any review on the task took longer than the limit." }} />
           <Mini label="Waiting for review" k={v.pending} def={{ means: "Submitted tasks waiting for review right now" }} />
           <Mini label="Waiting too long" k={v.over} tone="r" def={{ means: "Tasks waiting for review longer than the time limit", note: "These are in Action required." }} />
+          <Mini label="Resubmissions reviewed" k={v.resubReviewed} def={{ means: "Tasks reviewed in the period after the ground team fixed and resubmitted them", calc: "Resubmissions reviewed ÷ tasks reviewed", note: "Each one had changes required at an earlier review." }} />
           <Mini label="Waiting for re-review" k={v.rereview} def={{ means: "Fixed and resubmitted, waiting for review" }} />
         </div>
       </section>
