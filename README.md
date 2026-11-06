@@ -166,7 +166,7 @@ It is designed for **cluster business managers (CBMs)** and ground teams who do 
     </td>
     <td width="33%" valign="top">
       <h4>Off days and cover</h4>
-      Personal week offs, leave and backups move work to cover. Review-team off days pause SLA clocks, and tasks submitted on them are sampled or close themselves.
+      Personal week offs, leave and backups move work to cover. Reviewers see who's off at their properties on a read-only Team availability page. Review-team off days pause SLA clocks, and tasks submitted on them are sampled or close themselves.
     </td>
     <td width="33%" valign="top">
       <h4>Notifications</h4>
@@ -273,7 +273,7 @@ Every figure opens the list of tasks behind it. **Compare** ranks two to eight p
 |---|---|---|
 | **Ground team** | My Tasks, Map | Fill checklists, upload photos, check location, resubmit flagged items |
 | **CBM** | My Tasks, Analytics, Escalations, Map | Everything above for their properties, answer audit flags, waive tasks, raise escalations |
-| **Central reviewer** | Review Queue, Analytics, Escalations, Map | Pass or flag with reasons, reopen, reassign, remind |
+| **Central reviewer** | Review Queue, Analytics, Escalations, Map, Team availability | Pass or flag with reasons, reopen, reassign, remind, and see (read-only) week offs and leave of everyone at their clusters' properties |
 | **Auditor** | Review Queue (To Audit, Flag Answers), Analytics, Escalations, Map | Audit pass or fail, close or return flag answers |
 | **Admin** | Everything, plus Admin | Upload map locations, task setup, event triggers, checklists, schedules, categories, clusters, properties and people, week offs and leave |
 

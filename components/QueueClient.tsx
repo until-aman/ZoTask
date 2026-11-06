@@ -352,7 +352,7 @@ export default function QueueClient({ items, geo, views, reviewers, me, canRevie
                 <div className={`nextbox${over(t) ? " r" : ""}`}>
                   <h4>Next step</h4>
                   <p>{n.who ? `${n.who} ${n.what}` : n.what}</p>
-                  <div style={{ fontSize: 13, marginTop: 2 }}>{n.sub}</div>
+                  <div style={{ fontSize: 12, marginTop: 2 }}>{n.sub}</div>
                   {gr.open && <div style={{ marginTop: 8 }}><Age t={t} /></div>}
                 </div>
                 <dl className="kv">

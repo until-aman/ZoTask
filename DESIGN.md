@@ -10,7 +10,8 @@ All values live as CSS custom properties at the top of `app/globals.css`. Compon
 2. **One accent.** Purple marks what you can act on: links, the primary button, the selected tab, focus, and the current period in charts. Nothing decorative is purple.
 3. **Status is a soft badge.** Green, red, amber and gray badges have a tinted background and a dark text color from the same family. Color is never the only signal; the badge always has a word.
 4. **Same thing, same look.** A filter is always a white bordered button with a chevron. A list is always rows with thin dividers. A section always starts with a title and a rule.
-5. **Calm motion.** 120–200 ms ease-out for hover, open and close. Nothing moves when the user has asked for reduced motion.
+5. **Compact, like a mail client.** Small type (13 px body), tight table rows that lift with a soft shadow on hover, pill-shaped menu items and search boxes on a grey fill. Dense enough to scan a long queue without scrolling.
+6. **Calm motion.** 120–200 ms ease-out for hover, open and close. Nothing moves when the user has asked for reduced motion.
 
 ## Color
 
@@ -47,14 +48,14 @@ Inter for everything, with tabular figures (`font-variant-numeric: tabular-nums`
 
 | Role | Size / line | Weight | Color |
 |---|---|---|---|
-| Page title (`h1`) | 28 / 36 | 700 | `--fg` |
-| Section title (`h2`, `.band`) | 20 / 28 | 700 | `--fg` |
-| Block title (`h3`) | 16 / 24 | 600 | `--fg` |
-| Big figure (`.kpi .v`) | 24 / 32 | 600 | `--fg` |
-| Body | 14 / 20 | 400 | `--text` |
-| Label, button | 14 / 20 | 500–600 | `--fg` |
-| Caption, subtitle | 13 / 18 | 400 | `--muted` |
-| Small meta, table header | 12 / 16 | 500–600 | `--muted` |
+| Page title (`h1`) | 22 / 28 | 700 | `--fg` |
+| Section title (`h2`, `.band`) | 17 / 24 (dashboard bands 20 / 26) | 700 | `--fg` |
+| Block title (`h3`) | 14 / 20 | 600 | `--fg` |
+| Big figure (`.kpi .v`) | 20 / 26 | 600 | `--fg` |
+| Body, table cells | 13 / 18 | 400 | `--text` |
+| Label, button, menu item | 13–14 | 500–600 | `--fg` |
+| Caption, subtitle | 12–13 | 400 | `--muted` |
+| Small meta, table header | 11.5–12 | 500–600 | `--muted` |
 
 Titles never use uppercase. Table headers use sentence case.
 
@@ -69,7 +70,7 @@ Titles never use uppercase. Table headers use sentence case.
 
 ## Layout
 
-- Left menu 248 px (64 px when collapsed; hovering the rail opens it over the page), on `--sunken` grey with a hairline on its right. Brand row with a divider, a "Search menu…" box, then 15 px items with 20 px icons. Groups (Analytics, Admin) fold open to sub-items on an indented guide line.
+- Left menu 248 px (64 px when collapsed; hovering the rail opens it over the page), on `--sunken` grey with a hairline on its right. Brand row with a divider, a "Search menu…" box, then 14 px pill-shaped items with 18 px icons. Groups (Analytics, Admin) fold open to sub-items on an indented guide line.
 - Content max width 1600 px, 32 px side padding on desktop, 16 px on phones.
 - A 12-column grid; dashboard blocks take 4 columns (three across), wide charts take 8, tables take 12.
 - Every page starts with a **page header**: title on the left, primary actions on the right, an optional gray subtitle, and a 1 px rule underneath (`.phead`).

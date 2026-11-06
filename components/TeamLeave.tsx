@@ -30,6 +30,10 @@ export default function TeamLeave({ data, admin, embedded = false }: { data: Dat
   const [edit, setEdit] = useState<number | null>(null);
   const [toast, setToast] = useState("");
   const offToday = (p: TeamPerson) => personOffWhy(offOf(p), today);
+  // The days off from tomorrow through the next week, e.g. "Sun 8 Nov".
+  const nextOff = (p: TeamPerson) => Array.from({ length: 7 }, (_, i) => addDays(today, i + 1))
+    .map((d) => ({ d, why: personOffWhy(offOf(p), d) })).filter((x) => x.why)
+    .map((x) => ({ label: fmtDate(x.d, { weekday: "short", day: "numeric", month: "short" }), why: x.why as string }));
   const rows = useMemo(() => people.filter((p) => (!role || p.access_role === role) && (show !== "off" || offToday(p)) && (show !== "nobackup" || !p.backup_id)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [people, role, show]);
@@ -42,12 +46,16 @@ export default function TeamLeave({ data, admin, embedded = false }: { data: Dat
     { key: "week", label: "Weekly off", value: (p) => p.week.map((d) => DAYS[d]).join(", ") || null, render: (p) => p.week.length ? p.week.map((d) => DAYS[d]).join(", ") : <span className="muted">None</span> },
     { key: "leave", label: "Leave", value: (p) => p.leaves.filter((l) => l.to >= today).map(range).join(", ") || null,
       render: (p) => { const up = p.leaves.filter((l) => l.to >= today); return up.length ? <span className="small">{up.slice(0, 2).map(range).join(", ")}{up.length > 2 ? ` +${up.length - 2}` : ""}</span> : <span className="muted">None</span>; } },
+    { key: "next", label: "Off in the next 7 days", value: (p) => nextOff(p).map((d) => d.label).join(", ") || null,
+      render: (p) => { const n = nextOff(p); return n.length ? <span className="small" title={n.map((d) => `${d.label}: ${d.why}`).join("\n")}>{n.map((d) => d.label).join(", ")}</span> : <span className="muted">None</span>; } },
     { key: "backup", label: "Backup", value: (p) => (p.backup_id ? names[p.backup_id] : null), render: (p) => (p.backup_id ? names[p.backup_id] : <span className="t-a small">Not set</span>) },
   ];
   const editing = people.find((p) => p.id === edit) ?? null;
   return (
     <div className={embedded ? "grid" : "page grid"} style={{ gap: 14 }}>
-      {!embedded && <div className="phead"><div><h1>Week offs and leave</h1><p className="phead-sub">Each person&apos;s weekly day off, leave and backup.</p></div></div>}
+      {!embedded && <div className="phead"><div><h1>{admin ? "Week offs and leave" : "Team availability"}</h1><p className="phead-sub">{admin
+        ? <>Each person&apos;s weekly day off, leave and backup.</>
+        : <>Who is working at the properties you review, and their week offs, leave and backups. Only an admin can change these.</>}</p></div></div>}
       <p className="small muted" style={{ margin: 0, maxWidth: 820 }}>
         <b style={{ color: "var(--fg)" }}>Each person&apos;s own days off.</b> While someone is off, their tasks go to their backup or a teammate at the same property;
         with nobody to cover, the task isn&apos;t counted. Their reviews move to their backup, or their clock pauses until they&apos;re back.
@@ -60,10 +68,11 @@ export default function TeamLeave({ data, admin, embedded = false }: { data: Dat
       ]} />
       <FilterBar search={q} setSearch={setQ} searchLabel="Search people"
         chips={role ? [{ key: "role", label: <>Role: <b>{ROLE[role]}</b></>, clear: () => setRole("") }] : []}
-        panel={admin ? <Field label="Role"><select value={role} onChange={(e) => setRole(e.target.value)}><option value="">All roles</option>{Object.entries(ROLE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field> : undefined} />
+        panel={people.length ? <Field label="Role"><select value={role} onChange={(e) => setRole(e.target.value)}><option value="">All roles</option>{Object.entries(ROLE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field> : undefined} />
       <Table name="Team leave" rows={rows} rowKey={(p) => p.id} cols={cols} query={q} initialSort={undefined}
-        actions={(p) => [{ label: "Set days off and backup…", onClick: () => setEdit(p.id) }]} empty="Nobody here for these filters." />
-      {editing && <Editor p={editing} options={data.options[editing.id] ?? []} names={names} today={today}
+        actions={admin ? (p) => [{ label: "Set days off and backup…", onClick: () => setEdit(p.id) }] : undefined}
+        empty={people.length ? "Nobody here for these filters." : "No properties are assigned to you yet, so there's nobody to show."} />
+      {admin && editing && <Editor p={editing} options={data.options[editing.id] ?? []} names={names} today={today}
         close={() => setEdit(null)} done={(m) => { setToast(m); router.refresh(); setTimeout(() => setToast(""), 4000); }} />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>

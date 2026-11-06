@@ -78,7 +78,7 @@ export function Mini({ label, k, tone, def, of }: { label: string; k: K; tone?: 
 }
 
 export function Spark({ data, color = "var(--accent)", max = 100 }: { data: (number | null)[]; color?: string; max?: number }) {
-  const w = 80, h = 24;
+  const w = 64, h = 24;
   const pts = data.map((v, i) => (v === null ? null : [i * (w / Math.max(1, data.length - 1)), h - 2 - (v / (max || 1)) * (h - 4)])).filter(Boolean) as number[][];
   if (pts.length < 2) return <span className="muted small">—</span>;
   return <svg className="spark" width={w} height={h} aria-hidden="true"><polyline fill="none" stroke={color} strokeWidth="1.6" points={pts.map((p) => p.join(",")).join(" ")} /></svg>;
@@ -170,7 +170,7 @@ export function Table<R>({ cols, rows, rowKey, search, expand, pageSize: fixed, 
               <tr key={key} className={isOpen ? "open" : ""}>
                 {expand && <td><button type="button" className="exp" aria-expanded={isOpen} aria-label="Show details"
                   onClick={() => { const n = new Set(openRows); if (isOpen) n.delete(key); else n.add(key); setOpenRows(n); }}>{isOpen ? "▾" : "▸"}</button></td>}
-                {shown.map((c) => <td key={c.key} className={c.num ? "n" : ""}>{c.render ? c.render(r) : c.person ? <Person name={String(c.value(r) ?? "")} /> : c.value(r) ?? "—"}</td>)}
+                {shown.map((c) => <td key={c.key} className={c.num ? "n" : ""} data-label={typeof c.label === "string" ? c.label : undefined}>{c.render ? c.render(r) : c.person ? <Person name={String(c.value(r) ?? "")} /> : c.value(r) ?? "—"}</td>)}
                 {actions && <td className="tdact"><RowMenu actions={actions(r)} /></td>}
               </tr>,
               isOpen && expand ? <tr key={`${key}-x`} className="xrow"><td colSpan={shown.length + 1 + (actions ? 1 : 0)}>{expand(r)}</td></tr> : null,
@@ -195,7 +195,7 @@ export function CopyModal({ title, text, file, close, extra }: { title: string; 
     <div className="modal" onClick={close}>
       <div className="mcard wide" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
         <div className="row2"><h2 style={{ margin: 0 }}>{title}</h2><span className="spacer" /><button type="button" className="x" onClick={close} aria-label="Close">×</button></div>
-        <textarea ref={(el) => { ta = el; }} readOnly value={text} style={{ minHeight: 260, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 }} />
+        <textarea ref={(el) => { ta = el; }} readOnly value={text} style={{ minHeight: 260, fontFamily: "ui-monospace,Menlo,monospace", fontSize: 11.5 }} />
         <div className="row2">
           <button type="button" className="btn primary" onClick={() => copy(ta)}>Copy</button>
           {file && <a className="btn" href={`data:${file.endsWith(".csv") ? "text/csv" : "text/markdown"};charset=utf-8,${encodeURIComponent(text)}`} download={file}>Download</a>}

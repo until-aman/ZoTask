@@ -44,7 +44,7 @@ export function DrillDrawer({ drill, tasks, now, close, openTask }: { drill: Dri
           {list.map((t) => (
             <button key={t.id} type="button" className="drow" onClick={() => openTask(t.id)}>
               <div style={{ minWidth: 0 }}>
-                <div className="tname" style={{ fontSize: 13.5 }}>{t.task}{t.crit && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}</div>
+                <div className="tname" style={{ fontSize: 12.5 }}>{t.task}{t.crit && <span className="pill r" style={{ marginLeft: 6 }}>Critical</span>}</div>
                 <div className="tsub">{t.property} · {t.cluster}, {t.city}</div>
                 <div className="tsub">Scheduled {fmtDate(t.date)}, {t.win} · Last action: {t.lastL}, {when(t.lastAt)}</div>
                 <div className="tsub">{t.assignee ?? "Unassigned"} · due {when(t.due)} · <span className={t.sub && t.sub <= t.due ? "" : "warn"}>{lateBy(t, now)}</span></div>
