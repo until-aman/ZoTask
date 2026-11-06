@@ -258,7 +258,7 @@ The **Review Dashboard** (operations command center) is scoped to the viewer's p
 
 | Area | What it shows |
 |---|---|
-| **Ground team** | Tasks to be done and completed, completed on time (target 85%+), passed first attempt (target 80%+), missed (target under 5%), done late, sent back for fixes |
+| **Ground team** | Tasks past their deadline and completed, completed on time (target 85%+), passed first attempt (target 80%+), missed (target under 5%), done late, sent back for fixes |
 | **Reviewers** | Tasks to review and reviewed, reviewed on time (target 90%+), reviews missed (target under 2%), waiting too long |
 | **Outcome** | How every task past its deadline ended |
 | **Action required** | Issues ranked by severity and age, each with an owner |

@@ -70,6 +70,7 @@ export function ground(list: Row[], sentBack: Map<number, number>, passed: Set<n
     fta: ids(decided.filter((r) => r.first_decision === "pass")),
     returned: ids(act.filter((r) => (sentBack.get(r.id) ?? 0) >= 1)),
     repeat: ids(act.filter((r) => (sentBack.get(r.id) ?? 0) >= 2)),
+    resubmitted: ids(act.filter((r) => r.attempt >= 2)), // submitted again after a reviewer asked for changes
     approved: ids(due.filter((r) => passed.has(r.id) || PASSED_ST.includes(r.status))),
     done: ids(due.filter((r) => r.status === "done")),
     notrect: ids(due.filter((r) => r.status === "notrect")),
@@ -95,7 +96,7 @@ export function reviewing(revs: Rv[], backlog: Row[], now: number) {
   return {
     reviewed, inSla, afterSla: reviewed.filter((id) => !inSla.includes(id)), pending: pend.map((r) => r.id), over: over.map((r) => r.id),
     rereview: pend.filter((r) => r.status === "resub").map((r) => r.id), requiring: uniq([...reviewed, ...pend.map((r) => r.id)]),
-    sentBack, checks: checks.length, reReviewed: reviewed.filter((id) => byTask.get(id)!.length > 1),
+    sentBack, checks: checks.length, resubReviewed: reviewed.filter((id) => byTask.get(id)!.some((x) => x.attempt > 1)), reReviewed: reviewed.filter((id) => byTask.get(id)!.length > 1),
     median: quant(tat, 0.5), p90: quant(tat, 0.9), checkIds: uniq(checks.map((x) => x.instance_id)),
   };
 }
@@ -167,14 +168,14 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
     onTime: k(gC.onTime, gC.due, gP.onTime, gP.due), late: k(gC.late, gC.due, gP.late, gP.due),
     overdue: k(gC.overdue, gC.due), missed: k(gC.missed, gC.due, gP.missed, gP.due),
     fta: k(gC.fta, gC.decided, gP.fta, gP.decided), returned: k(gC.returned, gC.decided, gP.returned, gP.decided),
-    repeat: k(gC.repeat, gC.decided, gP.repeat, gP.decided),
+    repeat: k(gC.repeat, gC.decided, gP.repeat, gP.decided), resubmitted: k(gC.resubmitted, gC.returned, gP.resubmitted, gP.returned),
   };
   const reviewK = {
     requiring: k(vC.requiring), reviewed: k(vC.reviewed, undefined, vP.reviewed),
     inSla: k(vC.inSla, vC.reviewed, vP.inSla, vP.reviewed), afterSla: k(vC.afterSla, vC.reviewed, vP.afterSla, vP.reviewed),
     pending: k(vC.pending), over: k(vC.over, vC.pending), rereview: k(vC.rereview), missed: k(reviewMissed(cur), submittedIn),
     median: { ms: vC.median, prev: vP.median, ids: vC.checkIds }, p90: { ms: vC.p90, prev: vP.p90, ids: vC.checkIds },
-    checks: vC.checks,
+    checks: vC.checks, resubReviewed: k(vC.resubReviewed, vC.reviewed, vP.resubReviewed, vP.reviewed),
   };
   const outcome = {
     done: k(gC.done, gC.due, gP.done, gP.due), inprog: k(gC.inprog, gC.due), notsub: k(gC.overdue, gC.due),
