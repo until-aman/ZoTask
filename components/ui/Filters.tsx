@@ -4,7 +4,7 @@ import "@/lib/storage";
 // and the active filters as removable chips. Also the stat cards above it, the pager and header sorting below it.
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { deleteView, saveView, setDefaultView } from "@/app/actions";
+import { deleteView, saveView, setDefaultView, updateView } from "@/app/actions";
 import type { SavedView } from "@/lib/views";
 
 export type { SavedView };
@@ -111,36 +111,80 @@ function SavedViews({ page, views, current, apply, name = "", note, notify }: Sa
   const [saving, setSaving] = useState(false);
   const [manage, setManage] = useState(false);
   const close = useMemo(() => () => setManage(false), []);
-  const ref = useOutside(manage, close);
   const active = views.find((v) => sameFilters(v.f, current));
   const say = (m: string) => notify?.(m);
   return (
     <div className="saved" aria-label="Saved filters">
       <span className="saved-l">Saved</span>
       {views.map((v) => (
-        <button key={v.id} type="button" className="svchip" aria-pressed={active?.id === v.id} onClick={() => apply(v.f)} title={v.def ? "Opens by default" : "Apply these filters"}>
+        <button key={v.id} type="button" className="svchip" aria-pressed={active?.id === v.id} onClick={() => apply(v.f)} title={`${v.name}${v.def ? " (opens by default)" : ""}`}>
           {v.def && <span className="star" aria-label="default">★</span>}{v.name}
         </button>
       ))}
       {!active && <button type="button" className="svadd" onClick={() => setSaving(true)}>+ Save filters</button>}
-      {views.length > 0 && (
-        <span className="fwrap" ref={ref}>
-          <button type="button" className="link small" onClick={() => setManage(!manage)} aria-expanded={manage}>Manage</button>
-          {manage && (
-            <div className="pop right svman" role="dialog" aria-label="Manage saved filters">
-              {views.map((v) => (
-                <div key={v.id} className="svrow">
-                  <span className="ell">{v.name}</span>
-                  <button type="button" className={`link small${v.def ? " on" : ""}`} title={v.def ? "Stop opening with this" : "Open this page with it"}
-                    onClick={async () => { const r = await setDefaultView(v.id, !v.def); say(r.ok ? r.msg ?? "" : r.error); router.refresh(); }}>{v.def ? "★ Default" : "☆ Make default"}</button>
-                  <button type="button" className="link small t-r" onClick={async () => { const r = await deleteView(v.id); say(r.ok ? `Deleted “${v.name}”` : r.error); router.refresh(); }}>Delete</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </span>
-      )}
+      {views.length > 0 && <button type="button" className="link small" onClick={() => setManage(true)}>Manage</button>}
+      {manage && <ManageModal views={views} current={current} close={close} say={say} />}
       {saving && <SaveModal page={page} current={current} name={name} note={note} taken={views.map((v) => v.name)} close={() => setSaving(false)} done={(m) => { setSaving(false); say(m); router.refresh(); }} />}
+    </div>
+  );
+}
+
+/** Every saved filter for this page, with room for the full name: rename, update to what's on screen, make default, delete. */
+function ManageModal({ views, current, close, say }: { views: SavedView[]; current: object; close: () => void; say: (m: string) => void }) {
+  const router = useRouter();
+  const [edit, setEdit] = useState<number | null>(null);
+  const [name, setName] = useState("");
+  const [also, setAlso] = useState(false);
+  const [confirm, setConfirm] = useState<number | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") close(); }; document.addEventListener("keydown", k); return () => document.removeEventListener("keydown", k); }, [close]);
+  const act = async (fn: () => Promise<{ ok: boolean; msg?: string; error?: string } | { ok: true; msg?: string }>, after?: () => void) => {
+    setBusy(true); setErr("");
+    const r = await fn() as { ok: boolean; msg?: string; error?: string };
+    setBusy(false);
+    if (!r.ok) { setErr(r.error ?? "Something went wrong"); return; }
+    say(r.msg ?? ""); after?.(); router.refresh();
+  };
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
+      <div className="mcard svm" role="dialog" aria-label="Manage saved filters">
+        <div className="svm-h"><h2>Saved filters</h2><button type="button" className="icon-x" aria-label="Close" onClick={close}>×</button></div>
+        <p className="small muted" style={{ margin: 0 }}>The default opens automatically when you come to this page.</p>
+        <ul className="svm-list">
+          {views.map((v) => {
+            const same = sameFilters(v.f, current);
+            return (
+              <li key={v.id} className={`svm-row${v.def ? " def" : ""}`}>
+                {edit === v.id ? (
+                  <form className="svm-edit" onSubmit={(e) => { e.preventDefault(); act(() => updateView(v.id, name, also ? current : undefined), () => setEdit(null)); }}>
+                    <input type="text" value={name} onChange={(e) => { setName(e.target.value); setErr(""); }} maxLength={60} autoFocus aria-label="Name" />
+                    {!same && <label className="svm-also"><input type="checkbox" checked={also} onChange={(e) => setAlso(e.target.checked)} /> Also replace its filters with the ones on screen now</label>}
+                    <div className="svm-acts"><button type="button" className="btn" onClick={() => setEdit(null)}>Cancel</button><button type="submit" className="btn primary" disabled={busy || !name.trim()}>Save</button></div>
+                  </form>
+                ) : confirm === v.id ? (
+                  <div className="svm-confirm">
+                    <span>Delete <b>{v.name}</b>?</span>
+                    <div className="svm-acts"><button type="button" className="btn" onClick={() => setConfirm(null)}>Keep</button>
+                      <button type="button" className="btn danger" disabled={busy} onClick={() => act(() => deleteView(v.id).then((r) => (r.ok ? { ...r, msg: `Deleted “${v.name}”` } : r)), () => setConfirm(null))}>Delete</button></div>
+                  </div>
+                ) : <>
+                  <button type="button" className={`svm-star${v.def ? " on" : ""}`} aria-pressed={v.def} title={v.def ? "Default: click to stop opening with it" : "Make default"} disabled={busy}
+                    onClick={() => act(() => setDefaultView(v.id, !v.def))}>{v.def ? "★" : "☆"}</button>
+                  <div className="svm-name"><b>{v.name}</b>{v.def ? <span className="pill a">Default</span> : null}{same ? <span className="pill b">On screen now</span> : null}</div>
+                  <div className="svm-acts">
+                    {!v.def && <button type="button" className="btn sm" disabled={busy} onClick={() => act(() => setDefaultView(v.id, true))}>Make default</button>}
+                    <button type="button" className="btn sm" onClick={() => { setEdit(v.id); setName(v.name); setAlso(false); setConfirm(null); setErr(""); }}>Edit</button>
+                    <button type="button" className="btn sm danger-ghost" onClick={() => { setConfirm(v.id); setEdit(null); setErr(""); }}>Delete</button>
+                  </div>
+                </>}
+              </li>
+            );
+          })}
+        </ul>
+        {err && <p className="err" style={{ margin: 0 }}>{err}</p>}
+        <div className="row2"><span className="spacer" /><button type="button" className="btn" onClick={close}>Done</button></div>
+      </div>
     </div>
   );
 }

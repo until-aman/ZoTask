@@ -1515,3 +1515,27 @@ th,.sortbtn{white-space:normal}
 .outcome .lgw .lg:hover:not(:disabled){background:none;color:var(--accent-text)}
 @media (max-width:420px){.minis,.hbands .minis{grid-template-columns:repeat(2,minmax(0,1fr))}.mini{padding-left:10px}}
 .hbands .score{margin-bottom:8px}
+
+/* Manage saved filters: a roomy dialog, one row per saved filter with its full name. */
+.mcard.svm{width:min(560px,100%);gap:12px}
+.svm-h{display:flex;align-items:center;gap:8px}
+.svm-h h2{margin:0;flex:1}
+.icon-x{width:32px;height:32px;border:0;border-radius:999px;background:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer}
+.icon-x:hover{background:var(--sunken);color:var(--fg)}
+.svm-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;max-height:min(60vh,480px);overflow:auto}
+.svm-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.svm-row.def{border-color:#e8c766;background:#fffbeb}
+.svm-star{width:28px;height:28px;border:0;border-radius:999px;background:none;font-size:18px;line-height:1;color:var(--muted);cursor:pointer}
+.svm-star.on{color:#d49b00}
+.svm-star:hover:not(:disabled){background:var(--sunken)}
+.svm-name{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.svm-name b{font-weight:600;color:var(--fg);overflow-wrap:anywhere}
+.svm-acts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.btn.sm.danger-ghost{color:var(--red-ink)}
+.btn.sm.danger-ghost:hover{border-color:var(--red)}
+.svm-edit,.svm-confirm{grid-column:1 / -1;display:grid;gap:8px}
+.svm-edit input[type=text]{width:100%}
+.svm-also{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text)}
+.svm-confirm{grid-template-columns:minmax(0,1fr) auto;align-items:center}
+@media (max-width:520px){.svm-row{grid-template-columns:auto minmax(0,1fr)}.svm-row>.svm-acts{grid-column:1 / -1;justify-content:flex-start}.svm-confirm{grid-template-columns:minmax(0,1fr)}}
+.svchip{max-width:min(320px,100%)}

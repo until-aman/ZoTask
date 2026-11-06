@@ -185,6 +185,23 @@ export async function deleteView(id: number): Promise<Result> {
   const u = await requireUser();
   return guard(async () => { await run("DELETE FROM saved_views WHERE id=? AND user_id=?", id, u.id); return "Deleted"; });
 }
+/** Rename saved filters and, optionally, replace what they hold with the filters on screen now. */
+export async function updateView(id: number, name: string, filters?: object): Promise<Result> {
+  const u = await requireUser();
+  name = name.trim().replace(/\s+/g, " ");
+  return guard(async () => {
+    if (!name) throw new Error("Give the saved filters a name.");
+    await tx(async () => {
+      const v = await one<{ page: string }>("SELECT page FROM saved_views WHERE id=? AND user_id=?", id, u.id);
+      if (!v) throw new Error("Saved filter not found.");
+      if (await one("SELECT id FROM saved_views WHERE user_id=? AND page=? AND id<>? AND lower(trim(name))=lower(?)", u.id, v.page, id, name))
+        throw new Error(`You already have saved filters called “${name}”. Pick another name.`);
+      if (filters) await run("UPDATE saved_views SET name=?, filters=? WHERE id=?", name, JSON.stringify(filters), id);
+      else await run("UPDATE saved_views SET name=? WHERE id=?", name, id);
+    });
+    return filters ? `Updated “${name}” with the filters on screen` : `Saved as “${name}”`;
+  });
+}
 export async function setDefaultView(id: number, on = true): Promise<Result> {
   const u = await requireUser();
   return guard(async () => {
