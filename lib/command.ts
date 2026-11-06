@@ -54,23 +54,24 @@ export const toT = (r: Row): T => ({
   win: `${r.window_start}–${r.window_end}`, lastL: actionLabel(r.last_type), lastAt: r.last_at ?? r.status_since,
 });
 
-/** Ground team figures for a set of tasks. `sentBack` counts send-backs per task. */
+/** Ground team figures for a set of tasks. `sentBack` counts send-backs per task.
+ *  Every figure counts only tasks whose deadline has passed; tasks still ahead of their deadline aren't judged yet. */
 export function ground(list: Row[], sentBack: Map<number, number>, passed: Set<number>, now: number) {
   const act = list.filter((r) => r.status !== "waived");
   const due = act.filter((r) => r.window_end_at <= now);
   const ids = (xs: Row[]) => xs.map((r) => r.id);
-  const decided = act.filter((r) => r.first_decision);
+  const decided = due.filter((r) => r.first_decision);
   const sets = {
-    assigned: ids(act), due: ids(due), completed: ids(act.filter((r) => r.first_submitted_at)),
+    assigned: ids(act), due: ids(due), completed: ids(due.filter((r) => r.first_submitted_at)),
     onTime: ids(due.filter((r) => r.first_submitted_at && r.first_submitted_at <= r.window_end_at)),
     late: ids(due.filter((r) => r.first_submitted_at && r.first_submitted_at > r.window_end_at)),
     overdue: ids(due.filter((r) => r.status === "notsub")),
     missed: ids(due.filter((r) => r.status === "missed")),
     decided: ids(decided),
     fta: ids(decided.filter((r) => r.first_decision === "pass")),
-    returned: ids(act.filter((r) => (sentBack.get(r.id) ?? 0) >= 1)),
-    repeat: ids(act.filter((r) => (sentBack.get(r.id) ?? 0) >= 2)),
-    resubmitted: ids(act.filter((r) => r.attempt >= 2)), // submitted again after a reviewer asked for changes
+    returned: ids(due.filter((r) => (sentBack.get(r.id) ?? 0) >= 1)),
+    repeat: ids(due.filter((r) => (sentBack.get(r.id) ?? 0) >= 2)),
+    resubmitted: ids(due.filter((r) => r.attempt >= 2)), // submitted again after a reviewer asked for changes
     approved: ids(due.filter((r) => passed.has(r.id) || PASSED_ST.includes(r.status))),
     done: ids(due.filter((r) => r.status === "done")),
     notrect: ids(due.filter((r) => r.status === "notrect")),
@@ -164,7 +165,7 @@ export async function buildCommand(u: User, sp: SP, now = Date.now()) {
   const reviewMissed = (list: Row[]) => list.filter((r) => REVIEW_ST.includes(r.status) && waitMs(offCfg(), r, now) > r.review_sla_h * HOUR).map((r) => r.id);
   const submittedIn = cur.filter((r) => r.first_submitted_at).map((r) => r.id);
   const groundK = {
-    assigned: k(gC.assigned, undefined, gP.assigned), due: k(gC.due, undefined, gP.due), completed: k(gC.completed, gC.assigned, gP.completed, gP.assigned),
+    assigned: k(gC.assigned, undefined, gP.assigned), due: k(gC.due, undefined, gP.due), completed: k(gC.completed, gC.due, gP.completed, gP.due),
     onTime: k(gC.onTime, gC.due, gP.onTime, gP.due), late: k(gC.late, gC.due, gP.late, gP.due),
     overdue: k(gC.overdue, gC.due), missed: k(gC.missed, gC.due, gP.missed, gP.due),
     fta: k(gC.fta, gC.decided, gP.fta, gP.decided), returned: k(gC.returned, gC.decided, gP.returned, gP.decided),

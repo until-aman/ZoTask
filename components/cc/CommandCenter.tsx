@@ -30,23 +30,22 @@ function Health({ d }: { d: CC }) {
         <h3>Ground team</h3>
         <div className="kpis k5">
           <Tile label="Deadline passed" rate={false} k={{ ...g.due, prev: undefined }} unitNote="Done or not" target="In the period"
-            def={{ means: "Tasks in the period whose deadline is over, whether done or not", note: "This is the base for On time and Missed. Still to do: Overdue, not done. Cancelled tasks are left out." }} />
-          <Tile label="Tasks completed" rate={false} k={{ ...g.completed, prev: undefined }} unitNote="Submitted at least once" target={g.assigned.n ? `${share(g.completed.n, g.assigned.n)} scheduled` : undefined}
-            def={{ means: "Tasks submitted at least once, on time or late", calc: "Submitted tasks ÷ tasks scheduled in the period", note: "Includes tasks still in review." }} />
+            def={{ means: "Tasks in the period whose deadline is over, whether done or not", note: "Every Ground team figure counts only these tasks. Tasks whose deadline is still ahead aren't counted yet. Cancelled tasks are left out." }} />
+          <Tile label="Tasks completed" rate={false} k={{ ...g.completed, prev: undefined }} unitNote="Submitted at least once" target={share(g.completed.n, g.due.n)}
+            def={{ means: "Tasks past deadline that were submitted at least once, on time or late", calc: "Submitted tasks ÷ tasks past deadline", note: "Includes tasks still in review." }} />
           <Tile label="Completed on time" k={g.onTime} band={[85, 70]} target="Target 85%+" unitNote="Submitted by the deadline"
             def={{ means: "Tasks submitted by their deadline", calc: "Submitted on time ÷ tasks past deadline", note: "Cancelled tasks are left out." }} />
           <Tile label="Passed 1st attempt" k={g.fta} band={[80, 65]} target="Target 80%+" unitNote="Approved on the first review"
-            def={{ means: "Tasks approved at their first review", calc: "Approved first time ÷ tasks reviewed at least once", note: "Tasks still waiting for a first review are left out." }} />
+            def={{ means: "Tasks approved at their first review", calc: "Approved first time ÷ tasks past deadline reviewed at least once", note: "Tasks still waiting for a first review are left out." }} />
           <Tile label="Tasks missed" k={g.missed} band={[5, 10]} goodUp={false} target="Target under 5%" unitNote="Never submitted"
             def={{ means: "Tasks never submitted, even in the grace period", calc: "Missed ÷ tasks past deadline", note: "Lower is better." }} />
         </div>
         <div className="minis">
-          <Mini label="Scheduled" k={g.assigned} def={{ means: "All tasks scheduled in the period, including ones whose deadline hasn't come yet", note: "Cancelled tasks are left out." }} />
           <Mini label="Done late" k={g.late} tone="a" def={{ means: "Submitted, but after the deadline" }} />
           <Mini label="Overdue, not done" k={g.overdue} tone="a" def={{ means: "Past the deadline, not submitted, grace period still running", note: "These can still be saved today. Remind the owner." }} />
-          <Mini label="Sent back for fixes" k={g.returned} def={{ means: "Tasks a reviewer sent back for changes at least once" }} />
-          <Mini label="Resubmitted" k={g.resubmitted} def={{ means: "Tasks submitted again after a reviewer asked for changes", calc: "Resubmitted ÷ tasks sent back for fixes", note: "A sent-back task that isn't resubmitted is still being fixed, or ran out of time." }} />
-          <Mini label="Sent back 2+ times" k={g.repeat} tone="r" def={{ means: "Tasks sent back two or more times", note: "A sign of a training or process problem." }} />
+          <Mini label="Sent back for fixes" k={g.returned} def={{ means: "Tasks past deadline that a reviewer sent back for changes at least once" }} />
+          <Mini label="Resubmitted" k={g.resubmitted} def={{ means: "Tasks past deadline submitted again after a reviewer asked for changes", calc: "Resubmitted ÷ tasks sent back for fixes", note: "A sent-back task that isn't resubmitted is still being fixed, or ran out of time." }} />
+          <Mini label="Sent back 2+ times" k={g.repeat} tone="r" def={{ means: "Tasks past deadline sent back two or more times", note: "A sign of a training or process problem." }} />
         </div>
       </section>
       <section className="card score">
