@@ -1501,3 +1501,17 @@ th,.sortbtn{white-space:normal}
   .tbl.cards>table>tbody>tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
   .tbl.cards>table>tbody>tr>td:first-child,.tbl.cards>table>tbody>tr>td:first-child:has(>input[type=checkbox])+td,.tbl.cards>table>tbody>tr.xrow>td{grid-column:1 / -1}
 }
+
+/* Small metrics (the row under each scorecard, and the outcome legend) as separate pills, spread evenly across the row. */
+.minis,.hbands .minis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:10px}
+.mini{display:flex;align-items:center;gap:8px;min-width:0;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunken);font-size:12px;font-weight:500;color:var(--text)}
+.mini>b{font-size:14px;font-weight:600;line-height:20px}
+.mini>span:not(.tip){flex:1;min-width:0;line-height:1.25}
+.mini .tip{margin-left:auto;flex:none}
+.mini.click:hover,.mini.click:focus-visible{border-color:var(--accent);background:var(--accent-soft)}
+.outcome .legend{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.outcome .lgw{justify-content:space-between;gap:6px;padding:4px 6px 4px 8px;border:1px solid var(--line);border-radius:10px;background:var(--sunken)}
+.outcome .lgw .lg{font-size:12px}
+.outcome .lgw .lg:hover:not(:disabled){background:none;color:var(--accent-text)}
+@media (max-width:420px){.minis,.hbands .minis{grid-template-columns:repeat(2,minmax(0,1fr))}.mini{padding-left:10px}}
+.hbands .score{margin-bottom:8px}
